@@ -214,13 +214,22 @@
                                             @hasanyrole('super-admin')
                                             <select name="source" id="source" class="form-control" required>
                                                 @foreach($sources as $source)
-                                                    <option {{($ticket->source_id AND $ticket->source_id == $source->id) ? 'selected' : ''}} value="{{$source->id}}">{{$source->name}}</option>
+                                                    <option
+                                                        {{($ticket->source_id AND $ticket->source_id == $source->id) ? 'selected' : ''}} value="{{$source->id}}">{{$source->name}}</option>
                                                 @endforeach
                                             </select>
                                             @else
                                                 {{isset($ticket->source_id) ? $ticket->source->name : '-'}}
                                                 @endhasanyrole
                                         </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Preferred time to call</th>
+                                        <td> {{ $ticket->preferred_time ?? '-' }} </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Remarks</th>
+                                        <td style="text-align: justify;"> {{ $ticket->remarks ?? '-' }} </td>
                                     </tr>
                                     @hasrole('super-admin')
                                     @if ($ticket->method)
@@ -399,17 +408,19 @@
                                     @foreach($path as $key2 => $pathDetails)
                                         <!-- timeline item -->
                                         <div>
-                                            <i class="{{ Config::get('constants.status_icons.' . $pathDetails->nextStatus->slug) }}" style="background-color: {{ Config::get('constants.status_colors.' . $pathDetails->nextStatus->slug) }}; color: white;"></i>
+                                            <i class="{{ Config::get('constants.status_icons.' . $pathDetails->nextStatus->slug) }}"
+                                               style="background-color: {{ Config::get('constants.status_colors.' . $pathDetails->nextStatus->slug) }}; color: white;"></i>
                                             <div class="timeline-item">
                                                 <span class="time" style="font-size: 16px;"><i class="fas fa-clock"></i> {{$pathDetails->created_at->format('h:i:s A')}}</span>
                                                 <h3 class="timeline-header">
                                                     @hasanyrole('super-admin|sales-manager')
-                                                        <a target="_blank" href="{{ ($pathDetails->next_user) ? route('users.edit', $pathDetails->next_user) : '#' }}">
-                                                            {{ isset($pathDetails->nextUser) ? $pathDetails->nextUser->name : '-' }}
-                                                        </a>
+                                                    <a target="_blank"
+                                                       href="{{ ($pathDetails->next_user) ? route('users.edit', $pathDetails->next_user) : '#' }}">
+                                                        {{ isset($pathDetails->nextUser) ? $pathDetails->nextUser->name : '-' }}
+                                                    </a>
                                                     @else
                                                         <b class="text-primary">{{ $pathDetails->nextUser ? $pathDetails->nextUser->name : '-' }}</b>
-                                                    @endhasanyrole
+                                                        @endhasanyrole
                                                 </h3>
 
                                                 <div class="timeline-body">
@@ -417,7 +428,8 @@
                                                         <li>
                                                             <b>Previous Status:</b>
                                                             @if(isset($pathDetails->prevStatus))
-                                                                <span style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $pathDetails->prevStatus->slug) }}"
+                                                                <span
+                                                                    style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $pathDetails->prevStatus->slug) }}"
                                                                     class="badge">
                                                                 {{ $pathDetails->prevStatus->name }}
                                                                 </span>
@@ -428,7 +440,8 @@
                                                         <li>
                                                             <b>Current status:</b>
                                                             @if(isset($pathDetails->nextStatus))
-                                                                <span style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $pathDetails->nextStatus->slug) }}"
+                                                                <span
+                                                                    style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $pathDetails->nextStatus->slug) }}"
                                                                     class="badge">
                                                                 {{ $pathDetails->nextStatus->name }}
                                                                 </span>
@@ -445,12 +458,13 @@
                                                             </li>
                                                         @endif
                                                         @hasrole('super-admin|sales-manager')
-                                                            <li>
-                                                                <b>Previous User:</b>
-                                                                <a target="_blank" href="{{ $pathDetails->prevUser ? route('users.edit', $pathDetails->prevUser) : '#' }}">
-                                                                    {{$pathDetails->prevUser ? $pathDetails->prevUser->name : '-'}}
-                                                                </a>
-                                                            </li>
+                                                        <li>
+                                                            <b>Previous User:</b>
+                                                            <a target="_blank"
+                                                               href="{{ $pathDetails->prevUser ? route('users.edit', $pathDetails->prevUser) : '#' }}">
+                                                                {{$pathDetails->prevUser ? $pathDetails->prevUser->name : '-'}}
+                                                            </a>
+                                                        </li>
                                                         @endhasrole
                                                         <li><b>Comment:</b><br>
                                                             <p style="text-align: justify">
@@ -485,7 +499,6 @@
                         <h4 style="text-align: center;">Your role on this lead has end! Thank you.</h4>
                     </div>
 
-
                 @else
                     <div class="row mt-4">
                         <div class="col-12">
@@ -517,7 +530,8 @@
                                                         <option value="-1" disabled selected>Please select..</option>
                                                         @foreach($statuses as $status)
                                                             @if($status->slug === 'reviewed')
-                                                                <option value="{{$status->id}}">{{$status->name}}</option>
+                                                                <option
+                                                                    value="{{$status->id}}">{{$status->name}}</option>
                                                             @endif
                                                         @endforeach
                                                     </select>
@@ -529,7 +543,8 @@
                                                             </option>
                                                             @foreach($statuses as $status)
                                                                 @if($status->slug === 'pre-approved' OR $status->slug === 'rejected')
-                                                                    <option value="{{$status->id}}">{{$status->name}}</option>
+                                                                    <option
+                                                                        value="{{$status->id}}">{{$status->name}}</option>
                                                                 @endif
                                                             @endforeach
                                                         </select>
@@ -541,16 +556,17 @@
                                                                 @foreach($statuses as $status)
                                                                     @if($status->slug === 'approved')
                                                                         @unlessrole('super-admin')
-                                                                            @continue
+                                                                        @continue
                                                                         @endunlessrole
                                                                     @endif
                                                                     @if($status->slug != 'new' AND $status->id == $ticket->status->id AND $status->slug !== 'follow-up')
-                                                                         @continue
+                                                                        @continue
                                                                     @endif
                                                                     @if($status->slug === 'pre-approved' AND !auth()->user()->hasAnyRole(['super-admin', 'sales-manager']))
                                                                         @continue
                                                                     @endif
-                                                                    <option value="{{$status->id}}">{{$status->name}}</option>
+                                                                    <option
+                                                                        value="{{$status->id}}">{{$status->name}}</option>
                                                                 @endforeach
                                                             </select>
                                                             @endhasrole
@@ -568,11 +584,26 @@
                                             <div class="form-group">
                                                 <label for="user">Assign to</label><sup>*</sup>
                                                 <select name="user" id="user" class="form-control" required>
-                                                    @foreach($users as $user)
-                                                        <option value="{{$user->id}}" {{ ($ticket->user !== null && $user->id === $ticket->user->id) ? 'selected' : '' }}>{{$user->name}}
-                                                            ({{$user->role}})
-                                                        </option>
-                                                    @endforeach
+                                                    <optgroup label="Sales">
+                                                        @foreach($users as $user)
+                                                            @if ($user->role === 'sale')
+                                                                <option value="{{$user->id}}"
+                                                                    {{ ($ticket->user !== null && $user->id === $ticket->user->id) ? 'selected' : '' }}>
+                                                                    {{$user->name}}
+                                                                </option>
+                                                            @endif
+                                                        @endforeach
+                                                    </optgroup>
+                                                    <optgroup label="Tele-Sales">
+                                                        @foreach($users as $user)
+                                                            @if ($user->role === 'tele-sale')
+                                                                <option value="{{$user->id}}"
+                                                                    {{ ($ticket->user !== null && $user->id === $ticket->user->id) ? 'selected' : '' }}>
+                                                                    {{$user->name}}
+                                                                </option>
+                                                            @endif
+                                                        @endforeach
+                                                    </optgroup>
                                                 </select>
                                             </div>
                                             @endhasanyrole
@@ -597,7 +628,8 @@
                                                         </div>
                                                         <div class="form-group">
                                                             <label for="client-unit">Price</label><sup>*</sup>
-                                                            <input type="number" min="0" step="0.1" class="form-control" id="client-price"
+                                                            <input type="number" min="0" step="0.1" class="form-control"
+                                                                   id="client-price"
                                                                    name="client-price"/>
                                                         </div>
                                                         <div class="form-group">
@@ -644,7 +676,7 @@
                                                             <div class="input-group">
                                                                 <div class="input-group-prepend">
                                                                     <span class="input-group-text"><i
-                                                                                class="far fa-clock"></i></span>
+                                                                            class="far fa-clock"></i></span>
                                                                 </div>
                                                                 <input type="text" name="datetimes"
                                                                        class="form-control float-right"

@@ -62,21 +62,15 @@ class TicketController extends Controller
             return abort(404);
         }
 
-        $sale = $request->query('sales');
-        $status = $request->query('fstatus');
-        $camp = $request->query('camp');
-        $from = $request->query('from');
-        $to = $request->query('to');
-        $fullName = $request->query('fullName');
-        $phone = $request->query('phone');
+        $filterParams = $this->leadsHelper->getLeadsFilterParams($request);
 
         $leadId = $request->query('lead_id');
 
         $tickets = null;
 
         // Status filter
-        if (isset($status) && !empty($status) && $status !== 'all') {
-            $theStatus = Status::whereSlug($status)->first();
+        if (isset($filterParams['status']) && !empty($filterParams['status']) && $filterParams['status'] !== 'all') {
+            $theStatus = Status::whereSlug($filterParams['status'])->first();
             $tickets = Ticket::whereStatusId($theStatus->id);
 
             if (auth()->user()->hasRole('admin')) {
@@ -86,7 +80,7 @@ class TicketController extends Controller
                     ->toArray();
 
                 $tickets = Ticket::whereIn('status_id', $statuses);
-            } else if (auth()->user()->hasRole('accountant') and ($status !== 'booking' and $status !== 'approved' and $status !== 'sold')) {
+            } else if (auth()->user()->hasRole('accountant') and ($filterParams['status'] !== 'booking' and $filterParams['status'] !== 'approved' and $filterParams['status'] !== 'sold')) {
                 $statuses = Status::whereIn('slug', ['approved', 'sold'])
                     ->get()
                     ->pluck('id')
@@ -141,36 +135,36 @@ class TicketController extends Controller
         }
 
         // Sales filter
-        if (($sale and $sale !== '' and $sale !== 'all')) {
-            $tickets = $tickets->where('user_id', '=', $sale);
+        if (($filterParams['sale'] and $filterParams['sale'] !== '' and $filterParams['sale'] !== 'all')) {
+            $tickets = $tickets->where('user_id', '=', $filterParams['sale']);
         }
 
         // Campaign filter
-        if (($camp and $camp !== '')) {
-            $tickets = $tickets->where('campaign_name', 'LIKE', "%{$camp}%");
+        if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
+            $tickets = $tickets->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
         }
 
         // Created at from & to filters
-        if (($from and $from !== '') and ($to and $to !== '')) {
-            $from = date($from);
-            $to = date($to);
+        if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
+            $from = date($filterParams['from'] . ' 00:00:00');
+            $to = date($filterParams['to'] . ' 23:59:59');
             $tickets = $tickets->whereBetween('created_at', [$from, $to]);
-        } else if (($from and $from !== '') and (!$to or $to == '')) {
-            $from = date($request->from);
+        } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
+            $from = date($filterParams['from'] . ' 00:00:00');
             $tickets = $tickets->where('created_at', '>=', $from);
-        } else if ((!$from or $from == '') and ($to and $to !== '')) {
-            $to = date($request->to);
+        } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
+            $to = date($filterParams['to'] . ' 23:59:59');
             $tickets = $tickets->where('created_at', '<=', $to);
         }
 
         // Person Full_name filter
-        if (($fullName and $fullName !== '')) {
-            $tickets = $tickets->where('full_name', 'LIKE', "%{$fullName}%");
+        if (($filterParams['fullName'] and $filterParams['fullName'] !== '')) {
+            $tickets = $tickets->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
         }
 
         // Person phone filter
-        if (($phone and $phone !== '')) {
-            $tickets = $tickets->where('phone_number', 'LIKE', "%{$phone}%");
+        if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
+            $tickets = $tickets->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
         }
 
         if (!auth()->user()->hasRole('super-admin')) {
@@ -183,7 +177,7 @@ class TicketController extends Controller
 
         $tickets = $tickets->orderBy('created_at', 'DESC')->with('user')
             //->get();
-            ->paginate(15)
+            ->paginate(50)
             ->appends(request()->query());
 
         //dd($tickets);
@@ -211,9 +205,13 @@ class TicketController extends Controller
 
         $sales = null;
         if (auth()->user()->hasRole('super-admin')) {
-            $sales = User::role(['sale', 'tele-sale'])->get();
+            $sales = User::role(['sale', 'tele-sale'])
+                ->where('status', 'permitted')
+                ->get();
         } elseif (auth()->user()->hasRole('sales-manager')) {
-            $sales = User::whereManagerId(auth()->user()->id)->get();
+            $sales = User::whereManagerId(auth()->user()->id)
+                ->where('status', 'permitted')
+                ->get();
         }
 
         $fUpStatus = Status::whereSlug('follow-up')->first();
@@ -236,10 +234,10 @@ class TicketController extends Controller
             'sales' => $sales,
             'tickets' => $tickets,
             'statuses' => $statuses,
-            'currentStatus' => $status,
-            'currentSale' => $sale,
-            'from' => $from,
-            'to' => $to
+            'currentStatus' => $filterParams['status'],
+            'currentSale' => $filterParams['sale'],
+            'from' => $filterParams['from'],
+            'to' => $filterParams['to']
         ];
 
         session()->flashInput($request->input());
@@ -272,7 +270,9 @@ class TicketController extends Controller
         $users = null;
 
         if (!auth()->user()->hasAnyRole(['sale', 'tele-sale'])) {
-            $users = User::role('sale')->get();
+            $users = User::role(['sale', 'tele-sale'])
+                ->where('status', 'permitted')
+                ->get();
 
             foreach ($users as $key => $user) {
                 $user->role = count($user->roles) > 0 ? $user->roles[0]->name : '-';
@@ -288,7 +288,11 @@ class TicketController extends Controller
 
         $sources = Source::all();
 
-        return view('tickets.create')->with(['statuses' => $statuses, 'users' => $users, 'sources' => $sources]);
+        return view('tickets.create')->with([
+            'statuses' => $statuses,
+            'users' => $users,
+            'sources' => $sources
+        ]);
     }
 
     /**
@@ -308,6 +312,8 @@ class TicketController extends Controller
             'phone_number' => ['required', 'string', 'max:255'],
             'source' => ['required', 'integer', 'gt:0'],
             'user' => ['nullable', 'integer', 'gt:0'],
+            'preferred_time' => ['required', 'string', 'max:255'],
+            'remarks' => ['required', 'string', 'max:65535 '],
         ];
 
         $messages = [
@@ -355,13 +361,15 @@ class TicketController extends Controller
         $newTicket = Ticket::create([
             'campaign_name' => $request->campaign_name,
             'full_name' => $request->full_name,
-            'email' => isset($request->email) ? $request->email : null,
+            'email' => $request->email ?? null,
             'phone_number' => $request->phone_number,
             'user_id' => $user->id,
             'source_id' => $source->id,
             'status_id' => $statusNew->id,
             'assigner_id' => auth()->user()->id,
-            'method' => 'Manual'
+            'method' => 'Manual',
+            'preferred_time' => $request->preferred_time ?? null,
+            'remarks' => $request->remarks ?? null,
         ]);
 
         $dupLead = Ticket::wherePhoneNumber($request->phone_number)
@@ -440,7 +448,9 @@ class TicketController extends Controller
             return back()->withErrors(['msg' => 'Unauthorised Access.']);
         }
 
-        $users = User::role('sale')->get();
+        $users = User::role(['sale', 'tele-sale'])
+            ->where('status', 'permitted')
+            ->get();
 
         foreach ($users as $user) {
             $user->role = count($user->roles) > 0 ? $user->roles[0]->name : '-';
@@ -734,7 +744,8 @@ class TicketController extends Controller
         /// View leads
         if ($request->operation === 'view') {
             $rules = [
-                'file' => 'required|mimes:csv,txt,xlx,xls,pdf|max:2048',
+                'file' => 'required',
+                'file.*' => 'file|mimes:csv,xls,xlsx|max:2048'
             ];
 
             $messages = [
@@ -764,14 +775,19 @@ class TicketController extends Controller
                         'form_name',
                         'is_organic',
                         'platform',
-                        'full_name',
+                        'interested_in',
+                        'preferred_time',
                         'phone_number',
+                        'full_name',
                         'email',
-                        'job_title',
-                        'city',
                     ];
 
+                    if (sizeof($array[0]) === 0) {
+                        return back()->withErrors(['msg' => 'File is empty.'])->withInput($request->all());
+                    }
+
                     $file_cols = array_keys($array[0][0]);
+//                    dd($file_cols);
 
                     if ($cols !== $file_cols) {
                         return back()->withErrors(['msg' => 'Invalid file columns.'])->withInput($request->all());
@@ -781,15 +797,16 @@ class TicketController extends Controller
                     $leads = [];
 
                     foreach ($array as $row) {
-                        $row['id'] = trim(explode(':', $row['id'])[1]);
-                        $row['ad_id'] = trim(explode(':', $row['ad_id'])[1]);
-                        $row['adset_id'] = trim(explode(':', $row['adset_id'])[1]);
-                        $row['campaign_id'] = trim(explode(':', $row['campaign_id'])[1]);
-                        $row['form_id'] = trim(explode(':', $row['form_id'])[1]);
-                        $row['phone_number'] = trim(explode(':', $row['phone_number'])[1]);
+                        $row['id'] = $this->removeColon($row['id']);
+                        $row['ad_id'] = $this->removeColon($row['ad_id']);
+                        $row['adset_id'] = $this->removeColon($row['adset_id']);
+                        $row['campaign_id'] = $this->removeColon($row['campaign_id']);
+                        $row['form_id'] = $this->removeColon($row['form_id']);
+                        $row['preferred_time'] = $this->removeColon($row['preferred_time']);
+                        $row['interested_in'] = $this->removeColon($row['interested_in']);
 
                         // Phone number
-                        $row['phone_number'] = $this->rectifyPhone($row['phone_number']);
+                        $row['phone_number'] = $this->rectifyPhone($this->removeColon($row['phone_number']));
 
                         $lead = [
                             'number' => $row['id'],
@@ -806,9 +823,11 @@ class TicketController extends Controller
                             'full_name' => $row['full_name'],
                             'phone_number' => $row['phone_number'],
                             'email' => $row['email'],
-                            'job_title' => $row['job_title'],
+                            'job_title' => $row['job_title'] ?? null,
                             'created_time' => date('Y-m-d H:i:s', strtotime($row['created_time'])),
                             'source' => $row['platform'],
+                            'preferred_time' => $row['preferred_time'],
+                            'remarks' => $row['interested_in'],
                             'created_at' => Carbon::now(),
                             'updated_at' => Carbon::now(),
                         ];
@@ -816,7 +835,7 @@ class TicketController extends Controller
                         $leads[] = $lead;
                     }
                 } catch (\Exception $e) {
-                    return back()->withErrors(['msg' => 'Invalid file columns.'])->withInput($request->all());
+                    return back()->withErrors(['msg' => 'Invalid file.'])->withInput($request->all());
                 }
 
                 Cache::put('leads', $leads, 10);
@@ -859,93 +878,7 @@ class TicketController extends Controller
                 $leads[] = $lead;
             }
 
-            $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])
-                ->get()
-                ->pluck('id')
-                ->toArray();
-
-            $users = User::role('sale')
-                ->whereStatus('available')
-                ->whereHas('tickets', function ($query) use ($statuses) {
-                    $query->whereIn('status_id', $statuses);
-                })
-                ->with('tickets')
-                ->get();
-
-            $usersNoTickets = User::role('sale')
-                ->whereDoesntHave('tickets')
-                ->get();
-
-            $users = $users->merge($usersNoTickets);
-
-            $userCounts = [];
-
-            foreach ($users as $key => $user) {
-                $userCounts += [$user->id => count($user->tickets)];
-            }
-
-            asort($userCounts);
-            $userCounts = array_keys($userCounts);
-
-            $startPos = 0;
-            foreach ($leads as $key => $lead) {
-                if ($lead->status_id === $duplicateStatus) {
-                    $lead->user_id = null;
-                    $lead->save();
-                    continue;
-                }
-
-                // $ticket->user_id = $userCounts[$startPos]; // No auto distribute
-                $lead->user_id = null;
-
-                $startPos++;
-
-                if ($startPos === count($userCounts)) {
-                    $startPos = 0;
-                }
-
-                $lead->save();
-
-                $ticketPath = TicketPath::create([
-                    // 'next_user' => $ticket->user_id,
-                    'next_user' => null,
-                    'next_status' => $newStatus,
-                    'ticket_id' => $lead->id,
-                    'comment' => 'Initial ticket creation.',
-                ]);
-
-                $ticketPath->save();
-
-                // Notify Users
-                $user = User::find($lead->user_id);
-
-                // Super admin
-                $data = [
-                    'title' => 'New Lead',
-                    'message' => $lead->user_id != null ? 'A new lead has been assigned by by super-admin to user: ' : 'A new lead has been added to lead centre',
-                    'user' => $lead->user_id != null ? $user->name : '',
-                    'ticket' => $lead->id
-                ];
-
-                $superAdmins = User::role('super-admin')
-                    ->get()
-                    ->pluck('email')
-                    ->toArray();
-
-                Mail::to($superAdmins)->send(new LeadNotifyMail($data));
-
-                if ($lead->user_id != null) {
-                    // User himself
-                    $data = [
-                        'title' => 'New Lead',
-                        'message' => 'A new lead has been assigned by super-admin to you!',
-                        'user' => '',
-                        'ticket' => $lead->id
-                    ];
-
-                    Mail::to($user->email)->send(new LeadNotifyMail($data));
-                }
-            }
+            $this->leadsHelper->initiateImport($leads);
 
             return redirect()->route('tickets.all');
         }
@@ -994,13 +927,13 @@ class TicketController extends Controller
                 'campaign_id' => $row['campaign_id'],
                 'campaign_name' => $row['campaign_name'],
                 'form_id' => $row['form_id'],
-                'form_name' => isset($row['form_name']) ? $row['form_name'] : '',
-                'is_organic' => isset($row['is_organic']) ? $row['is_organic'] : '',
+                'form_name' => $row['form_name'] ?? '',
+                'is_organic' => $row['is_organic'] ?? '',
                 'platform' => $row['platform'],
                 'full_name' => $row['full_name'],
                 'phone_number' => $row['phone_number'],
                 'email' => $row['email'],
-                'job_title' => isset($row['job_title']) ? $row['job_title'] : '',
+                'job_title' => $row['job_title'] ?? '',
                 'status_id' => $newStatus,
                 'source_id' => $row['platform'] === 'ig' ? Source::where('name', 'Instagram')->first()->id : ($row['platform'] === 'fb' ? Source::where('name', 'Facebook')->first()->id : Source::where('name', 'Unspecified')->first()->id),
                 'assigner_id' => auth()->user()->id,
@@ -1019,7 +952,8 @@ class TicketController extends Controller
             $tickets[] = $ticket;
         }
 
-        $fbHelper->initiateImport($tickets);
+        $leadsHelper->initiateImport($tickets);
+        $leadsHelper->emptyFBLeadsSheet(count($tickets));
 
         return response()->json(['OK' => count($posts)], 200);
     }
@@ -1165,7 +1099,7 @@ class TicketController extends Controller
                 $ticketUser->save();
             } else {
                 if ($ticketUser and $ticketUser->status === 'banned') {
-                    $ticketUser->status = 'available';
+                    $ticketUser->status = 'permitted';
                     $ticketUser->save();
                 }
             }
@@ -1215,6 +1149,15 @@ class TicketController extends Controller
         }
 
         return back()->withErrors(['msg' => 'Unable to move ticket forward.'])->withInput($request->all());
+    }
+
+    function removeColon($inputString)
+    {
+        if (str_contains($inputString, ':')) {
+            return trim(explode(':', $inputString)[1]);
+        } else {
+            return $inputString;
+        }
     }
 
     function rectifyPhone($phoneNumber)
@@ -1339,7 +1282,7 @@ class TicketController extends Controller
     public function downloadAttachment($type, $id)
     {
         if ($type === 'excel_temp') {
-            $pathToFile = storage_path('app/public/uploads/excel_template.csv');
+            $pathToFile = storage_path('app/public/uploads/Excel_file_template.csv');
         } else {
             $ticket = Ticket::findOrFail($id);
 
@@ -1382,7 +1325,7 @@ class TicketController extends Controller
         }
 
         $rules = [
-            'sales' => ['required', 'integer', Rule::in(User::role(['sale'])->get()->pluck('id')->toArray())],
+            'sales' => ['required', 'integer', Rule::in(User::role(['sale', 'tele-sale'])->get()->pluck('id')->toArray())],
             'lead_ids' => 'required|array|min:1',
             'lead_ids.*' => 'required|integer|gt:0',
         ];
@@ -1400,24 +1343,27 @@ class TicketController extends Controller
             return back()->withErrors($validator->errors())->withInput($request->all());
         }
 
-        $reShuffledId = Status::where('slug', 're-shuffled')->first()->id;
+        // $reShuffledId = Status::where('slug', 're-shuffled')->first()->id;
+        $newStatusId = Status::where('slug', 'new')->first()->id;
 
         foreach ($request->lead_ids as $lead_id) {
             $lead = Ticket::findOrFail($lead_id);
             $lead->user_id = $request->sales;
-            $lead->status_id = $reShuffledId;
+            $lead->status_id = $newStatusId; // Changed to New (1/9/2022)
 
             $tPath = TicketPath::where('ticket_id', $lead->id)
                 ->orderBy('updated_at', 'DESC')
                 ->first();
 
+            // Check whether all tickets should go to Tele-sales or not?!
+
             $leadPath = TicketPath::create([
                 'prev_user' => $tPath->next_user,
                 'next_user' => $request->sales,
-                'prev_status' => $tPath->next_status,
-                'next_status' => $reShuffledId,
+                'prev_status' => $tPath->next_status, // Check
+                'next_status' => $newStatusId, // Check what to put???
                 'ticket_id' => $lead->id,
-                'comment' => 'Re-forwarded by admin.',
+                'comment' => 'A new lead has been assigned to you by a super-admin.',
             ]);
 
             $lead->save();

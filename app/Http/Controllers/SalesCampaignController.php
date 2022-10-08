@@ -30,7 +30,7 @@ class SalesCampaignController extends Controller
     {
         return view('salesCamps.index')->with([
             'salesCamps' => SalesCampaign::all(),
-            'sales' => User::role(['sale'])->get(),
+            'sales' => User::role(['sale', 'tele-sale'])->get(),
             'use_camps' => boolval(GeneralSettings::whereName('use_camps')->first()->value),
         ]);
     }
@@ -66,7 +66,9 @@ class SalesCampaignController extends Controller
     public function store(Request $request)
     {
         $rules = [
-            'sales' => ['required', 'integer', Rule::in(User::role(['sale'])->get()->pluck('id')->toArray())],
+            'sales' => ['required', 'integer', Rule::in(User::role(['sale', 'tele-sale'])
+                ->pluck('id')
+                ->toArray())],
             'campaign_name' => ['required', 'string', 'max:255'],
         ];
 

@@ -50,6 +50,8 @@ class CreateTicketsTable extends Migration
                 ->constrained('users')
                 ->onUpdate('cascade');
             $table->string('method')->nullable();
+            $table->string('preferred_time')->nullable();
+            $table->text('remarks')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

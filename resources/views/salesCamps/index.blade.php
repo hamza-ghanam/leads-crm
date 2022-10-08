@@ -99,11 +99,24 @@
                                         <div class="form-group">
                                             <label for="client-unit">Sales employee</label><sup>*</sup>
                                             <select name="sales" id="sales" class="form-control" required>
-                                                @foreach($sales as $salesEmp)
-                                                    <option value="{{ $salesEmp->id }}">
-                                                        {{ $salesEmp->name }}
-                                                    </option>
-                                                @endforeach
+                                                <optgroup label="Sales">
+                                                    @foreach($sales as $user)
+                                                        @if ($user->getRoleNames()[0] === 'sale')
+                                                            <option value="{{$user->id}}">
+                                                                {{$user->name}}
+                                                            </option>
+                                                        @endif
+                                                    @endforeach
+                                                </optgroup>
+                                                <optgroup label="Tele-Sales">
+                                                    @foreach($sales as $user)
+                                                        @if ($user->getRoleNames()[0] === 'tele-sale')
+                                                            <option value="{{$user->id}}">
+                                                                {{$user->name}}
+                                                            </option>
+                                                        @endif
+                                                    @endforeach
+                                                </optgroup>
                                             </select>
                                         </div>
                                     </div>

@@ -28,6 +28,7 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         //
     ];
+
     /**
      * Define the application's command schedule.
      *
@@ -91,6 +92,7 @@ class Kernel extends ConsoleKernel
             /**** New Method (15/05/2022) ****/
             /**** Call helper function (03/09/2022) ****/
             $leadsHelper->initiateImport($tickets);
+            $leadsHelper->emptyFBLeadsSheet(count($tickets));
 
 
             /* Old Method
@@ -289,17 +291,77 @@ class Kernel extends ConsoleKernel
                 return;
             }
 
-            $statuses = Status::whereIn('slug', ['new', 'follow-up', 're-shuffled'])
+            $statuses = Status::whereIn('slug', ['new', 'follow-up'])  // re-shuffled has been removed 12/9/2022
                 ->get()
                 ->pluck('id')
                 ->toArray();
 
-            $reShuffledId = Status::where('slug', 're-shuffled')->first()->id;
+            // $reShuffledId = Status::where('slug', 're-shuffled')->first()->id;
 
             //// 01. Status: NEW (3 Hours)
             $newStatusId = Status::where('slug', 'new')->first()->id;
             $tickets = Ticket::where('status_id', $newStatusId)->get();
 
+            /** New method 11/9/2022 */
+            $teleSales = User::role('tele-sale')
+                ->where('status', 'permitted')
+                ->get();
+
+            $teleUserCounts = [];
+            foreach ($teleSales as $key => $teleSale) {
+                $tCount = Ticket::where('user_id', $teleSale->id)
+                    ->whereIn('status_id', $statuses)
+                    ->count();
+                $teleUserCounts += [$teleSale->id => $tCount];
+            }
+            asort($teleUserCounts);
+            $teleUserCounts = array_keys($teleUserCounts);
+
+            $startPos = 0;
+            foreach ($tickets as $key => $ticket) {
+                $tPath = TicketPath::where('ticket_id', $ticket->id)
+                    ->where('next_status', $newStatusId)
+                    ->orderBy('updated_at', 'DESC')
+                    ->first();
+
+                $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
+                $endTime = Carbon::now();
+                $diffHours = $endTime->diffInHours($startTime);
+
+                if ($diffHours >= 3) {
+                    $oldUser = User::find($ticket->user_id);
+
+                    // Lead now is with Sales => tele-sales
+                    if ($oldUser->getRoleNames()[0] === 'sale' || $oldUser->getRoleNames()[0] === 'sales-senior') {
+                        $ticket->user_id = $teleUserCounts[$startPos];
+                        $startPos++;
+                    } // Lead is now with tele-sales => tele-sales manager
+                    else if ($oldUser->getRoleNames()[0] === 'tele-sale') {
+                        $salesManager = User::find($oldUser->manager_id);
+                        $ticket->user_id = $salesManager->id;
+                    }
+
+                    $ticket->save();
+
+                    // Check whether all tickets should go to Tele-sales or not?!
+                    $ticketPath = TicketPath::create([
+                        'prev_user' => $tPath->next_user,
+                        'next_user' => $ticket->user_id,
+                        'prev_status' => $newStatusId, // Check
+                        'next_status' => $newStatusId, // Check
+                        'ticket_id' => $ticket->id,
+                        'comment' => 'Back from NEW after 3 hours inactive.',
+                    ]);
+                    $ticketPath->save();
+
+                    if ($startPos === count($teleUserCounts)) {
+                        $startPos = 0;
+                    }
+                }
+            }
+
+            /** Old Method, stopped at 11/9/2022 */
+            /*
             // Junior
             $jrUsers = User::role('sale')->where('status', 'permitted')->get();
             $jrUserCounts = [];
@@ -403,42 +465,36 @@ class Kernel extends ConsoleKernel
                     }
                 }
             }
+            */
 
+            /** Stopped at 9/11/022 */
             //// 02. Status: Follow Up (15 days)
             $followUpStatus = Status::where('slug', 'follow-up')->first()->id;
             $tickets = Ticket::where('status_id', $followUpStatus)->get();
 
-            $statuses = Status::whereIn('slug', ['new', 'follow-up', 're-shuffled'])->get()->pluck('id')->toArray();
+            $statuses = Status::whereIn('slug', ['new', 'follow-up'])
+                ->get()
+                ->pluck('id')
+                ->toArray();
 
-            // Junior
-            $jrUsers = User::role('sale')->where('status', 'permitted')->get();
-            $jrUserCounts = [];
-            foreach ($jrUsers as $key => $user) {
-                $tCount = Ticket::where('user_id', $user->id)->whereIn('status_id', $statuses)->count();
-                $jrUserCounts += [$user->id => $tCount];
+            /** New method 11/9/2022 */
+            $teleSales = User::role('tele-sale')
+                ->where('status', 'permitted')
+                ->get();
+
+            $teleUserCounts = [];
+            foreach ($teleSales as $key => $teleSale) {
+                $tCount = Ticket::where('user_id', $teleSale->id)
+                    ->whereIn('status_id', $statuses)
+                    ->count();
+                $teleUserCounts += [$teleSale->id => $tCount];
             }
+            asort($teleUserCounts);
+            $teleUserCounts = array_keys($teleUserCounts);
 
-            asort($jrUserCounts);
-            $jrUserCounts = array_keys($jrUserCounts);
-
-            // Senior
-            $srUsers = User::role('sales-senior')->where('status', 'permitted')->get();
-            $srUserCounts = [];
-            foreach ($srUsers as $key => $user) {
-                $tCount = Ticket::where('user_id', $user->id)->whereIn('status_id', $statuses)->get();
-                $srUserCounts += [$user->id => $tCount];
-            }
-            asort($srUserCounts);
-            $srUserCounts = array_keys($srUserCounts);
-            $jrCount = count($srUserCounts) > 0 ? floor(count($tickets) / 3) : count($tickets);
-
-            // Junior Distribution
+            // Distribution
             $startPos = 0;
             foreach ($tickets as $key => $ticket) {
-                if ($key === $jrCount) {
-                    break;
-                }
-
                 $tPath = TicketPath::where('ticket_id', $ticket->id)
                     ->where('next_status', $followUpStatus)
                     ->orderBy('updated_at', 'DESC')
@@ -450,96 +506,52 @@ class Kernel extends ConsoleKernel
 
                 if ($diffDays >= 15) {
                     $oldUser = User::find($ticket->user_id);
-                    $ticket->user_id = $jrUserCounts[$startPos];
-                    $ticket->status_id = $reShuffledId;
+
+                    // Lead now is with Sales => tele-sales
+                    if ($oldUser->getRoleNames()[0] === 'sale' || $oldUser->getRoleNames()[0] === 'sales-senior') {
+                        $ticket->user_id = $teleUserCounts[$startPos];
+                        $startPos++;
+                    } // Lead is now with tele-sales => tele-sales manager
+                    else if ($oldUser->getRoleNames()[0] === 'tele-sale') {
+                        $salesManager = User::find($oldUser->manager_id);
+                        $ticket->user_id = $salesManager->id;
+                    }
+
+                    $ticket->status_id = $newStatusId;
                     $ticket->save();
 
                     $ticketPath = TicketPath::create([
                         'prev_user' => $oldUser->id,
-                        'next_user' => $jrUserCounts[$startPos],
+                        'next_user' => $teleUserCounts[$startPos],
                         'prev_status' => $followUpStatus,
-                        'next_status' => $reShuffledId,
+                        'next_status' => $newStatusId,
                         'ticket_id' => $ticket->id,
                         'comment' => 'Back from FOLLOW-UP after 15 days inactive.',
                     ]);
+
                     $ticketPath->save();
 
-                    /** Notify Users */
-                    $user = User::find($ticket->user_id);
+                    $data = [
+                        'title' => 'Back from FOLLOW-UP',
+                        'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ',
+                        'user' => $ticket->user->name,
+                        'ticket' => $ticket->id
+                    ];
 
-                    // Super admin
-                    $data = ['title' => 'Back from FOLLOW-UP', 'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ', 'user' => $user->name, 'ticket' => $ticket->id];
                     $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
                     Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
                     // User himself
                     $data = ['title' => 'Back from FOLLOW-UP', 'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                    Mail::to($user->email)->send(new LeadNotifyMail($data));
+                    Mail::to($ticket->user->email)->send(new LeadNotifyMail($data));
 
                     // Old User himself
                     $data = ['title' => 'Withdrawn Lead', 'message' => 'Lead has been automatically withdrawn from you!', 'user' => '', 'ticket' => $ticket->id];
                     Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
 
                     $startPos++;
-                    if ($startPos === count($jrUserCounts)) {
+                    if ($startPos === count($teleUserCounts)) {
                         $startPos = 0;
-                    }
-                }
-            }
-
-            // Senior Distribution
-            if (count($srUserCounts) > 0) {
-                $startPos = 0;
-                foreach ($tickets as $key => $ticket) {
-                    if ($key >= 0 and $key < $jrCount) {
-                        continue;
-                    }
-
-                    $tPath = TicketPath::where('ticket_id', $ticket->id)
-                        ->where('next_status', $followUpStatus)
-                        ->orderBy('updated_at', 'DESC')
-                        ->first();
-
-                    $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
-                    $endTime = Carbon::now();
-                    $diffDays = $startTime->diffInDays($endTime);
-
-                    if ($diffDays >= 15) {
-                        $oldUser = User::find($ticket->user_id);
-                        $ticket->user_id = $srUserCounts[$startPos];
-                        $ticket->status_id = $reShuffledId;
-                        $ticket->save();
-
-                        $ticketPath = TicketPath::create([
-                            'prev_user' => $tPath->next_user,
-                            'next_user' => $srUserCounts[$startPos],
-                            'prev_status' => $followUpStatus,
-                            'next_status' => $reShuffledId,
-                            'ticket_id' => $ticket->id,
-                            'comment' => 'Back from FOLLOW-UP after 15 days inactive.',
-                        ]);
-                        $ticketPath->save();
-
-                        /** Notify Users */
-                        $user = User::find($ticket->user_id);
-
-                        // Super admin
-                        $data = ['title' => 'Back from FOLLOW-UP', 'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ', 'user' => $user->name, 'ticket' => $ticket->id];
-                        $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-                        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
-
-                        // User himself
-                        $data = ['title' => 'Back from FOLLOW-UP', 'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                        Mail::to($user->email)->send(new LeadNotifyMail($data));
-
-                        // Old User himself
-                        $data = ['title' => 'Withdrawn Lead', 'message' => 'Lead has been automatically withdrawn from you!', 'user' => '', 'ticket' => $ticket->id];
-                        Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
-
-                        $startPos++;
-                        if ($startPos === count($jrUserCounts)) {
-                            $startPos = 0;
-                        }
                     }
                 }
             }
@@ -548,34 +560,24 @@ class Kernel extends ConsoleKernel
             $meetingStatus = Status::where('slug', 'meeting')->first()->id;
             $tickets = Ticket::where('status_id', $meetingStatus)->get();
 
-            // Junior
-            $jrUsers = User::role('sale')->where('status', 'permitted')->get();
-            $jrUserCounts = [];
-            foreach ($jrUsers as $key => $user) {
-                $tCount = Ticket::where('user_id', $user->id)->whereIn('status_id', $statuses)->count();
-                $jrUserCounts += [$user->id => $tCount];
-            }
-            asort($jrUserCounts);
-            $jrUserCounts = array_keys($jrUserCounts);
+            /** New method 11/9/2022 */
+            $teleSales = User::role('tele-sale')
+                ->where('status', 'permitted')
+                ->get();
 
-            // Senior
-            $srUsers = User::role('sales-senior')->where('status', 'permitted')->get();
-            $srUserCounts = [];
-            foreach ($srUsers as $key => $user) {
-                $tCount = Ticket::where('user_id', $user->id)->whereIn('status_id', $statuses)->get();
-                $srUserCounts += [$user->id => $tCount];
+            $teleUserCounts = [];
+            foreach ($teleSales as $key => $teleSale) {
+                $tCount = Ticket::where('user_id', $teleSale->id)
+                    ->whereIn('status_id', $statuses)
+                    ->count();
+                $teleUserCounts += [$teleSale->id => $tCount];
             }
-            asort($srUserCounts);
-            $srUserCounts = array_keys($srUserCounts);
-            $jrCount = count($srUserCounts) > 0 ? floor(count($tickets) / 3) : count($tickets);
+            asort($teleUserCounts);
+            $teleUserCounts = array_keys($teleUserCounts);
 
             // Junior Distribution
             $startPos = 0;
             foreach ($tickets as $key => $ticket) {
-                if ($key === $jrCount) {
-                    break;
-                }
-
                 $tPath = TicketPath::where('ticket_id', $ticket->id)
                     ->where('next_status', $meetingStatus)
                     ->orderBy('updated_at', 'DESC')
@@ -586,23 +588,31 @@ class Kernel extends ConsoleKernel
                 $diffDays = $startTime->diffInDays($endTime);
                 if ($diffDays >= 7) {
                     $oldUser = User::find($ticket->user_id);
-                    $ticket->user_id = $jrUserCounts[$startPos];
-                    $ticket->status_id = $reShuffledId;
+
+                    // Lead now is with Sales => tele-sales
+                    if ($oldUser->getRoleNames()[0] === 'sale' || $oldUser->getRoleNames()[0] === 'sales-senior') {
+                        $ticket->user_id = $teleUserCounts[$startPos];
+                        $startPos++;
+                    } // Lead is now with tele-sales => tele-sales manager
+                    else if ($oldUser->getRoleNames()[0] === 'tele-sale') {
+                        $salesManager = User::find($oldUser->manager_id);
+                        $ticket->user_id = $salesManager->id;
+                    }
+
+                    $ticket->status_id = $newStatusId;
                     $ticket->save();
                     $ticketPath = TicketPath::create([
                         'prev_user' => $tPath->next_user,
-                        'next_user' => $jrUserCounts[0],
+                        'next_user' => $teleUserCounts[0],
                         'prev_status' => $meetingStatus,
-                        'next_status' => $reShuffledId,
+                        'next_status' => $newStatusId,
                         'ticket_id' => $ticket->id,
                         'comment' => 'Back from MEETING after 7 days inactive.',
                     ]);
 
                     $ticketPath->save();
 
-                    /** Notify Users */
-                    $user = User::find($ticket->user_id);
-
+                    ////// Notify Users
                     // Super admin
                     $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => $user->name, 'ticket' => $ticket->id];
                     $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
@@ -610,72 +620,15 @@ class Kernel extends ConsoleKernel
 
                     // User himself
                     $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                    Mail::to($user->email)->send(new LeadNotifyMail($data));
+                    Mail::to($ticket->user->email)->send(new LeadNotifyMail($data));
 
                     // Old User himself
                     $data = ['title' => 'Withdrawn Lead', 'message' => 'Lead has been automatically withdrawn from you!', 'user' => '', 'ticket' => $ticket->id];
                     Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
 
                     $startPos++;
-                    if ($startPos === count($jrUserCounts)) {
+                    if ($startPos === count($teleUserCounts)) {
                         $startPos = 0;
-                    }
-                }
-            }
-
-            // Senior Distribution
-            if (count($srUserCounts) > 0) {
-                $startPos = 0;
-                foreach ($tickets as $key => $ticket) {
-                    if ($key >= 0 and $key < $jrCount) {
-                        continue;
-                    }
-
-                    $tPath = TicketPath::where('ticket_id', $ticket->id)
-                        ->where('next_status', $meetingStatus)
-                        ->orderBy('updated_at', 'DESC')
-                        ->first();
-
-                    $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
-                    $endTime = Carbon::now();
-                    $diffDays = $startTime->diffInDays($endTime);
-
-                    if ($diffDays >= 7) {
-                        $oldUser = User::find($ticket->user_id);
-                        $ticket->user_id = $srUserCounts[$startPos];
-                        $ticket->status_id = $reShuffledId;
-                        $ticket->save();
-                        $ticketPath = TicketPath::create([
-                            'prev_user' => $tPath->next_user,
-                            'next_user' => $srUserCounts[$startPos],
-                            'prev_status' => $followUpStatus,
-                            'next_status' => $reShuffledId,
-                            'ticket_id' => $ticket->id,
-                            'comment' => 'Back from FOLLOW-UP after 15 days inactive.',
-                        ]);
-
-                        $ticketPath->save();
-
-                        /** Notify Users */
-                        $user = User::find($ticket->user_id);
-
-                        // Super admin
-                        $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => $user->name, 'ticket' => $ticket->id];
-                        $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-                        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
-
-                        // User himself
-                        $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                        Mail::to($user->email)->send(new LeadNotifyMail($data));
-
-                        // Old User himself
-                        $data = ['title' => 'Withdrawn Lead', 'message' => 'Lead has been automatically withdrawn from you!', 'user' => '', 'ticket' => $ticket->id];
-                        Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
-
-                        $startPos++;
-                        if ($startPos === count($jrUserCounts)) {
-                            $startPos = 0;
-                        }
                     }
                 }
             }
@@ -707,14 +660,14 @@ class Kernel extends ConsoleKernel
                     ]);
                     $ticketPath->save();
 
-                    // Notify Users
-                    /** 1. Super admin */
+                    /////// Notify Users
+                    // 1. Super admin
                     $user = User::find($ticket->user_id);
                     $data = ['title' => 'Dead Lead', 'message' => 'Lead has been automatically moved from WAITING to DEAD after 7 days of inactivity: ', 'user' => auth()->user()->name, 'ticket' => $ticket->id];
                     $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
                     Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
-                    // User himself
+                    // 2. User himself
                     $data = ['title' => 'Dead Lead', 'message' => 'Lead has been automatically moved from WAITING to DEAD after 7 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
                     Mail::to($user->email)->send(new LeadNotifyMail($data));
                 }

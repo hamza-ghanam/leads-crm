@@ -35,7 +35,7 @@
                                    target="_blank"/>Click here</a>
                             </div>
                             <div class="form-group">
-                                <label for="file">Select Excel (CSV) file</label>
+                                <label for="file">Select Excel (CSV or XLSX) file</label>
                                 <input type="file" class="form-control" id="fileUpload" name="file"
                                        value="{{ old('file') }}"/>
                             </div>
@@ -107,7 +107,7 @@
                 "info": true,
                 "autoWidth": false,
                 "responsive": true,
-                "pageLength": 15
+                "pageLength": 50
             });
         });
 

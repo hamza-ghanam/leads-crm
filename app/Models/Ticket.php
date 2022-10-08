@@ -34,7 +34,9 @@ class Ticket extends Model
         'status_id',
         'source_id',
         'assigner_id',
-        'method'
+        'method',
+        'preferred_time',
+        'remarks',
     ];
 
     /**

@@ -9,6 +9,7 @@ use App\Models\Status;
 use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Revolution\Google\Sheets\Facades\Sheets;
 
@@ -39,7 +40,7 @@ class LeadsHelper
         $campSalesSR = array_fill_keys($campNames, []);
         $campSalesJR = array_fill_keys($campNames, []);
 
-        foreach ($campNames as $key => $campName) {
+        foreach ($campNames as $campName) {
             $campLeads[$campName] = $leads->where('campaign_name', $campName);
 
             // Junior
@@ -157,7 +158,7 @@ class LeadsHelper
                 'user' => '',
                 'ticket' => $lead->id
             ];
-            //Mail::to($user->email)->send(new LeadNotifyMail($data));
+            Mail::to($user->email)->send(new LeadNotifyMail($data));
 
             $message = 'A new lead is automatically assigned to the user: ';
         } else {
@@ -173,7 +174,7 @@ class LeadsHelper
         ];
 
         $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-        //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
     }
 
     public function prepareJrAndSrSalesLists($salesJR, $salesSR, $statuses): array
@@ -203,9 +204,9 @@ class LeadsHelper
         return [$jrUserCounts, $srUserCounts];
     }
 
-    public function emptyLeadsSheet($leads)
+    public function emptyFBLeadsSheet($leadsLength)
     {
-        for ($i = 0; $i < count($leads); $i++) {
+        for ($i = 0; $i < $leadsLength; $i++) {
             Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))
                 ->sheet(config('sheets.post_sheet_id'))
                 ->range('A' . ($i + 2))
@@ -215,8 +216,8 @@ class LeadsHelper
 
     public function initiateImport($leads)
     {
-        $statuses = Status::whereIn('slug', ['new', 'follow-up', 're-shuffled'])
-            ->get()
+        $statuses = Status::whereIn('slug', ['new', 'follow-up']) // re-shuffled has been removed 12/9/2022
+        ->get()
             ->pluck('id')
             ->toArray();
 
@@ -226,7 +227,19 @@ class LeadsHelper
         } else {
             $this->importCampaingsBased($leads, $statuses);
         }
+    }
 
-        $this->emptyLeadsSheet($leads);
+    public function getLeadsFilterParams(Request $request)
+    {
+        return [
+            'sale' => $request->query('sales'),
+            'status' => $request->query('fstatus'),
+            'camp' => $request->query('camp'),
+            'from' => $request->query('from'),
+            'to' => $request->query('to'),
+            'fullName' => $request->query('fullName'),
+            'phone' =>  $request->query('phone'),
+            'linkable' => $request->query('linkable')
+        ];
     }
 }

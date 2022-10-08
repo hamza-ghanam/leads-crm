@@ -40,7 +40,8 @@
                             <a href="{{ route('tickets.create') }}" class="btn btn-primary">Add New</a>
                         </div>
                         <div class="col-2">
-                            <button type="button" id="enable-fwd" class="btn btn-secondary">Enable multiple forwarding</button>
+                            <button type="button" id="enable-fwd" class="btn btn-secondary">Enable multiple forwarding
+                            </button>
                         </div>
                         @hasanyrole('super-admin|sales-manager')
                         <div class="col-9">
@@ -110,7 +111,7 @@
                                             @continue
                                         @endif
                                         <option
-                                                {{(old('fstatus') === $status->slug) ? 'selected' : ''}} value="{{$status->slug}}">{{$status->name}}</option>
+                                            {{(old('fstatus') === $status->slug) ? 'selected' : ''}} value="{{$status->slug}}">{{$status->name}}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -122,7 +123,7 @@
                                     <option value="all">All</option>
                                     @foreach($sales as $sale)
                                         <option
-                                                {{(old('sales') AND old('sales') == $sale->id) ? 'selected' : ''}} value="{{$sale->id}}">{{$sale->name}}</option>
+                                            {{(old('sales') AND old('sales') == $sale->id) ? 'selected' : ''}} value="{{$sale->id}}">{{$sale->name}}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -179,81 +180,89 @@
                     @hasanyrole('super-admin|sales-manager')
                     <form name="fwd-form" action="{{ route('tickets.multipleForward') }}" method="post" id="fwd-form">
                         @csrf
-                    @endhasanyrole
-                    <table id="example20" class="table table-bordered table-hover">
-                        <thead>
-                        <tr>
-                            <th class="fwd-leads" style="display:none !important;"></th>
-                            <th>ID</th>
-                            <th>Campaign Name</th>
-                            <th>Full Name</th>
-                            <th>Phone Number</th>
-                            <th>Email</th>
-                            <th>Status</th>
-                            <th>Current User</th>
-                            <th>Latest Follow-up</th>
-                            <th>Created at</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach($tickets as $key => $ticket)
-                            <tr @if($ticket->status->slug === 'duplicated') class="table-danger"
-                                @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif)>
-                                <td class="fwd-leads" style="display:none !important;">
+                        @endhasanyrole
+                        <table id="example20" class="table table-bordered table-hover">
+                            <thead>
+                            <tr>
+                                <th class="fwd-leads" style="display:none !important;">
                                     <div class="form-check">
-                                        <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
-                                               value="{{ $ticket->id }}" class="form-check-input"/>
+                                        <input class="form-check-input" type="checkbox" value="" id="select-all">
+                                        <label id="select-all-lbl" class="form-check-label" for="flexCheckDefault">
+                                            Select all
+                                        </label>
                                     </div>
-                                </td>
-                                <td><a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket->id }}</a></td>
-                                <td>
-                                    <a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket['campaign_name'] !== null ? $ticket['campaign_name'] : '-' }}</a>
-                                </td>
-                                <td>{{ $ticket['full_name'] !== null ? $ticket['full_name'] : '-' }}</td>
-                                <td>{{ $ticket['phone_number'] !== null ? $ticket['phone_number'] : '-' }}</td>
-                                <td>{{ $ticket['email'] !== null ? $ticket['email'] : '-' }}</td>
-                                <td>
+                                </th>
+                                <th>ID</th>
+                                <th>Campaign Name</th>
+                                <th>Full Name</th>
+                                <th>Phone Number</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Current User</th>
+                                <th>Latest Follow-up</th>
+                                <th>Created at</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($tickets as $key => $ticket)
+                                <tr @if($ticket->status->slug === 'duplicated') class="table-danger"
+                                    @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif)>
+                                    <td class="fwd-leads" style="display:none !important;">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
+                                                   value="{{ $ticket->id }}" class="form-check-input"/>
+                                        </div>
+                                    </td>
+                                    <td><a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket->id }}</a>
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket['campaign_name'] !== null ? $ticket['campaign_name'] : '-' }}</a>
+                                    </td>
+                                    <td>{{ $ticket['full_name'] !== null ? $ticket['full_name'] : '-' }}</td>
+                                    <td>{{ $ticket['phone_number'] !== null ? $ticket['phone_number'] : '-' }}</td>
+                                    <td>{{ $ticket['email'] !== null ? $ticket['email'] : '-' }}</td>
+                                    <td>
                                 <span class="badge"
                                       style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $ticket->status->slug) }}">
                                     {{$ticket->status->name}}
                                 </span>
-                                </td>
-                                <td>
-                                    <a href="{{ $ticket->user ? route('users.edit', [$ticket->user['id']]) : '#' }}"
-                                       target="_blank">{{ $ticket->user ? $ticket->user->name : '-' }}</a>
-                                </td>
-                                <td>
-                                    {{ $ticket->lastFollowUp }}
-                                </td>
-                                <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
-                                <td>
-                                    <ul class="nav nav-pills ml-auto p-2">
-                                        <li class="nav-item dropdown" style="line-height: 1;">
-                                            <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">
-                                                Actions <span class="caret"></span>
-                                            </a>
-                                            <div class="dropdown-menu">
-                                                @can('show ticket')
-                                                    <a class="dropdown-item" tabindex="-1"
-                                                       href="{{ route('tickets.show', [$ticket['id']]) }}"><i
+                                    </td>
+                                    <td>
+                                        <a href="{{ $ticket->user ? route('users.edit', [$ticket->user['id']]) : '#' }}"
+                                           target="_blank">{{ $ticket->user ? $ticket->user->name : '-' }}</a>
+                                    </td>
+                                    <td>
+                                        {{ $ticket->lastFollowUp }}
+                                    </td>
+                                    <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
+                                    <td>
+                                        <ul class="nav nav-pills ml-auto p-2">
+                                            <li class="nav-item dropdown" style="line-height: 1;">
+                                                <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">
+                                                    Actions <span class="caret"></span>
+                                                </a>
+                                                <div class="dropdown-menu">
+                                                    @can('show ticket')
+                                                        <a class="dropdown-item" tabindex="-1"
+                                                           href="{{ route('tickets.show', [$ticket['id']]) }}"><i
                                                                 class="fas fa-info-circle"></i> Details</a>
-                                                @endcan
-                                                <div class="dropdown-divider"></div>
-                                                @can('delete ticket')
-                                                    <a class="dropdown-item" tabindex="-1" href="#"
-                                                       onclick="deleteTicket({{$ticket->id}})" style="color: red;">
-                                                        <i class="fas fa-trash"></i> Delete
-                                                    </a>
-                                                @endcan
-                                            </div>
-                                        </li>
-                                    </ul>
-                                </td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                        <tfoot style="display: none !important;" class="fwd-leads">
+                                                    @endcan
+                                                    <div class="dropdown-divider"></div>
+                                                    @can('delete ticket')
+                                                        <a class="dropdown-item" tabindex="-1" href="#"
+                                                           onclick="deleteTicket({{$ticket->id}})" style="color: red;">
+                                                            <i class="fas fa-trash"></i> Delete
+                                                        </a>
+                                                    @endcan
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                            <tfoot style="display: none !important;" class="fwd-leads">
                             <tr>
                                 <td colspan="11">
                                     <div class="form-group row">
@@ -265,9 +274,9 @@
                                     </div>
                                 </td>
                             </tr>
-                        </tfoot>
-                    </table>
-                    @hasanyrole('super-admin|sales-manager')
+                            </tfoot>
+                        </table>
+                        @hasanyrole('super-admin|sales-manager')
                         <div class="modal fade" id="modal-lg">
                             <div class="modal-dialog modal-lg">
                                 <div class="modal-content">
@@ -282,11 +291,24 @@
                                         <div class="form-group">
                                             <label for="client-unit">Sales employee</label><sup>*</sup>
                                             <select name="sales" id="sales" class="form-control" required>
-                                                @foreach($sales as $salesEmp)
-                                                    <option value="{{ $salesEmp->id }}">
-                                                        {{ $salesEmp->name }}
-                                                    </option>
-                                                @endforeach
+                                                <optgroup label="Sales">
+                                                    @foreach($sales as $salesEmp)
+                                                        @if ($salesEmp->getRoleNames()[0] === 'sale')
+                                                            <option value="{{ $salesEmp->id }}">
+                                                                {{ $salesEmp->name }}
+                                                            </option>
+                                                        @endif
+                                                    @endforeach
+                                                </optgroup>f
+                                                <optgroup label="Tele-Sales">
+                                                    @foreach($sales as $salesEmp)
+                                                        @if ($salesEmp->getRoleNames()[0] === 'tele-sale')
+                                                            <option value="{{ $salesEmp->id }}">
+                                                                {{ $salesEmp->name }}
+                                                            </option>
+                                                        @endif
+                                                    @endforeach
+                                                </optgroup>
                                             </select>
                                         </div>
                                     </div>
@@ -311,7 +333,9 @@
                     <div class="row mt-3">
                         <div class="col-sm-12 col-md-5">
                             <div class="dataTables_info" role="status" aria-live="polite">
-                                Showing {{ ($tickets->currentPage() - 1) * $tickets->perPage() + 1 }} to {{ $tickets->perPage() * $tickets->currentPage() <= $tickets->total() ? $tickets->perPage() * $tickets->currentPage() : $tickets->total() }} of {{ $tickets->total() }} entries
+                                Showing {{ ($tickets->currentPage() - 1) * $tickets->perPage() + 1 }}
+                                to {{ $tickets->perPage() * $tickets->currentPage() <= $tickets->total() ? $tickets->perPage() * $tickets->currentPage() : $tickets->total() }}
+                                of {{ $tickets->total() }} entries
                             </div>
                         </div>
                         <div class="col-sm-12 col-md-7">
@@ -347,10 +371,10 @@
         });
 
         @if(session()->has('successMsg'))
-            Toast.fire({
-                icon: 'success',
-                title: '{{ session()->get('successMsg') }}'
-            })
+        Toast.fire({
+            icon: 'success',
+            title: '{{ session()->get('successMsg') }}'
+        })
         @endif
 
         const fromElem = document.getElementById('from') || false;
@@ -535,5 +559,24 @@
         document.getElementById('submit-fwd').addEventListener('click', () => {
             $('#modal-lg').modal('show');
         }, false);
+
+        const selectAll = document.getElementById('select-all');
+        selectAll.checked = false;
+        document.getElementById('select-all').addEventListener('click', () => {
+            const checkBoxes = document.querySelectorAll('.form-check-input');
+
+            checkBoxes.forEach(box => {
+                if (box.checked) {
+                    box.checked = false;
+                    selectAll.checked = false;
+                    document.getElementById('select-all-lbl').innerHTML = 'Select all';
+                } else {
+                    box.checked = true;
+                    selectAll.checked = true;
+                    document.getElementById('select-all-lbl').innerHTML = 'Deselect all';
+                }
+            });
+        }, false);
+
     </script>
 @endsection

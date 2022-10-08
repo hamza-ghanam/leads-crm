@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\LeadsHelper;
 use App\Models\Status;
 use App\Models\Ticket;
 use App\Models\TicketPath;
@@ -10,6 +11,8 @@ use App\Models\User;
 
 class HomeController extends Controller
 {
+    private $leadsHelper;
+
     /**
      * Create a new controller instance.
      *
@@ -17,6 +20,7 @@ class HomeController extends Controller
      */
     public function __construct()
     {
+        $this->leadsHelper = new LeadsHelper();
         $this->middleware('auth');
     }
 
@@ -30,23 +34,19 @@ class HomeController extends Controller
     {
 
         if (auth()->user()->hasAnyRole('super-admin')) {
-            $sale = $request->query('sales');
-            $status = $request->query('fstatus');
-            $camp = $request->query('camp');
-            $from = $request->query('from');
-            $to = $request->query('to');
-            $fullName = $request->query('fullName');
-            $phone = $request->query('phone');
-            $linkable = $request->query('linkable');
+            $filterParams = $this->leadsHelper->getLeadsFilterParams($request);
+
+            $filterParams = $this->leadsHelper->getLeadsFilterParams($request);
+
             $stats = [];
 
-            if ($linkable && !auth()->user()->hasAnyRole('sales-manager', 'super-admin')) {
+            if ($filterParams['linkable'] && !auth()->user()->hasAnyRole('sales-manager', 'super-admin')) {
                 return redirect()->to('/');
             }
 
             // Set status(es)
-            if ($status and $status !== 'all') {
-                $status = Status::whereSlug($status)->get();
+            if ($filterParams['status'] and $filterParams['status'] !== 'all') {
+                $status = Status::whereSlug($filterParams['status'])->get();
             } else {
                 $status = Status::all();
                 foreach ($status as $key => $oneStatus) {
@@ -60,40 +60,40 @@ class HomeController extends Controller
                 $tickets = Ticket::where('id', '>', 0);
 
                 // Campaign filter
-                if (($camp and $camp !== '')) {
-                    $tickets = $tickets->where('campaign_name', 'LIKE', "%{$camp}%");
+                if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
+                    $tickets = $tickets->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
                 }
 
                 // Created at from & to filters
-                if (($from and $from !== '') and ($to and $to !== '')) {
-                    $from = date($from);
-                    $to = date($to);
+                if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
+                    $from = date($filterParams['from']);
+                    $to = date($filterParams['to']);
                     $tickets = $tickets->whereBetween('created_at', [$from, $to]);
-                } else if (($from and $from !== '') and (!$to or $to == '')) {
-                    $from = date($request->from);
+                } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
+                    $from = date($filterParams['from']);
                     $tickets = $tickets->where('created_at', '>=', $from);
-                } else if ((!$from or $from == '') and ($to and $to !== '')) {
-                    $to = date($request->to);
+                } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
+                    $to = date($filterParams['to']);
                     $tickets = $tickets->where('created_at', '<=', $to);
                 }
 
                 // Person Full_name filter
-                if (($fullName and $fullName !== '')) {
-                    $tickets = $tickets->where('full_name', 'LIKE', "%{$fullName}%");
+                if (($filterParams['fullName'] and $filterParams['fullName'] !== '')) {
+                    $tickets = $tickets->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
                 }
 
                 // Person phone filter
-                if (($phone and $phone !== '')) {
-                    $tickets = $tickets->where('phone_number', 'LIKE', "%{$phone}%");
+                if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
+                    $tickets = $tickets->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
                 }
 
+                $sale = [];
                 if (auth()->user()->hasAnyRole('sale', 'tele-sale')) {
                     $sale = auth()->user()->id;
                 } else if (auth()->user()->hasAnyRole('accountant') and $status->slug !== 'approved' and $singleStatus->slug !== 'sold') {
                     continue;
                 } else if (auth()->user()->hasRole('sales-manager')) {
-                    if ((!$sale or $sale == '' or $sale === 'all')) {
-                        $sale = [];
+                    if ((!$filterParams['sale'] or $filterParams['sale'] == '' or $filterParams['sale'] === 'all')) {
                         $sale = User::where('manager_id', auth()->user()->id)
                             ->get()
                             ->pluck('id')
@@ -122,7 +122,7 @@ class HomeController extends Controller
                     }
                 });
 
-                if (!$linkable) {
+                if (!$filterParams['linkable']) {
                     $tickets = $tickets->count();
                 } else {
                     $tickets = $tickets->get();
@@ -149,16 +149,16 @@ class HomeController extends Controller
                 'stats' => $stats,
                 'sales' => $sales,
                 'currentSale' => $sale,
-                'currentStatus' => $request->query('fstatus'),
-                'camp' => $camp,
-                'from' => $from,
-                'to' => $to,
-                'fullName' => $fullName,
-                'phone' => $phone,
+                'currentStatus' => $filterParams['status'],
+                'camp' => $filterParams['camp'],
+                'from' => $filterParams['from'],
+                'to' => $filterParams['to'],
+                'fullName' => $filterParams['fullName'],
+                'phone' => $filterParams['phone'],
                 'statuses' => $allStatuses,
             ];
 
-            if (!$linkable) {
+            if (!$filterParams['linkable']) {
                 return view('home')->with($resultParams);
             } else {
                 return view('tickets.report')->with($resultParams);
@@ -204,6 +204,5 @@ class HomeController extends Controller
 
             return view('home')->with(['stats' => $stats]);
         }
-
     }
 }

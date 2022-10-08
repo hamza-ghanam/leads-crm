@@ -296,7 +296,7 @@
         <strong>Copyright &copy; 2021 <a href="#">Leads CRM</a>.</strong>
         All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
-            <b>Version</b> Alpha
+            <b>Version</b> 1.0
         </div>
     </footer>
 </div>

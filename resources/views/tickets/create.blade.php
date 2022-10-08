@@ -60,15 +60,38 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <div class="form-group">
+                                <label for="preferred-time">Preferred time to call</label><sup>*</sup>
+                                <input type="text" class="form-control" id="preferred-time" name="preferred_time"
+                                       placeholder="Enter preferred time to call"
+                                       value="{{ old('preferred_time') }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="remarks">Remarks</label>
+                                <textarea class="form-control" id="remarks" name="remarks"
+                                          placeholder="Enter remarks" cols="10" rows="3">{{ old('remarks') }}</textarea>
+                            </div>
                             @unlessrole('sale|tele-sale')
-                                <div class="form-group">
-                                    <label for="user">Assign to</label><sup>*</sup>
-                                    <select name="user" id="user" class="form-control" required>
+                            <div class="form-group">
+                                <label for="user">Assign to</label><sup>*</sup>
+                                <select name="user" id="user" class="form-control" required>
+                                    <optgroup label="Sales">
                                         @foreach($users as $user)
-                                            <option value="{{$user->id}}">{{$user->name}} ({{$user->role}})</option>
+                                            @if ($user->role === 'sale')
+                                                <option value="{{$user->id}}">{{$user->name}}</option>
+                                            @endif
                                         @endforeach
-                                    </select>
-                                </div>
+                                    </optgroup>
+                                    <optgroup label="Tele-Sales">
+                                        @foreach($users as $user)
+                                            @if ($user->role === 'tele-sale')
+                                                <option value="{{$user->id}}">{{$user->name}}</option>
+                                            @endif
+                                        @endforeach
+                                    </optgroup>
+
+                                </select>
+                            </div>
                             @endhasallroles
                             <button type="submit" class="btn btn-primary">Save</button>
                             <a class="btn btn-dark ml-3" href="{{route('tickets.all')}}">Cancel</a>

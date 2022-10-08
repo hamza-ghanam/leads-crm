@@ -229,13 +229,13 @@ class UserController extends Controller
         if (isset($request->password) and $request->password !== '') {
             $user->password = Hash::make($request->password);
         }
-        
+
         if (!$request->ban_check) {
             $user->status = 'banned';
         } else {
             $user->status = 'permitted';
         }
-        
+
         if (!$request->delete_check) {
             User::destroy($id);
         } else {
@@ -261,7 +261,7 @@ class UserController extends Controller
         if (!$user) {
             return response()->json(['error' => 'No such user.'], 404);
         }
-        
+
         if (!$user->deleted_at) {
             User::destroy($id);
         } else {
@@ -287,10 +287,10 @@ class UserController extends Controller
             return back()->withErrors(['msg' => 'User is not exists']);
         }
 
-        if ($user->status == 'available') {
+        if ($user->status == 'permitted') {
             $user->status = 'banned';
         } else {
-            $user->status = 'available';
+            $user->status = 'permitted';
         }
 
         $user->save();
