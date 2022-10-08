@@ -5,6 +5,7 @@ namespace App\Helpers;
 use App\Mail\LeadNotifyMail;
 use App\Models\GeneralSettings;
 use App\Models\SalesCampaign;
+use App\Models\Source;
 use App\Models\Status;
 use App\Models\Ticket;
 use App\Models\TicketPath;
@@ -204,6 +205,59 @@ class LeadsHelper
         return [$jrUserCounts, $srUserCounts];
     }
 
+    public function fetchLeadsFromFBLeadsSheet($manual = null): array
+    {
+        $sheets = Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))
+            ->sheet(config('sheets.post_sheet_id'))
+            ->get();
+        $header = $sheets->pull(0);
+        $rawLeads = Sheets::collection($header, $sheets);
+
+        $tickets = [];
+        $newStatus = Status::where('slug', 'new')->first()->id;
+        $duplicatedStatus = Status::whereName('duplicated')->first();
+
+        foreach ($rawLeads as $key => $rawLead) {
+            // Phone number
+            $rawLead['phone_number'] = str_replace(' ', '', $rawLead['phone_number']);
+            $rawLead['phone_number'] = $this->rectifyPhone($rawLead['phone_number']);
+
+            $ticket = new Ticket([
+                'number' => $rawLead['id'],
+                'ad_id' => $rawLead['ad_id'],
+                'ad_name' => $rawLead['ad_name'],
+                'adset_id' => $rawLead['ad_name'],
+                'adset_name' => $rawLead['adset_id'],
+                'campaign_id' => $rawLead['campaign_id'],
+                'campaign_name' => $rawLead['campaign_name'],
+                'form_id' => $rawLead['form_id'],
+                'form_name' => $rawLead['form_name'] ?? '',
+                'is_organic' => $rawLead['is_organic'] ?? '',
+                'platform' => $rawLead['platform'],
+                'full_name' => $rawLead['full_name'],
+                'phone_number' => $rawLead['phone_number'],
+                'email' => $rawLead['email'],
+                'job_title' => $rawLead['job_title'] ?? '',
+                'status_id' => $newStatus,
+                'source_id' => $rawLead['platform'] === 'ig' ? Source::where('name', 'Instagram')->first()->id : ($rawLead['platform'] === 'fb' ? Source::where('name', 'Facebook')->first()->id : Source::where('name', 'Unspecified')->first()->id),
+                'assigner_id' => $manual ? auth()->user()->id : null,
+                'method' => $manual ? 'Manual Facebook' : 'Automatic Facebook'
+            ]);
+
+            $dupLead = Ticket::wherePhoneNumber($ticket->phone_number)
+                ->where('phone_number', '!=', '')
+                ->where('id', '!=', $ticket->id)
+                ->first();
+
+            if ($dupLead and $dupLead !== null) {
+                $ticket->status_id = $duplicatedStatus->id;
+            }
+            $tickets[] = $ticket;
+        }
+
+        return $tickets;
+    }
+
     public function emptyFBLeadsSheet($leadsLength)
     {
         for ($i = 0; $i < $leadsLength; $i++) {
@@ -238,8 +292,41 @@ class LeadsHelper
             'from' => $request->query('from'),
             'to' => $request->query('to'),
             'fullName' => $request->query('fullName'),
-            'phone' =>  $request->query('phone'),
+            'phone' => $request->query('phone'),
             'linkable' => $request->query('linkable')
         ];
+    }
+
+    public function filterLeads($filterParams, $leads)
+    {
+        // Campaign filter
+        if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
+            $leads = $leads->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
+        }
+
+        // Created at from & to filters
+        if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
+            $from = date($filterParams['from'] . ' 00:00:00');
+            $to = date($filterParams['to'] . ' 23:59:59');
+            $leads = $leads->whereBetween('created_at', [$from, $to]);
+        } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
+            $from = date($filterParams['from'] . ' 00:00:00');
+            $leads = $leads->where('created_at', '>=', $from);
+        } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
+            $to = date($filterParams['to'] . ' 23:59:59');
+            $leads = $leads->where('created_at', '<=', $to);
+        }
+
+        // Person Full_name filter
+        if (($filterParams['fullName'] and $filterParams['fullName'] !== '')) {
+            $leads = $leads->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
+        }
+
+        // Person phone filter
+        if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
+            $leads = $leads->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
+        }
+
+        return $leads;
     }
 }

@@ -11,10 +11,12 @@ class Controller extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
-    public function hasPermission($permission)
+    public function hasPermission($permission): bool
     {
         if (!auth()->user()->hasPermissionTo($permission)) {
-            return abort(404);
+            abort(404);
         }
+
+        return true;
     }
 }

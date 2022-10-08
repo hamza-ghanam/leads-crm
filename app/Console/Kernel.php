@@ -51,49 +51,12 @@ class Kernel extends ConsoleKernel
                 */
             }
 
-            $leadsHelper = new LeadsHelper();
-
-            $sheets = Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))->sheet(config('sheets.post_sheet_id'))->get();
-            $header = $sheets->pull(0);
-            $posts = Sheets::collection($header, $sheets);
-            $tickets = [];
-            $newStatus = Status::where('slug', 'new')->first()->id;
-            $duplicatedStatus = Status::whereName('duplicated')->first();
-
-            foreach ($posts as $key => $row) {
-                $ticket = new Ticket([
-                    'number' => $row['id'],
-                    'ad_id' => $row['ad_id'],
-                    'ad_name' => $row['ad_name'],
-                    'adset_id' => $row['ad_name'],
-                    'adset_name' => $row['adset_id'],
-                    'campaign_id' => $row['campaign_id'],
-                    'campaign_name' => $row['campaign_name'],
-                    'form_id' => $row['form_id'],
-                    'form_name' => $row['form_name'] ?? '',
-                    'is_organic' => $row['is_organic'] ?? '',
-                    'platform' => $row['platform'],
-                    'full_name' => $row['full_name'],
-                    'phone_number' => $row['phone_number'],
-                    'email' => $row['email'],
-                    'job_title' => $row['job_title'] ?? '',
-                    'status_id' => $newStatus,
-                    'source_id' => $row['platform'] === 'ig' ? Source::where('name', 'Instagram')->first()->id : ($row['platform'] === 'fb' ? Source::where('name', 'Facebook')->first()->id : Source::where('name', 'Unspecified')->first()->id),
-                    'method' => 'Automatic Facebook'
-                ]);
-
-                $dupLead = Ticket::wherePhoneNumber($ticket->phone_number)->where('phone_number', '!=', '')->where('id', '!=', $ticket->id)->first();
-                if ($dupLead and $dupLead !== null) {
-                    $ticket->status_id = $duplicatedStatus->id;
-                }
-                $tickets[] = $ticket;
-            }
-
             /**** New Method (15/05/2022) ****/
             /**** Call helper function (03/09/2022) ****/
-            $leadsHelper->initiateImport($tickets);
-            $leadsHelper->emptyFBLeadsSheet(count($tickets));
-
+            $leadsHelper = new LeadsHelper();
+            $leads = $leadsHelper->fetchLeadsFromFBLeadsSheet();
+            $leadsHelper->initiateImport($leads);
+            $leadsHelper->emptyFBLeadsSheet(count($leads));
 
             /* Old Method
             $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])
@@ -468,7 +431,8 @@ class Kernel extends ConsoleKernel
             */
 
             /** Stopped at 9/11/022 */
-            //// 02. Status: Follow Up (15 days)
+            //// 02. Status: Follow Up (7 days)
+            $followUpDays = 7;  ///// Changed from 15 to 7 on 7/10/2022
             $followUpStatus = Status::where('slug', 'follow-up')->first()->id;
             $tickets = Ticket::where('status_id', $followUpStatus)->get();
 
@@ -504,7 +468,7 @@ class Kernel extends ConsoleKernel
                 $endTime = Carbon::now();
                 $diffDays = $startTime->diffInDays($endTime);
 
-                if ($diffDays >= 15) {
+                if ($diffDays >= $followUpDays) {
                     $oldUser = User::find($ticket->user_id);
 
                     // Lead now is with Sales => tele-sales
@@ -557,6 +521,7 @@ class Kernel extends ConsoleKernel
             }
 
             //// 03. Status: Meeting (7 days)
+            $meetingDays = 7;
             $meetingStatus = Status::where('slug', 'meeting')->first()->id;
             $tickets = Ticket::where('status_id', $meetingStatus)->get();
 
@@ -586,7 +551,7 @@ class Kernel extends ConsoleKernel
                 $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
                 $endTime = Carbon::now();
                 $diffDays = $startTime->diffInDays($endTime);
-                if ($diffDays >= 7) {
+                if ($diffDays >= $meetingDays) {
                     $oldUser = User::find($ticket->user_id);
 
                     // Lead now is with Sales => tele-sales
@@ -634,6 +599,7 @@ class Kernel extends ConsoleKernel
             }
 
             //// 04. Status: Waiting (7 days)
+            $waitingDays = 7;
             $waitingStatus = Status::where('slug', 'waiting')->first()->id;
             $tickets = Ticket::where('status_id', $waitingStatus)->get();
 
@@ -646,7 +612,7 @@ class Kernel extends ConsoleKernel
                 $endTime = Carbon::now();
                 $diffDays = $startTime->diffInDays($endTime);
 
-                if ($diffDays >= 7) {
+                if ($diffDays >= $waitingDays) {
                     $deadStatus = Status::where('slug', 'dead')->first()->id;
                     $ticket->status_id = $deadStatus;
                     $ticket->save();

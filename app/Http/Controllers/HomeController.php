@@ -28,14 +28,12 @@ class HomeController extends Controller
      * Show the application dashboard.
      *
      * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Contracts\Support\Renderable
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Http\RedirectResponse
      */
     public function index(Request $request)
     {
 
         if (auth()->user()->hasAnyRole('super-admin')) {
-            $filterParams = $this->leadsHelper->getLeadsFilterParams($request);
-
             $filterParams = $this->leadsHelper->getLeadsFilterParams($request);
 
             $stats = [];
@@ -45,7 +43,7 @@ class HomeController extends Controller
             }
 
             // Set status(es)
-            if ($filterParams['status'] and $filterParams['status'] !== 'all') {
+            if ($filterParams['status'] && $filterParams['status'] !== 'all') {
                 $status = Status::whereSlug($filterParams['status'])->get();
             } else {
                 $status = Status::all();
@@ -59,41 +57,15 @@ class HomeController extends Controller
             foreach ($status as $key => $singleStatus) {
                 $tickets = Ticket::where('id', '>', 0);
 
-                // Campaign filter
-                if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
-                    $tickets = $tickets->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
-                }
-
-                // Created at from & to filters
-                if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-                    $from = date($filterParams['from']);
-                    $to = date($filterParams['to']);
-                    $tickets = $tickets->whereBetween('created_at', [$from, $to]);
-                } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
-                    $from = date($filterParams['from']);
-                    $tickets = $tickets->where('created_at', '>=', $from);
-                } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-                    $to = date($filterParams['to']);
-                    $tickets = $tickets->where('created_at', '<=', $to);
-                }
-
-                // Person Full_name filter
-                if (($filterParams['fullName'] and $filterParams['fullName'] !== '')) {
-                    $tickets = $tickets->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
-                }
-
-                // Person phone filter
-                if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
-                    $tickets = $tickets->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
-                }
+                $tickets = $this->leadsHelper->filterLeads($filterParams, $tickets);
 
                 $sale = [];
                 if (auth()->user()->hasAnyRole('sale', 'tele-sale')) {
                     $sale = auth()->user()->id;
-                } else if (auth()->user()->hasAnyRole('accountant') and $status->slug !== 'approved' and $singleStatus->slug !== 'sold') {
+                } else if (auth()->user()->hasAnyRole('accountant') && $status->slug !== 'approved' && $singleStatus->slug !== 'sold') {
                     continue;
                 } else if (auth()->user()->hasRole('sales-manager')) {
-                    if ((!$filterParams['sale'] or $filterParams['sale'] == '' or $filterParams['sale'] === 'all')) {
+                    if ((!$filterParams['sale'] || $filterParams['sale'] == '' || $filterParams['sale'] === 'all')) {
                         $sale = User::where('manager_id', auth()->user()->id)
                             ->get()
                             ->pluck('id')
@@ -112,11 +84,11 @@ class HomeController extends Controller
                     // Status filter
                     $query = $query->where('next_status', $singleStatus->id);
 
-                    if (($sale and $sale !== 'all')) {
+                    if (($sale && $sale !== 'all')) {
                         // Sales filter
-                        if ($sale and is_array($sale) and count($sale) > 0) {
+                        if ($sale && is_array($sale) && count($sale) > 0) {
                             $query = $query->whereIn('next_user', $sale);
-                        } else if ($sale and !is_array($sale) and $sale !== '' and $sale !== 'all') {
+                        } else if ($sale && !is_array($sale) && $sale !== '' && $sale !== 'all') {
                             $query = $query->where('next_user', $sale);
                         }
                     }
@@ -168,12 +140,12 @@ class HomeController extends Controller
             $stats = [];
 
             foreach ($statuses as $key => $status) {
-                if ($status->slug === 'duplicated' and !auth()->user()->hasRole('super-admin')) {
+                if ($status->slug === 'duplicated' && !auth()->user()->hasRole('super-admin')) {
                     continue;
                 }
 
                 if (auth()->user()->hasAnyRole('sale', 'tele-sale')) {
-                    if ((auth()->user()->hasRole('sale')) and str_ends_with($status->slug, 'tele')) {
+                    if ((auth()->user()->hasRole('sale')) && str_ends_with($status->slug, 'tele')) {
                         continue;
                     }
 
@@ -182,7 +154,7 @@ class HomeController extends Controller
                         ->count();
                     $stats += [$status->name => $leads];
                 } else if (auth()->user()->hasAnyRole('accountant')) {
-                    if (str_ends_with($status->slug, 'tele') or ($status->slug !== 'approved' and $status->slug !== 'sold')) {
+                    if (str_ends_with($status->slug, 'tele') || ($status->slug !== 'approved' && $status->slug !== 'sold')) {
                         continue;
                     }
 

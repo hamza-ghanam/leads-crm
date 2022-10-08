@@ -139,33 +139,7 @@ class TicketController extends Controller
             $tickets = $tickets->where('user_id', '=', $filterParams['sale']);
         }
 
-        // Campaign filter
-        if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
-            $tickets = $tickets->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
-        }
-
-        // Created at from & to filters
-        if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $from = date($filterParams['from'] . ' 00:00:00');
-            $to = date($filterParams['to'] . ' 23:59:59');
-            $tickets = $tickets->whereBetween('created_at', [$from, $to]);
-        } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
-            $from = date($filterParams['from'] . ' 00:00:00');
-            $tickets = $tickets->where('created_at', '>=', $from);
-        } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $to = date($filterParams['to'] . ' 23:59:59');
-            $tickets = $tickets->where('created_at', '<=', $to);
-        }
-
-        // Person Full_name filter
-        if (($filterParams['fullName'] and $filterParams['fullName'] !== '')) {
-            $tickets = $tickets->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
-        }
-
-        // Person phone filter
-        if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
-            $tickets = $tickets->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
-        }
+        $tickets = $this->leadsHelper->filterLeads($filterParams, $tickets);
 
         if (!auth()->user()->hasRole('super-admin')) {
             $dupStatus = Status::whereSlug('duplicated')->first();
@@ -252,7 +226,7 @@ class TicketController extends Controller
     /**
      * Show om  form for creating a new resource.
      *
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Http\Response
      */
     public function create()
     {
@@ -299,7 +273,7 @@ class TicketController extends Controller
      * Store a newly created resource in storage.
      *
      * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function store(Request $request)
     {
@@ -344,7 +318,7 @@ class TicketController extends Controller
             }
         } else {
             $user = User::find($request->user);
-            $sender = auth()->user()->roles[0]->name;
+            $sender = auth()->user()->getRoleNames()[0];
         }
 
         if (!$user) {
@@ -540,7 +514,7 @@ class TicketController extends Controller
      *
      * @param \Illuminate\Http\Request $request
      * @param int $id
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function update(Request $request, $id)
     {
@@ -570,12 +544,14 @@ class TicketController extends Controller
 
         if (auth()->user()->hasAnyRole(['sale', 'tele-sale'])) {
             if (count($request->all()) > 3) {
-                return back()->withErrors(['msg' => 'You can change only full name.'])->withInput($request->all());
+                return back()->withErrors(['msg' => 'You can change only full name.'])
+                    ->withInput($request->all());
             } else {
                 if ($request->has('full_name')) {
                     $ticket->full_name = $request->full_name;
                 } else {
-                    return back()->withErrors(['msg' => 'Please provide valid full name.'])->withInput($request->all());
+                    return back()->withErrors(['msg' => 'Please provide valid full name.'])
+                        ->withInput($request->all());
                 }
             }
         } elseif (auth()->user()->hasAnyRole(['super-admin', 'admin'])) {
@@ -679,7 +655,7 @@ class TicketController extends Controller
      * Remove the specified resource from storage.
      *
      * @param int $id
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\JsonResponse
      */
     public function destroy($id)
     {
@@ -732,11 +708,6 @@ class TicketController extends Controller
             ->with(['leads' => $leads]);
     }
 
-    public function viewExelLeads(Request $request)
-    {
-        return back();
-    }
-
     public function importFromExcelFile(Request $request)
     {
         parent::hasPermission('excel import');
@@ -787,7 +758,6 @@ class TicketController extends Controller
                     }
 
                     $file_cols = array_keys($array[0][0]);
-//                    dd($file_cols);
 
                     if ($cols !== $file_cols) {
                         return back()->withErrors(['msg' => 'Invalid file columns.'])->withInput($request->all());
@@ -902,60 +872,12 @@ class TicketController extends Controller
     {
         parent::hasPermission('facebook import');
 
-        $sheets = Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))
-            ->sheet(config('sheets.post_sheet_id'))
-            ->get();
+        /**** Call helper function (03/09/2022) ****/
+        $leads = $this->leadsHelper->fetchLeadsFromFBLeadsSheet('Manual');
+        $this->leadsHelper->initiateImport($leads);
+        $this->leadsHelper->emptyFBLeadsSheet(count($leads));
 
-        $header = $sheets->pull(0);
-        $posts = Sheets::collection($header, $sheets);
-
-        $tickets = [];
-        $newStatus = Status::where('slug', 'new')->first()->id;
-        $duplicate = Status::whereName('duplicated')->first();
-
-        foreach ($posts as $key => $row) {
-            // Phone number
-            $row['phone_number'] = str_replace(' ', '', $row['phone_number']);
-            $row['phone_number'] = $this->rectifyPhone($row['phone_number']);
-
-            $ticket = new Ticket([
-                'number' => $row['id'],
-                'ad_id' => $row['ad_id'],
-                'ad_name' => $row['ad_name'],
-                'adset_id' => $row['ad_name'],
-                'adset_name' => $row['adset_id'],
-                'campaign_id' => $row['campaign_id'],
-                'campaign_name' => $row['campaign_name'],
-                'form_id' => $row['form_id'],
-                'form_name' => $row['form_name'] ?? '',
-                'is_organic' => $row['is_organic'] ?? '',
-                'platform' => $row['platform'],
-                'full_name' => $row['full_name'],
-                'phone_number' => $row['phone_number'],
-                'email' => $row['email'],
-                'job_title' => $row['job_title'] ?? '',
-                'status_id' => $newStatus,
-                'source_id' => $row['platform'] === 'ig' ? Source::where('name', 'Instagram')->first()->id : ($row['platform'] === 'fb' ? Source::where('name', 'Facebook')->first()->id : Source::where('name', 'Unspecified')->first()->id),
-                'assigner_id' => auth()->user()->id,
-                'method' => 'Manual Facebook'
-            ]);
-
-            $dupLead = Ticket::wherePhoneNumber($ticket->phone_number)
-                ->where('phone_number', '!=', '')
-                ->where('id', '!=', $ticket->id)
-                ->first();
-
-            if ($dupLead and $dupLead !== null) {
-                $ticket->status_id = $duplicate->id;
-            }
-
-            $tickets[] = $ticket;
-        }
-
-        $leadsHelper->initiateImport($tickets);
-        $leadsHelper->emptyFBLeadsSheet(count($tickets));
-
-        return response()->json(['OK' => count($posts)], 200);
+        return response()->json(['OK' => count($leads)], 200);
     }
 
     public function moveForward(Request $request, $id)
@@ -1151,7 +1073,7 @@ class TicketController extends Controller
         return back()->withErrors(['msg' => 'Unable to move ticket forward.'])->withInput($request->all());
     }
 
-    function removeColon($inputString)
+    function removeColon($inputString): string
     {
         if (str_contains($inputString, ':')) {
             return trim(explode(':', $inputString)[1]);
@@ -1179,16 +1101,6 @@ class TicketController extends Controller
         }
 
         return $phoneNumber;
-    }
-
-    public function indexReviewed()
-    {
-        parent::hasPermission('create invoice');
-
-        $reviewStatus = Status::whereSlug('booking')->first();
-        $tickets = Ticket::whereStatusId($reviewStatus->id)->get();
-
-        return view('tickets.index')->with(['tickets' => $tickets]);
     }
 
     public function makeInvoice($id, Request $request)
