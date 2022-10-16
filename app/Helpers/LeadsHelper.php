@@ -140,13 +140,13 @@ class LeadsHelper
 
     public function createAndAssignLead($lead, $statusId, $comment = '')
     {
-        $ticketPath = TicketPath::create([
+        $leadPath = TicketPath::create([
             'next_user' => $lead->user_id,
             'next_status' => $statusId,
             'ticket_id' => $lead->id,
             'comment' => $comment === '' ? 'Initial lead creation.' : $comment,
         ]);
-        $ticketPath->save();
+        $leadPath->save();
 
         /// Notify Users
         $user = User::find($lead->user_id);
@@ -235,7 +235,7 @@ class LeadsHelper
         $header = $sheets->pull(0);
         $rawLeads = Sheets::collection($header, $sheets);
 
-        $tickets = [];
+        $leads = [];
         $newStatus = Status::where('slug', 'new')->first()->id;
         $duplicatedStatus = Status::whereName('duplicated')->first();
 
@@ -244,7 +244,7 @@ class LeadsHelper
             $rawLead['phone_number'] = str_replace(' ', '', $rawLead['phone_number']);
             $rawLead['phone_number'] = $this->rectifyPhone($rawLead['phone_number']);
 
-            $ticket = new Ticket([
+            $lead = new Ticket([
                 'number' => $rawLead['id'],
                 'ad_id' => $rawLead['ad_id'],
                 'ad_name' => $rawLead['ad_name'],
@@ -261,23 +261,23 @@ class LeadsHelper
                 'email' => $rawLead['email'],
                 'job_title' => $rawLead['job_title'] ?? '',
                 'status_id' => $newStatus,
-                'source_id' => $this->getSourceName($rawLead['platform']),
+                'source_id' => $this->getSourceID($rawLead['platform']),
                 'assigner_id' => $manual ? auth()->user()->id : null,
-                'method' => $manual ? 'Manual Facebook' : 'Automatic Facebook'
+                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source)
             ]);
 
-            $dupLead = Ticket::wherePhoneNumber($ticket->phone_number)
+            $dupLead = Ticket::wherePhoneNumber($lead->phone_number)
                 ->where('phone_number', '!=', '')
-                ->where('id', '!=', $ticket->id)
+                ->where('id', '!=', $lead->id)
                 ->first();
 
             if ($dupLead and $dupLead !== null) {
-                $ticket->status_id = $duplicatedStatus->id;
+                $lead->status_id = $duplicatedStatus->id;
             }
-            $tickets[] = $ticket;
+            $leads[] = $lead;
         }
 
-        return $tickets;
+        return $leads;
     }
 
     public function emptyZapierLeadsSheet($source, $leadsLength)
@@ -354,7 +354,7 @@ class LeadsHelper
         return $leads;
     }
 
-    function rectifyPhone($phoneNumber)
+    function rectifyPhone($phoneNumber): string
     {
         $phoneNumber = str_replace(' ', '', $phoneNumber);
 
@@ -365,26 +365,22 @@ class LeadsHelper
         $phoneNumber = str_replace($persian, $num, $phoneNumber);
         $phoneNumber = str_replace($arabic, $num, $phoneNumber);
 
-        $uaePrefix = '+971 ';
+        $uaePrefix = '+971';
 
         if (str_starts_with($phoneNumber, '00971')) {
             $phoneNumber = substr($phoneNumber, 5);
-            $phoneNumber = $uaePrefix . $phoneNumber;
         } else if (str_starts_with($phoneNumber, '+971')) {
             $phoneNumber = substr($phoneNumber, 4);
-            $phoneNumber = $uaePrefix . $phoneNumber;
         } else if (str_starts_with($phoneNumber, '971')) {
             $phoneNumber = substr($phoneNumber, 3);
-            $phoneNumber = $uaePrefix . $phoneNumber;
         } else if (str_starts_with($phoneNumber, '05')) {
             $phoneNumber = substr($phoneNumber, 1);
-            $phoneNumber = $uaePrefix . $phoneNumber;
         }
 
-        return $phoneNumber;
+        return $uaePrefix . ' ' . $phoneNumber;
     }
 
-    public function getSourceName($platform)
+    public function getSourceID($platform)
     {
         switch ($platform) {
             case 'fb':
@@ -393,7 +389,7 @@ class LeadsHelper
                 return Source::where('name', 'Instagram')->first()->id;
             case 'tk':
                 return Source::where('name', 'TikTok')->first()->id;
-            case 'sh':
+            case 'sc':
                 return Source::where('name', 'Snapchat')->first()->id;
             default:
                 return Source::where('name', 'Unspecified')->first()->id;

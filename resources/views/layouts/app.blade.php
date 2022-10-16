@@ -203,7 +203,7 @@
                                 <a href="{{ route('tickets.archived') }}"
                                    class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.archived') !== false  ? 'active' : ''}}">
                                     <i class="far fa-circle nav-icon"></i>
-                                    <p>Show Archived Leads</p>
+                                    <p>Archived Leads</p>
                                 </a>
                             </li>
                             @endhasrole

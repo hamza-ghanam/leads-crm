@@ -49,7 +49,7 @@ Route::prefix('tickets')->group(function () {
     Route::delete('delete/{id}', [TicketController::class, 'destroy'])->name('tickets.delete');
     Route::post('importFromExcel', [TicketController::class, 'importFromExcelFile'])->name('tickets.excel');
     Route::get('showImports/{source}', [TicketController::class, 'showImportLeads'])->name('tickets.showImports');
-    Route::get('importLeads/{source}', [TicketController::class, 'importLeads'])->name('tickets.doImport');
+    Route::get('importLeads/{source}', [TicketController::class, 'importLeadsFromZapier'])->name('tickets.doImport');
     Route::post('moveForward/{id}', [TicketController::class, 'moveForward'])->name('tickets.moveForward');
     Route::post('makeInvoice/{id}', [TicketController::class, 'makeInvoice'])->name('tickets.makeInvoice');
     Route::post('attachPassport/{id}', [TicketController::class, 'attachPassport'])->name('tickets.attachPassport');

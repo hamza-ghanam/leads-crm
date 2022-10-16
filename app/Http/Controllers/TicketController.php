@@ -6,9 +6,7 @@ use App\Helpers\LeadsHelper;
 use App\Imports\TicketsImport;
 use App\Mail\LeadNotifyMail;
 use App\Models\Booking;
-use App\Models\GeneralSettings;
 use App\Models\Meeting;
-use App\Models\SalesCampaign;
 use App\Models\Source;
 use App\Models\Status;
 use App\Models\Ticket;
@@ -54,7 +52,7 @@ class TicketController extends Controller
      * Display a listing of the resource.
      * @param \Illuminate\Http\Request $request
      * @param string $status
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Http\Response
      */
     public function index(Request $request)
     {
@@ -222,7 +220,9 @@ class TicketController extends Controller
         if ($request->isMethod('get')) {
             return view('tickets.index')->with($resultParams);
         } else {
-            return view('tickets.index')->with($resultParams)->withInput($request->all());
+            return view('tickets.index')
+                ->with($resultParams)
+                ->withInput($request->all());
         }
     }
 
@@ -290,7 +290,7 @@ class TicketController extends Controller
             'source' => ['required', 'integer', 'gt:0'],
             'user' => ['nullable', 'integer', 'gt:0'],
             'preferred_time' => ['required', 'string', 'max:255'],
-            'remarks' => ['required', 'string', 'max:65535 '],
+            'remarks' => ['nullable', 'string', 'max:65535'],
         ];
 
         $messages = [
@@ -369,8 +369,7 @@ class TicketController extends Controller
         $saved = $newTicket->save();
 
         if ($saved) {
-            // Notify Users
-
+            //////// Notify Users
 
             // Super admin
             $data = [
@@ -409,7 +408,7 @@ class TicketController extends Controller
      * Display the specified resource.
      *
      * @param int $id
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Http\Response
      */
     public function show($id)
     {
@@ -674,7 +673,7 @@ class TicketController extends Controller
 
         $data = [
             'title' => 'Lead Delete',
-            'message' => 'Lead has been updated by user: ',
+            'message' => 'Lead has been deleted by user: ',
             'user' => auth()->user()->name,
             'ticket' => $ticket->id
         ];
@@ -691,7 +690,7 @@ class TicketController extends Controller
         // User himself
         $data = [
             'title' => 'Lead Delete',
-            'message' => 'Lead has been updated by you!',
+            'message' => 'Lead has been deleted by you!',
             'user' => '',
             'ticket' => $ticket->id
         ];
@@ -728,7 +727,7 @@ class TicketController extends Controller
         return view('tickets.showImports', ['facebook'])->with(['tickets' => $tickets]);
     }
 
-    public function importFromExcelFile(Request $request)
+    public function importFromExcelFile(Request $request): \Illuminate\Http\RedirectResponse
     {
         parent::hasPermission('excel import');
 
@@ -847,7 +846,7 @@ class TicketController extends Controller
             $duplicateStatus = Status::whereName('duplicated')->first()->id;
 
             foreach ($leadsArr as $key => $lead) {
-                $lead['source_id'] = $lead['source'] ? Source::where('name', 'Instagram')->first()->id : ($lead['platform'] === 'fb' ? Source::where('name', 'Facebook')->first()->id : Source::where('name', 'Unspecified')->first()->id);
+                $lead['source_id'] = $this->leadsHelper->getSourceID($lead['source']);
                 unset($lead['created_time']);
 
                 $lead = new Ticket($lead);
@@ -874,7 +873,7 @@ class TicketController extends Controller
         }
     }
 
-    public function importLeads($source)
+    public function importLeadsFromZapier($source): \Illuminate\Http\JsonResponse
     {
         parent::hasPermission('facebook import');
 
@@ -890,7 +889,7 @@ class TicketController extends Controller
         return response()->json(['OK' => count($leads)], 200);
     }
 
-    public function moveForward(Request $request, $id)
+    public function moveForward(Request $request, $id): \Illuminate\Http\RedirectResponse
     {
         parent::hasPermission('change status');
 
@@ -1025,71 +1024,68 @@ class TicketController extends Controller
             $mtng->save();
         }
 
-        if ($tPath && $ticket) {
-            if ($theStatus->slug === 'meeting') {
-                $ticketUser->status = 'banned';
+
+        if ($theStatus->slug === 'meeting') {
+            $ticketUser->status = 'banned';
+            $ticketUser->save();
+        } else {
+            if ($ticketUser and $ticketUser->status === 'banned') {
+                $ticketUser->status = 'permitted';
                 $ticketUser->save();
-            } else {
-                if ($ticketUser and $ticketUser->status === 'banned') {
-                    $ticketUser->status = 'permitted';
-                    $ticketUser->save();
-                }
             }
-
-            // Notify Users
-            /** 1. Super admin */
-            $nxt = Status::find($tPath->next_status)->name;
-            $prv = Status::find($tPath->prev_status)->name;
-
-            $data = [
-                'title' => 'Lead Status Update',
-                'message' => 'A new lead status has been updated from "' . $prv . '" to "' . $nxt . '" by user: ',
-                'user' => auth()->user()->name,
-                'ticket' => $ticket->id
-            ];
-
-            $superAdmins = User::role('super-admin')
-                ->get()
-                ->pluck('email')
-                ->toArray();
-
-            Mail::to($superAdmins)->send(new LeadNotifyMail($data));
-
-            // User himself
-            $data = [
-                'title' => 'Lead Status Update',
-                'message' => 'A new lead status has been updated from "' . $prv . '" to "' . $nxt . '". ',
-                'user' => '',
-                'ticket' => $ticket->id
-            ];
-
-            Mail::to($user->email)->send(new LeadNotifyMail($data));
-
-            if (strpos(strtolower($theStatus->name), 'book') !== false) {
-                $booking = Booking::create([
-                    'project_name' => $request['client-project'],
-                    'unit_number' => $request['client-unit'],
-                    'price' => $request['client-price'],
-                    'developer_name' => $request['client-developer'],
-                    'user_id' => auth()->user()->id,
-                    'ticket_id' => $ticket->id
-                ]);
-
-                $booking->save();
-            }
-            return redirect()->route('tickets.show', [$ticket->id]);
         }
 
-        return back()->withErrors(['msg' => 'Unable to move ticket forward.'])->withInput($request->all());
+        // Notify Users
+        /** 1. Super admin */
+        $nxt = Status::find($tPath->next_status)->name;
+        $prv = Status::find($tPath->prev_status)->name;
+
+        $data = [
+            'title' => 'Lead Status Update',
+            'message' => 'A new lead status has been updated from "' . $prv . '" to "' . $nxt . '" by user: ',
+            'user' => auth()->user()->name,
+            'ticket' => $ticket->id
+        ];
+
+        $superAdmins = User::role('super-admin')
+            ->get()
+            ->pluck('email')
+            ->toArray();
+
+        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+
+        // User himself
+        $data = [
+            'title' => 'Lead Status Update',
+            'message' => 'A new lead status has been updated from "' . $prv . '" to "' . $nxt . '". ',
+            'user' => '',
+            'ticket' => $ticket->id
+        ];
+
+        Mail::to($user->email)->send(new LeadNotifyMail($data));
+
+        if (strpos(strtolower($theStatus->name), 'book') !== false) {
+            $booking = Booking::create([
+                'project_name' => $request['client-project'],
+                'unit_number' => $request['client-unit'],
+                'price' => $request['client-price'],
+                'developer_name' => $request['client-developer'],
+                'user_id' => auth()->user()->id,
+                'ticket_id' => $ticket->id
+            ]);
+
+            $booking->save();
+        }
+        return redirect()->route('tickets.show', [$ticket->id]);
     }
 
     function removeColon($inputString): string
     {
         if (str_contains($inputString, ':')) {
-            return trim(explode(':', $inputString)[1]);
-        } else {
-            return $inputString;
+            $inputString = trim(explode(':', $inputString)[1]);
         }
+
+        return $inputString;
     }
 
     public function makeInvoice($id, Request $request)
