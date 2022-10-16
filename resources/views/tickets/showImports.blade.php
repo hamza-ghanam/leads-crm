@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
 @section('title')
-    Facebook Leads List
+    <span id="sourceName"></span> Leads List
 @endsection
 
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ URL::to('/') }}">Home</a></li>
-    <li class="breadcrumb-item">Leads list</li>
+    <li class="breadcrumb-item">Leads import list</li>
 @endsection
 
 @section('content')
@@ -88,7 +88,7 @@
 
 @section('script')
     <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('public/dist/js/pages/dashboard2.js') }}"></script>
+    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
     <!-- Toastr -->
     <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
 
@@ -141,13 +141,21 @@
             }
         }
 
+        const urlString = window.location.href;
+        const urlParts = urlString.replace(/\/\s*$/,'').split('/');
+        const source = urlParts.at(-1);
+
+        const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
+
+        document.getElementById('sourceName').innerHTML = sourceLabel;
+
         async function importTickets() {
             document.getElementById('fb-data-table').style.display = 'none';
             document.getElementById('loader').style.display = '';
 
             const token = '{{ csrf_token() }}';
             try {
-                let response = await fetch('/tickets/importFacebookLead/', {
+                let response = await fetch('/tickets/importLeads/' + source, {
                     credentials: 'same-origin',
                     headers: {
                         'Content-Type': 'application/json',
@@ -167,7 +175,7 @@
 
                     Toast.fire({
                         icon: 'success',
-                        title: response.OK + ' Facebook leads have been successfully imported'
+                        title: response.OK + ' ' + sourceLabel + ' leads ' + (response.OK > 1 ? 'have' : 'has') + ' been successfully imported'
                     })
                 } else if (response.OK == 0) {
                     document.getElementById('loader').style.display = 'none';

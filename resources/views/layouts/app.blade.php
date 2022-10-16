@@ -154,99 +154,125 @@
                             </ul>
                         </li>
                     @endif
-                        <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'tickets') !== false)  ? 'menu-open' : '' }}">
-                            <a href="#"
-                               class="nav-link {{ strpos(Route::currentRouteName(), 'tickets') !== false  ? 'active' : ''}}">
-                                <i class="nav-icon fas fa-ticket-alt"></i>
-                                <p>
-                                    Leads Center
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    @can('list tickets')
-                                        <a href="{{ route('tickets.all', [ 'from' => date('Y-m-01'), 'to' => date("Y-m-d")]) }}"
-                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.all') !== false  ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Show All</p>
-                                        </a>
-                                    @endcan
-                                    @can('list tickets')
-                                        <a href="/tickets/all?fstatus=re-shuffled"
-                                           class="nav-link {{ strpos(Route::currentRouteName(), 're-shuffled') !== false  ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Re-shuffled Leads</p>
-                                        </a>
-                                    @endcan
-                                    @can('create invoice')
-                                        @if(auth()->user()->hasRole('accountant'))
-                                            <a href="{{ route('tickets.all') }}"
-                                               class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.all') !== false  ? 'active' : ''}}">
-                                                <i class="far fa-circle nav-icon"></i>
-                                                <p>Show All</p>
-                                            </a>
-                                        @endif
-                                    @endcan
-                                </li>
-                                @can('add ticket')
-                                    <li class="nav-item">
-                                        <a href="{{ route('tickets.create') }}"
-                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.create') !== false  ? 'active' : ''}}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Add New Lead</p>
-                                        </a>
-                                    </li>
-                                @endcan
-                                @can('excel import')
-                                    <li class="nav-item">
-                                        <a href="{{ route('tickets.excelShow') }}"
-                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.excel') !== false  ? 'active' : ''}}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Excel import</p>
-                                        </a>
-                                    </li>
-                                @endcan
-                                @can('facebook import')
-                                    <li class="nav-item">
-                                        <a href="{{ route('tickets.facebook') }}"
-                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.facebook') !== false  ? 'active' : ''}}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Facebook import</p>
-                                        </a>
-                                    </li>
-                                @endcan
-                                @hasrole('super-admin')
-                                <li class="nav-item">
-                                    <a href="{{ route('tickets.archived') }}"
-                                       class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.archived') !== false  ? 'active' : ''}}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Show Archived Leads</p>
-                                    </a>
-                                </li>
-                                @endhasrole
-                            </ul>
-                        </li>
-                    @hasrole('super-admin')
-                        <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'salesCamps') !== false)  ? 'menu-open' : '' }}">
-                            <a href="#"
-                               class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps') !== false  ? 'active' : ''}}">
-                                <i class="nav-icon fas fa-map-signs"></i>
-                                <p>
-                                    Sales Campaigns
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="{{ route('salesCamps.index') }}"
-                                       class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps.index') !== false  ? 'active' : '' }}">
+                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'tickets') !== false && strpos(Route::currentRouteName(), 'showImports') === false)  ? 'menu-open' : '' }}">
+                        <a href="#"
+                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets') !== false && strpos(Route::currentRouteName(), 'showImports') === false  ? 'active' : ''}}">
+                            <i class="nav-icon fas fa-ticket-alt"></i>
+                            <p>
+                                Leads Center
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                @can('list tickets')
+                                    <a href="{{ route('tickets.all', [ 'from' => date('Y-m-01'), 'to' => date("Y-m-d")]) }}"
+                                       class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.all') !== false  ? 'active' : '' }}">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Show All</p>
                                     </a>
+                                @endcan
+                                @can('list tickets')
+                                    <a href="/tickets/all?fstatus=re-shuffled"
+                                       class="nav-link {{ strpos(Route::currentRouteName(), 're-shuffled') !== false  ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Re-shuffled Leads</p>
+                                    </a>
+                                @endcan
+                                @can('create invoice')
+                                    @if(auth()->user()->hasRole('accountant'))
+                                        <a href="{{ route('tickets.all') }}"
+                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.all') !== false  ? 'active' : ''}}">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>Show All</p>
+                                        </a>
+                                    @endif
+                                @endcan
+                            </li>
+                            @can('add ticket')
+                                <li class="nav-item">
+                                    <a href="{{ route('tickets.create') }}"
+                                       class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.create') !== false  ? 'active' : ''}}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Add New Lead</p>
+                                    </a>
                                 </li>
-                            </ul>
-                        </li>
+                            @endcan
+                            @hasrole('super-admin')
+                            <li class="nav-item">
+                                <a href="{{ route('tickets.archived') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.archived') !== false  ? 'active' : ''}}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Show Archived Leads</p>
+                                </a>
+                            </li>
+                            @endhasrole
+                        </ul>
+                    </li>
+
+                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'showImports') !== false)  ? 'menu-open' : '' }}">
+                        <a href="#"
+                           class="nav-link {{ strpos(Route::currentRouteName(), 'showImports') !== false  ? 'active' : ''}}">
+                            <i class="nav-icon fas fa-download"></i>
+                            <p>
+                                Leads Import
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+
+                            @can('excel import')
+                                <li class="nav-item">
+                                    <a href="{{ route('tickets.showImports', ['excel']) }}"
+                                       class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.showImports') !== false && strpos(request()->route('source'), 'excel') !== false  ? 'active' : ''}}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Excel import</p>
+                                    </a>
+                                </li>
+                            @endcan
+                            @can('facebook import')
+                                <li class="nav-item">
+                                    <a href="{{ route('tickets.showImports', ['facebook']) }}"
+                                       class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.showImports') !== false && strpos(request()->route('source'), 'facebook') !== false  ? 'active' : ''}}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Facebook import</p>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('facebook import')
+                                <li class="nav-item">
+                                    <a href="{{ route('tickets.showImports', ['tiktok']) }}"
+                                       class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.showImports') !== false && strpos(request()->route('source'), 'tiktok') !== false ? 'active' : ''}}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>TikTok import</p>
+                                    </a>
+                                </li>
+                            @endcan
+                        </ul>
+                    </li>
+
+
+                    @hasrole('super-admin')
+                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'salesCamps') !== false)  ? 'menu-open' : '' }}">
+                        <a href="#"
+                           class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps') !== false  ? 'active' : ''}}">
+                            <i class="nav-icon fas fa-map-signs"></i>
+                            <p>
+                                Sales Campaigns
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('salesCamps.index') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps.index') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Show All</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
                     @endhasrole
                 </ul>
             </nav>
@@ -296,7 +322,7 @@
         <strong>Copyright &copy; 2021 <a href="#">Leads CRM</a>.</strong>
         All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
-            <b>Version</b> 1.0
+            <b>Version</b> {{ env('APP_VERSION') }}
         </div>
     </footer>
 </div>
@@ -321,6 +347,53 @@
 <!-- AdminLTE for demo purposes -->
 <script src="{{ asset('dist/js/demo.js') }}"></script>
 
+<!-- The core Firebase JS SDK is always required and must be listed first -->
+<script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-messaging.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+<script>
+
+    // Your web app's Firebase configuration
+    var firebaseConfig = {
+        apiKey: "AIzaSyCJyExVqmT0cLM60nO5HF1my0dopyqRoWI",
+        authDomain: "leads-crm-4553d.firebaseapp.com",
+        projectId: "leads-crm-4553d",
+        storageBucket: "leads-crm-4553d.appspot.com",
+        messagingSenderId: "388756731314",
+        appId: "1:388756731314:web:e147dfc6ec4936c67860ab"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    const messaging = firebase.messaging();
+
+    function initFirebaseMessagingRegistration() {
+        messaging.requestPermission().then(function () {
+            return messaging.getToken()
+        }).then(function (token) {
+
+            axios.post("{{ route('fcmToken') }}", {
+                _method: "PATCH",
+                token
+            }).then(({data}) => {
+                console.log(data)
+            }).catch(({response: {data}}) => {
+                console.error(data)
+            })
+
+        }).catch(function (err) {
+            console.log(`Token Error :: ${err}`);
+        });
+    }
+
+    initFirebaseMessagingRegistration();
+
+    messaging.onMessage(function ({data: {body, title}}) {
+        new Notification(title, {body});
+    });
+</script>
 @yield('script')
 </body>
 </html>

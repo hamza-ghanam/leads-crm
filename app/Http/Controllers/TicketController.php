@@ -14,6 +14,7 @@ use App\Models\Status;
 use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
+use App\Notifications\SendPushNotification;
 use Carbon\Carbon;
 use Google\Exception;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Kutia\Larafirebase\Facades\Larafirebase;
 use Maatwebsite\Excel\Facades\Excel;
 use Revolution\Google\Sheets\Facades\Sheets;
 use PDF;
@@ -29,6 +31,7 @@ use App\Mail\sendingEmail;
 use App\Models\ArchivedLead;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Notification;
 
 //use Carbon\Carbon;
 
@@ -330,7 +333,7 @@ class TicketController extends Controller
 
         // Phone number
         $request->phone_number = str_replace(' ', '', $request->phone_number);
-        $request->phone_number = $this->rectifyPhone($request->phone_number);
+        $request->phone_number = $this->leadsHelper->rectifyPhone($request->phone_number);
 
         $newTicket = Ticket::create([
             'campaign_name' => $request->campaign_name,
@@ -608,7 +611,7 @@ class TicketController extends Controller
             if ($request->has('phone_number')) {
                 // Phone number
                 $request->phone_number = str_replace(' ', '', $request->phone_number);
-                $request->phone_number = $this->rectifyPhone($request->phone_number);
+                $request->phone_number = $this->leadsHelper->rectifyPhone($request->phone_number);
 
                 $ticket->phone_number = $request->phone_number;
             }
@@ -698,14 +701,31 @@ class TicketController extends Controller
         return response()->json(['OK' => 'Deleted. ' . $id], 200);
     }
 
-
-    public function showExcel()
+    public function showImportLeads($source)
     {
-        parent::hasPermission('excel import');
-        $leads = Session::get('leads');
+        parent::hasPermission('facebook import');
 
-        return view('tickets.excel')
-            ->with(['leads' => $leads]);
+        if (!in_array($source, ['excel', 'facebook', 'tiktok'])) {
+            return redirect()->route('tickets.all');
+        }
+
+        if ($source === 'excel') {
+            $leads = Session::get('leads');
+
+            return view('tickets.excel')
+                ->with(['leads' => $leads]);
+        }
+
+        [$spread, $sheet] = $this->leadsHelper->getSpreadsheetDetails($source);
+
+        $sheets = Sheets::spreadsheet(config('sheets.' . $spread))
+            ->sheet(config('sheets.' . $sheet))
+            ->get();
+
+        $header = $sheets->pull(0);
+        $tickets = Sheets::collection($header, $sheets);
+
+        return view('tickets.showImports', ['facebook'])->with(['tickets' => $tickets]);
     }
 
     public function importFromExcelFile(Request $request)
@@ -776,7 +796,7 @@ class TicketController extends Controller
                         $row['interested_in'] = $this->removeColon($row['interested_in']);
 
                         // Phone number
-                        $row['phone_number'] = $this->rectifyPhone($this->removeColon($row['phone_number']));
+                        $row['phone_number'] = $this->leadsHelper->rectifyPhone($this->removeColon($row['phone_number']));
 
                         $lead = [
                             'number' => $row['id'],
@@ -854,28 +874,18 @@ class TicketController extends Controller
         }
     }
 
-    public function showImportFromFacebookLead()
+    public function importLeads($source)
     {
         parent::hasPermission('facebook import');
 
-        $sheets = Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))
-            ->sheet(config('sheets.post_sheet_id'))
-            ->get();
-
-        $header = $sheets->pull(0);
-        $tickets = Sheets::collection($header, $sheets);
-
-        return view('tickets.facebook')->with(['tickets' => $tickets]);
-    }
-
-    public function importFromFacebookLead()
-    {
-        parent::hasPermission('facebook import');
+        if (!in_array($source, ['facebook', 'tiktok'])) {
+            return response()->json(['ERROR' => 0], 404);
+        }
 
         /**** Call helper function (03/09/2022) ****/
-        $leads = $this->leadsHelper->fetchLeadsFromFBLeadsSheet('Manual');
+        $leads = $this->leadsHelper->fetchLeadsFromZapier($source, 'Manual');
         $this->leadsHelper->initiateImport($leads);
-        $this->leadsHelper->emptyFBLeadsSheet(count($leads));
+        $this->leadsHelper->emptyZapierLeadsSheet($source, count($leads));
 
         return response()->json(['OK' => count($leads)], 200);
     }
@@ -1080,27 +1090,6 @@ class TicketController extends Controller
         } else {
             return $inputString;
         }
-    }
-
-    function rectifyPhone($phoneNumber)
-    {
-        $phoneNumber = str_replace(' ', '', $phoneNumber);
-
-        if (str_starts_with($phoneNumber, '00971')) {
-            $phoneNumber = substr($phoneNumber, 5);
-            $phoneNumber = '+971 ' . $phoneNumber;
-        } else if (str_starts_with($phoneNumber, '+971')) {
-            $phoneNumber = substr($phoneNumber, 4);
-            $phoneNumber = '+971 ' . $phoneNumber;
-        } else if (str_starts_with($phoneNumber, '971')) {
-            $phoneNumber = substr($phoneNumber, 3);
-            $phoneNumber = '+971 ' . $phoneNumber;
-        } else if (str_starts_with($phoneNumber, '05')) {
-            $phoneNumber = substr($phoneNumber, 1);
-            $phoneNumber = '+971 ' . $phoneNumber;
-        }
-
-        return $phoneNumber;
     }
 
     public function makeInvoice($id, Request $request)
@@ -1316,6 +1305,7 @@ class TicketController extends Controller
 
     public function devTest()
     {
+        /*
         $leads = [
             [
                 "number" => "203924041859471",
@@ -1474,5 +1464,18 @@ class TicketController extends Controller
         }
 
         $this->leadsHelper->initiateImport($tickets);
+        */
+
+        // $fcmTokens = User::whereNotNull('fcm_token')->pluck('fcm_token')->toArray();
+
+//        Larafirebase::withTitle("New Lead")
+//        ->withBody("A new lead has been assigned to you!")
+//        ->sendMessage($fcmTokens);
+
+        // Notification::send(null,new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
+
+        // auth()->user()->notify(new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
+        dd($this->leadsHelper->rectifyPhone('٠٥٠١٦٩٠٩٩٦'));
+        //return redirect()->route('home');
     }
 }

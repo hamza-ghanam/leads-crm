@@ -26,6 +26,7 @@ class User extends Authenticatable
         'status',
         'password',
         'manager_id',
+        'fcm_token',
     ];
 
     /**

@@ -54,9 +54,9 @@ class Kernel extends ConsoleKernel
             /**** New Method (15/05/2022) ****/
             /**** Call helper function (03/09/2022) ****/
             $leadsHelper = new LeadsHelper();
-            $leads = $leadsHelper->fetchLeadsFromFBLeadsSheet();
+            $leads = $leadsHelper->fetchLeadsFromZapier('facebook');
             $leadsHelper->initiateImport($leads);
-            $leadsHelper->emptyFBLeadsSheet(count($leads));
+            $leadsHelper->emptyZapierLeadsSheet('facebook', count($leads));
 
             /* Old Method
             $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])
@@ -142,8 +142,8 @@ class Kernel extends ConsoleKernel
             }
 
             for ($i = 0; $i < count($tickets); $i++) {
-                Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))
-                    ->sheet(config('sheets.post_sheet_id'))
+                Sheets::spreadsheet(config('sheets.fb_spreadsheet_id'))
+                    ->sheet(config('sheets.fb_sheet_id'))
                     ->range('A' . ($i + 2))
                     ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
             }

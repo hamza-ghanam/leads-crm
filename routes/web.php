@@ -6,6 +6,7 @@ use App\Http\Controllers\GeneralSettingsController;
 use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 use App\Mail\LeadNotifyMail;
+use App\Http\Controllers\WebNotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,9 +48,8 @@ Route::prefix('tickets')->group(function () {
     Route::get('edit/{id}', [TicketController::class, 'edit'])->name('tickets.edit');
     Route::delete('delete/{id}', [TicketController::class, 'destroy'])->name('tickets.delete');
     Route::post('importFromExcel', [TicketController::class, 'importFromExcelFile'])->name('tickets.excel');
-    Route::get('showExcel', [TicketController::class, 'showExcel'])->name('tickets.excelShow');
-    Route::get('facebookLeads', [TicketController::class, 'showImportFromFacebookLead'])->name('tickets.facebook');
-    Route::get('importFacebookLead', [TicketController::class, 'importFromFacebookLead'])->name('tickets.doFacebook');
+    Route::get('showImports/{source}', [TicketController::class, 'showImportLeads'])->name('tickets.showImports');
+    Route::get('importLeads/{source}', [TicketController::class, 'importLeads'])->name('tickets.doImport');
     Route::post('moveForward/{id}', [TicketController::class, 'moveForward'])->name('tickets.moveForward');
     Route::post('makeInvoice/{id}', [TicketController::class, 'makeInvoice'])->name('tickets.makeInvoice');
     Route::post('attachPassport/{id}', [TicketController::class, 'attachPassport'])->name('tickets.attachPassport');
@@ -84,3 +84,9 @@ Route::prefix('settings')->group(function () {
 Route::get('devTest', [TicketController::class, 'devTest'])->name('devTest');
 
 
+Route::patch('/fcm-token', [WebNotificationController::class, 'updateToken'])->name('fcmToken');
+Route::post('/send-notification',[WebNotificationController::class,'notification'])->name('notification');
+
+Route::get('/test', function () {
+    return view('test');
+});

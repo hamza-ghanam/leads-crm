@@ -128,7 +128,7 @@
 
 @section('script')
     <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('public/dist/js/pages/dashboard2.js') }}"></script>
+    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
     <script>
         var fromElem = document.getElementById('from') || false;
         var toElem = document.getElementById('to') || false;

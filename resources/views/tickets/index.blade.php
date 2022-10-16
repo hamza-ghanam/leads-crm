@@ -46,9 +46,8 @@
                         @hasanyrole('super-admin|sales-manager')
                         <div class="col-9">
                             <div class="float-right">
-                                <a href="{{ route('tickets.excelShow') }}" class="btn btn-info">Excel Import</a>
-                                <a href="{{ route('tickets.facebook') }}" class="btn btn-primary ml-3">Facebook
-                                    Import</a>
+                                <a href="{{ route('tickets.showImports', ['excel']) }}" class="btn btn-info">Excel Import</a>
+                                <a href="{{ route('tickets.showImports', ['facebook']) }}" class="btn btn-primary ml-3">Facebook Import</a>
                             </div>
                         </div>
                         @endhasanyrole

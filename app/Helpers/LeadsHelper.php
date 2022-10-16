@@ -205,10 +205,32 @@ class LeadsHelper
         return [$jrUserCounts, $srUserCounts];
     }
 
-    public function fetchLeadsFromFBLeadsSheet($manual = null): array
+    public function getSpreadsheetDetails($source): array
     {
-        $sheets = Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))
-            ->sheet(config('sheets.post_sheet_id'))
+        $spread = '';
+        $sheet = '';
+
+        switch ($source) {
+            case 'facebook':
+                $spread = 'fb_spreadsheet_id';
+                $sheet = 'fb_sheet_id';
+                break;
+
+            case 'tiktok':
+                $spread = 'tk_spreadsheet_id';
+                $sheet = 'tk_sheet_id';
+                break;
+        }
+
+        return [$spread, $sheet];
+    }
+
+    public function fetchLeadsFromZapier($source, $manual = null): array
+    {
+        [$spread, $sheet] = $this->getSpreadsheetDetails($source);
+
+        $sheets = Sheets::spreadsheet(config('sheets.' . $spread))
+            ->sheet(config('sheets.' . $sheet))
             ->get();
         $header = $sheets->pull(0);
         $rawLeads = Sheets::collection($header, $sheets);
@@ -239,7 +261,7 @@ class LeadsHelper
                 'email' => $rawLead['email'],
                 'job_title' => $rawLead['job_title'] ?? '',
                 'status_id' => $newStatus,
-                'source_id' => $rawLead['platform'] === 'ig' ? Source::where('name', 'Instagram')->first()->id : ($rawLead['platform'] === 'fb' ? Source::where('name', 'Facebook')->first()->id : Source::where('name', 'Unspecified')->first()->id),
+                'source_id' => $this->getSourceName($rawLead['platform']),
                 'assigner_id' => $manual ? auth()->user()->id : null,
                 'method' => $manual ? 'Manual Facebook' : 'Automatic Facebook'
             ]);
@@ -258,11 +280,13 @@ class LeadsHelper
         return $tickets;
     }
 
-    public function emptyFBLeadsSheet($leadsLength)
+    public function emptyZapierLeadsSheet($source, $leadsLength)
     {
+        [$spread, $sheet] = $this->getSpreadsheetDetails($source);
+
         for ($i = 0; $i < $leadsLength; $i++) {
-            Sheets::spreadsheet(config('sheets.post_spreadsheet_id'))
-                ->sheet(config('sheets.post_sheet_id'))
+            Sheets::spreadsheet(config('sheets.' . $spread))
+                ->sheet(config('sheets.' . $sheet))
                 ->range('A' . ($i + 2))
                 ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
         }
@@ -328,5 +352,51 @@ class LeadsHelper
         }
 
         return $leads;
+    }
+
+    function rectifyPhone($phoneNumber)
+    {
+        $phoneNumber = str_replace(' ', '', $phoneNumber);
+
+        $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+        $arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+        $num = range(0, 9);
+        $phoneNumber = str_replace($persian, $num, $phoneNumber);
+        $phoneNumber = str_replace($arabic, $num, $phoneNumber);
+
+        $uaePrefix = '+971 ';
+
+        if (str_starts_with($phoneNumber, '00971')) {
+            $phoneNumber = substr($phoneNumber, 5);
+            $phoneNumber = $uaePrefix . $phoneNumber;
+        } else if (str_starts_with($phoneNumber, '+971')) {
+            $phoneNumber = substr($phoneNumber, 4);
+            $phoneNumber = $uaePrefix . $phoneNumber;
+        } else if (str_starts_with($phoneNumber, '971')) {
+            $phoneNumber = substr($phoneNumber, 3);
+            $phoneNumber = $uaePrefix . $phoneNumber;
+        } else if (str_starts_with($phoneNumber, '05')) {
+            $phoneNumber = substr($phoneNumber, 1);
+            $phoneNumber = $uaePrefix . $phoneNumber;
+        }
+
+        return $phoneNumber;
+    }
+
+    public function getSourceName($platform)
+    {
+        switch ($platform) {
+            case 'fb':
+                return Source::where('name', 'Facebook')->first()->id;
+            case 'ig':
+                return Source::where('name', 'Instagram')->first()->id;
+            case 'tk':
+                return Source::where('name', 'TikTok')->first()->id;
+            case 'sh':
+                return Source::where('name', 'Snapchat')->first()->id;
+            default:
+                return Source::where('name', 'Unspecified')->first()->id;
+        }
     }
 }

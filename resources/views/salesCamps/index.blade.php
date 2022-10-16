@@ -145,7 +145,7 @@
 
 @section('script')
     <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('public/dist/js/pages/dashboard2.js') }}"></script>
+    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
     <!-- Toastr -->
     <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
 

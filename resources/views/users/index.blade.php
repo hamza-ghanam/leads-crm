@@ -99,7 +99,7 @@ Users list
 
 @section('script')
 <!-- PAGE SCRIPTS -->
-<script src="{{ asset('public/dist/js/pages/dashboard2.js') }}"></script>
+<script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
 <script>
     $(function() {
         $('#example2').DataTable({
