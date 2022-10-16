@@ -1471,7 +1471,7 @@ class TicketController extends Controller
         // Notification::send(null,new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
 
         // auth()->user()->notify(new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
-        dd($this->leadsHelper->rectifyPhone('٠٥٠١٦٩٠٩٩٦'));
+        dd($this->leadsHelper->rectifyPhone('966555552292'));
         //return redirect()->route('home');
     }
 }

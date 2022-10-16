@@ -36,7 +36,7 @@
             <div class="card">
                 <div class="card-header">
                     @can('add ticket')
-                        <a href="#" onclick="importTickets()" class="btn btn-primary">Start import</a>
+                        <a href="#" id="start-btn" onclick="importTickets()" class="btn btn-primary">Start import</a>
                     @endcan
                 </div>
                 <!-- /.card-header -->

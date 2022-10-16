@@ -369,15 +369,19 @@ class LeadsHelper
 
         if (str_starts_with($phoneNumber, '00971')) {
             $phoneNumber = substr($phoneNumber, 5);
+            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
         } else if (str_starts_with($phoneNumber, '+971')) {
             $phoneNumber = substr($phoneNumber, 4);
+            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
         } else if (str_starts_with($phoneNumber, '971')) {
             $phoneNumber = substr($phoneNumber, 3);
+            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
         } else if (str_starts_with($phoneNumber, '05')) {
             $phoneNumber = substr($phoneNumber, 1);
+            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
         }
 
-        return $uaePrefix . ' ' . $phoneNumber;
+        return $phoneNumber;
     }
 
     public function getSourceID($platform)
