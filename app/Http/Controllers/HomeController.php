@@ -32,10 +32,9 @@ class HomeController extends Controller
      */
     public function index(Request $request)
     {
-
         if (auth()->user()->hasAnyRole('super-admin')) {
             $filterParams = $this->leadsHelper->getLeadsFilterParams($request);
-
+//dd($filterParams['status']);
             $stats = [];
 
             if ($filterParams['linkable'] && !auth()->user()->hasAnyRole('sales-manager', 'super-admin')) {
@@ -128,6 +127,7 @@ class HomeController extends Controller
                 'fullName' => $filterParams['fullName'],
                 'phone' => $filterParams['phone'],
                 'statuses' => $allStatuses,
+                'fcm_token' => auth()->user()->fcm_token,
             ];
 
             if (!$filterParams['linkable']) {
@@ -174,7 +174,7 @@ class HomeController extends Controller
                 }
             }
 
-            return view('home')->with(['stats' => $stats]);
+            return view('home')->with(['stats' => $stats, 'fcm_token' => auth()->user()->fcm_token]);
         }
     }
 }

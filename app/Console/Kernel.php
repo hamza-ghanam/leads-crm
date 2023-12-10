@@ -38,6 +38,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // every 30 minutes, Facebook leads (Updated at: 17/5/2022)
+        // Adding TikTok leads, at 13/11/2022
         $schedule->call(function () {
             $pullDate = date('Y-m-d H:i:s');
             $dateBegin = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 10:29:57"));
@@ -54,9 +55,16 @@ class Kernel extends ConsoleKernel
             /**** New Method (15/05/2022) ****/
             /**** Call helper function (03/09/2022) ****/
             $leadsHelper = new LeadsHelper();
+
+            // Facebook
             $leads = $leadsHelper->fetchLeadsFromZapier('facebook');
             $leadsHelper->initiateImport($leads);
             $leadsHelper->emptyZapierLeadsSheet('facebook', count($leads));
+
+            // TikTok
+            $leads = $leadsHelper->fetchLeadsFromZapier('tiktok');
+            $leadsHelper->initiateImport($leads);
+            $leadsHelper->emptyZapierLeadsSheet('tiktok', count($leads));
 
             /* Old Method
             $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])

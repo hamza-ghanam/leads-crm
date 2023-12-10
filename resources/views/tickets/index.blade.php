@@ -46,8 +46,10 @@
                         @hasanyrole('super-admin|sales-manager')
                         <div class="col-9">
                             <div class="float-right">
-                                <a href="{{ route('tickets.showImports', ['excel']) }}" class="btn btn-info">Excel Import</a>
-                                <a href="{{ route('tickets.showImports', ['facebook']) }}" class="btn btn-primary ml-3">Facebook Import</a>
+                                <a href="{{ route('tickets.showImports', ['excel']) }}" class="btn btn-info">Excel
+                                    Import</a>
+                                <a href="{{ route('tickets.showImports', ['facebook']) }}" class="btn btn-primary ml-3">Facebook
+                                    Import</a>
                             </div>
                         </div>
                         @endhasanyrole
@@ -58,29 +60,132 @@
         </div>
     @endcan
 
-    @hasanyrole('super-admin|sales-manager')
+    @hasanyrole('super-admin|sales-manager|sale|tele-sale')
     <div class="row">
-        <div class="col-12">
-            <div class="card card-dark">
-                <div class="card-header">
-                    <h3 class="card-title">Search</h3>
+        <div class="col-12 col-sm-12">
+            <div class="card card-primary card-outline card-tabs">
+                <div class="card-header p-0 pt-1 border-bottom-0">
+                    <div id="flip" style="cursor: pointer;">
+                        <span class="float-right">
+                            <i id="angle1" class="fas fa-angle-down" style="margin-left: -25px !important;"></i>
+                        </span>
+                    </div>
+                    <ul class="nav nav-tabs" id="custom-tabs-three-tab" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="custom-tabs-filter-tab" data-toggle="pill"
+                               href="#custom-tabs-filter" role="tab" aria-controls="custom-tabs-filter"
+                               aria-selected="true">Filter</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="custom-tabs-search-id-tab" data-toggle="pill"
+                               href="#custom-tabs-search-id" role="tab" aria-controls="custom-tabs-search-id"
+                               aria-selected="false">Search by ID</a>
+                        </li>
+                    </ul>
                 </div>
-                <!-- /.card-header -->
-                <form role="form" id="form-id" method="post" action="">
-                    @csrf
-                    <div class="card-body">
-                        <div class="form-group row">
-                            <label for="person" class="col-sm-2 col-form-label">Lead ID</label>
-                            <div class="col-sm-4">
-                                <input type="text" class="form-control form-control-sm" name="lead_id" id="lead_id"
-                                       value="{{old('lead_id')}}"/>
-                            </div>
-                            <div class="col-sm-2">
-                                <button type="button" id="ok-id" class="btn btn-success btn-sm">OK</button>
-                            </div>
+                <div class="card-body">
+                    <div class="tab-content" id="custom-tabs-three-tabContent">
+                        <div class="tab-pane fade show active" id="custom-tabs-filter" role="tabpanel"
+                             aria-labelledby="custom-tabs-filter-tab">
+                            <!-- form start -->
+                            <form role="form" class="filter-form" id="filter-form" method="post" action="">
+                                @csrf
+                                <div class="card-body">
+                                    <div class="form-group row">
+                                        <label for="person" class="col-sm-2 col-form-label">Lead info</label>
+                                        <label for="fstatus" class="col-sm-1 col-form-label-sm">Status:</label>
+                                        <div class="col-sm-2">
+                                            <select id="fstatus" name="fstatus"
+                                                    class="form-control form-control-sm select2">
+                                                <option value="all">All</option>
+                                                @foreach($statuses as $status)
+                                                    @if (auth()->user()->hasRole('accountant') AND ($status->slug != 'booking' AND $status->slug != 'approved' AND $status->slug != 'sold'))
+                                                        @continue
+                                                    @endif
+                                                    <option
+                                                        {{(old('fstatus') === $status->slug) ? 'selected' : ''}} value="{{$status->slug}}">{{$status->name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @hasanyrole('super-admin|sales-manager')
+                                        <label for="sales" class="col-sm-1 col-form-label-sm">Sales:</label>
+                                        <div class="col-sm-2">
+                                            <select id="sales" name="sales" class="form-control form-control-sm select2"
+                                                    >
+                                                <option value="all">All</option>
+                                                @foreach($sales as $sale)
+                                                    <option
+                                                        {{(old('sales') AND old('sales') == $sale->id) ? 'selected' : ''}} value="{{$sale->id}}">{{$sale->name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        @endhasanyrole
+                                        <label for="camp" class="col-sm-1 col-form-label-sm">Campaign:</label>
+                                        <div class="col-sm-3">
+                                            <input type="text" class="form-control form-control-sm" id="camp"
+                                                   name="camp"
+                                                   value="{{old('camp')}}"/>
+                                        </div>
+                                    </div>
+                                    <div class="form-group row">
+                                        <label for="filter" class="col-sm-2 col-form-label">Creation date</label>
+                                        <label for="from" class="col-sm-1 col-form-label-sm">From:</label>
+                                        <div class="col-sm-3">
+                                            <input type="date" class="form-control form-control-sm" name="from"
+                                                   id="from"
+                                                   value="{{old('from')}}"/>
+                                        </div>
+                                        <label for="to" class="col-sm-1 col-form-label-sm">To:</label>
+                                        <div class="col-sm-3">
+                                            <input type="date" class="form-control form-control-sm" name="to" id="to"
+                                                   value="{{old('to')}}"/>
+                                        </div>
+                                    </div>
+                                    <div class="form-group row">
+                                        <label for="person" class="col-sm-2 col-form-label">Personal info</label>
+                                        <label for="fullName" class="col-sm-1 col-form-label-sm">Full Name:</label>
+                                        <div class="col-sm-3">
+                                            <input type="text" class="form-control form-control-sm" id="fullName"
+                                                   name="fullName"
+                                                   value="{{old('fullName')}}"/>
+                                        </div>
+                                        <label for="phone" class="col-sm-1 col-form-label-sm">Phone:</label>
+                                        <div class="col-sm-3">
+                                            <input type="text" class="form-control form-control-sm" id="phone"
+                                                   name="phone"
+                                                   value="{{old('phone')}}"/>
+                                        </div>
+                                    </div>
+
+                                    <!-- /.card-body -->
+                                    <div class="float-right">
+                                        <button type="button" id="ok-filter" class="btn btn-success">OK</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="tab-pane fade" id="custom-tabs-search-id" role="tabpanel"
+                             aria-labelledby="custom-tabs-search-id-tab">
+                            <form role="form" class="filter-form" method="post" action="" id="form-id">
+                                @csrf
+                                <div class="card-body">
+                                    <div class="form-group row">
+                                        <label for="person" class="col-sm-2 col-form-label">Lead ID</label>
+                                        <div class="col-sm-4">
+                                            <input type="text" class="form-control form-control-sm" name="lead_id"
+                                                   id="lead_id"
+                                                   value="{{old('lead_id')}}"/>
+                                        </div>
+                                        <div class="col-sm-2">
+                                            <button type="button" id="ok-id" class="btn btn-success btn-sm">OK</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                </form>
+                </div>
+                <!-- /.card -->
             </div>
         </div>
     </div>
@@ -89,85 +194,9 @@
     <div class="row">
         <div class="col-12">
             <div class="card card-secondary">
-                <div id="flip" class="card-header" style="cursor: pointer;">
-                    <h3 class="card-title">Filter</h3>
-                    <span class="float-right"><i id="angle1" class="fas fa-angle-down"></i></span>
-                </div>
-                <!-- /.card-header -->
-                <!-- form start -->
-                <form role="form" id="filter-form" method="post" action="">
-                    @csrf
-                    <div class="card-body">
-                        <div class="form-group row">
-                            <label for="person" class="col-sm-2 col-form-label">Lead info</label>
-                            <label for="fstatus" class="col-sm-1 col-form-label-sm">Status:</label>
-                            <div class="col-sm-2">
-                                <select id="fstatus" name="fstatus" class="form-control form-control-sm select2"
-                                        data-dropdown-css-class="select2-info">
-                                    <option value="all">All</option>
-                                    @foreach($statuses as $status)
-                                        @if (auth()->user()->hasRole('accountant') AND ($status->slug != 'booking' AND $status->slug != 'approved' AND $status->slug != 'sold'))
-                                            @continue
-                                        @endif
-                                        <option
-                                            {{(old('fstatus') === $status->slug) ? 'selected' : ''}} value="{{$status->slug}}">{{$status->name}}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @hasanyrole('super-admin|sales-manager')
-                            <label for="sales" class="col-sm-1 col-form-label-sm">Sales:</label>
-                            <div class="col-sm-2">
-                                <select id="sales" name="sales" class="form-control form-control-sm select2"
-                                        data-dropdown-css-class="select2-info">
-                                    <option value="all">All</option>
-                                    @foreach($sales as $sale)
-                                        <option
-                                            {{(old('sales') AND old('sales') == $sale->id) ? 'selected' : ''}} value="{{$sale->id}}">{{$sale->name}}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            @endhasanyrole
-                            <label for="camp" class="col-sm-1 col-form-label-sm">Campaign:</label>
-                            <div class="col-sm-3">
-                                <input type="text" class="form-control form-control-sm" id="camp" name="camp"
-                                       value="{{old('camp')}}"/>
-                            </div>
-                        </div>
-                        <div class="form-group row">
-                            <label for="filter" class="col-sm-2 col-form-label">Creation date</label>
-                            <label for="from" class="col-sm-1 col-form-label-sm">From:</label>
-                            <div class="col-sm-3">
-                                <input type="date" class="form-control form-control-sm" name="from" id="from"
-                                       value="{{old('from')}}"/>
-                            </div>
-                            <label for="to" class="col-sm-1 col-form-label-sm">To:</label>
-                            <div class="col-sm-3">
-                                <input type="date" class="form-control form-control-sm" name="to" id="to"
-                                       value="{{old('to')}}"/>
-                            </div>
-                        </div>
-                        <div class="form-group row">
-                            <label for="person" class="col-sm-2 col-form-label">Personal info</label>
-                            <label for="fullName" class="col-sm-1 col-form-label-sm">Full Name:</label>
-                            <div class="col-sm-3">
-                                <input type="text" class="form-control form-control-sm" id="fullName" name="fullName"
-                                       value="{{old('fullName')}}"/>
-                            </div>
-                            <label for="phone" class="col-sm-1 col-form-label-sm">Phone:</label>
-                            <div class="col-sm-3">
-                                <input type="text" class="form-control form-control-sm" id="phone" name="phone"
-                                       value="{{old('phone')}}"/>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- /.card-body -->
 
-                    <div class="card-footer">
-                        <div class="float-right">
-                            <button type="button" id="ok-filter" class="btn btn-success">OK</button>
-                        </div>
-                    </div>
-                </form>
+                <!-- /.card-header -->
+
             </div>
         </div>
     </div>
@@ -205,7 +234,7 @@
                             </thead>
                             <tbody>
                             @foreach($tickets as $key => $ticket)
-                                <tr @if($ticket->status->slug === 'duplicated') class="table-danger"
+                                <tr id="row_{{ $ticket->id }}" @if($ticket->status->slug === 'duplicated') class="table-danger"
                                     @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif)>
                                     <td class="fwd-leads" style="display:none !important;">
                                         <div class="form-check">
@@ -298,7 +327,8 @@
                                                             </option>
                                                         @endif
                                                     @endforeach
-                                                </optgroup>f
+                                                </optgroup>
+
                                                 <optgroup label="Tele-Sales">
                                                     @foreach($sales as $salesEmp)
                                                         @if ($salesEmp->getRoleNames()[0] === 'tele-sale')
@@ -354,26 +384,23 @@
 
 @section('script')
 
-    <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
-    <!-- Select2 -->
-    <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
     <!-- Toastr -->
     <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
 
     <script>
         const Toast = Swal.mixin({
             toast: true,
+            background: '#E3E5E8',
             position: 'top-end',
             showConfirmButton: false,
-            timer: 3000
+            timer: 3000,
         });
 
         @if(session()->has('successMsg'))
         Toast.fire({
             icon: 'success',
-            title: '{{ session()->get('successMsg') }}'
-        })
+            title: '{{ session()->get('successMsg') }}',
+        });
         @endif
 
         const fromElem = document.getElementById('from') || false;
@@ -408,18 +435,17 @@
         }
 
         function getParams(url, formId) {
-            console.log(formId);
             const form = document.getElementById(formId);
             const formData = new FormData(form);
 
             let i = 0;
-            for (var pair of formData.entries()) {
+            for (const pair of formData.entries()) {
                 if (pair[0] === '_token') {
                     continue;
                 }
 
                 if (pair[1] !== '') {
-                    if (i == 0) {
+                    if (i === 0) {
                         url += '?' + pair[0] + '=' + pair[1];
                     } else {
                         url += '&' + pair[0] + '=' + pair[1];
@@ -443,7 +469,7 @@
             });
 
             $("#flip").click(function () {
-                $("#filter-form").slideToggle("slow");
+                $(".filter-form").slideToggle("slow");
                 const element = document.getElementById('angle1');
                 const style = element.getAttribute('class');
                 const attr = style === 'fas fa-angle-down' ? 'fas fa-angle-up' : 'fas fa-angle-down';
@@ -473,32 +499,72 @@
             });
         });
 
+        function deleteRow(rowId)
+        {
+            const row = document.getElementById(rowId);
+            row.parentNode.removeChild(row);
+        }
+
         async function deleteTicket(id) {
-            if (confirm('Are you sure?')) {
-                const token = '{{ csrf_token() }}';
-                try {
-                    let response = await fetch('/tickets/delete/' + id, {
-                        method: 'DELETE',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-Token': token,
-                        },
-                    });
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!'
+            }).then(async (result) => {
+                if (result.value) {
+                    const token = '{{ csrf_token() }}';
 
-                    response = await response.json();
+                    try {
+                        Swal.fire({
+                            title: 'Please wait!',
+                            imageUrl: '{{asset('dist/img/loading2.gif')}}',
+                            imageWidth: 128,
+                            imageHeight: 128,
+                            imageAlt: 'Deleting..',
+                            showConfirmButton: false,
+                        });
 
-                    if (response.error) {
-                        alert(response.error);
-                        console.log(response);
-                    } else if (response.OK) {
-                        location.reload();
+
+                        let resp = await axios.delete('/tickets/delete/' + id, {
+                            withCredentials: true,
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-Token': token,
+                            }
+                        });
+
+                        let result = resp.data;
+
+                        Swal.close();
+
+                        if (result.OK) {
+                            deleteRow('row_' + id);
+
+                            Toast.fire({
+                                icon: 'success',
+                                title: 'Deleted!',
+                                text: 'The ticket has been deleted.',
+                            });
+                        }
+                    } catch (e) {
+                        console.log(e.response);
+                        let errors = '';
+                        Object.keys(e.response?.data).forEach(valInd => {
+                            errors += (e.response?.data[valInd] + '\n');
+                        });
+
+                        Toast.fire({
+                            icon: 'warning',
+                            title: errors,
+                        });
                     }
-                } catch (e) {
-                    console.log(e);
                 }
-            }
+            });
         }
 
 

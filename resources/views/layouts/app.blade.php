@@ -54,6 +54,12 @@
             color: red !important;
         }
     </style>
+
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ asset('dist/img/favicons/site.webmanifest') }}">
 </head>
 <body class=" hold-transition sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed
     ">
@@ -210,6 +216,7 @@
                         </ul>
                     </li>
 
+                    @hasrole('super-admin')
                     <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'showImports') !== false)  ? 'menu-open' : '' }}">
                         <a href="#"
                            class="nav-link {{ strpos(Route::currentRouteName(), 'showImports') !== false  ? 'active' : ''}}">
@@ -252,8 +259,6 @@
                         </ul>
                     </li>
 
-
-                    @hasrole('super-admin')
                     <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'salesCamps') !== false)  ? 'menu-open' : '' }}">
                         <a href="#"
                            class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps') !== false  ? 'active' : ''}}">
@@ -319,7 +324,7 @@
 
     <!-- Main Footer -->
     <footer class="main-footer">
-        <strong>Copyright &copy; 2021 <a href="#">Leads CRM</a>.</strong>
+        <strong>Copyright &copy; 2021 - {{ date("Y") }} | <a href="#">Leads CRM</a>.</strong>
         All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
             <b>Version</b> {{ env('APP_VERSION') }}
@@ -347,14 +352,16 @@
 <!-- AdminLTE for demo purposes -->
 <script src="{{ asset('dist/js/demo.js') }}"></script>
 
-<!-- The core Firebase JS SDK is always required and must be listed first -->
-<script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.3.2/firebase-messaging.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<!-- Select 2 -->
+<script src="{{ asset('plugins/select2/js/select2.min.js') }}"></script>
 
-<script>
+<script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-analytics.js";
+    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-messaging.js";
 
-    // Your web app's Firebase configuration
     var firebaseConfig = {
         apiKey: "AIzaSyCJyExVqmT0cLM60nO5HF1my0dopyqRoWI",
         authDomain: "leads-crm-4553d.firebaseapp.com",
@@ -364,36 +371,40 @@
         appId: "1:388756731314:web:e147dfc6ec4936c67860ab"
     };
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
+    window.addEventListener("load", (e) => {
+        initFirebaseMessagingRegistration();
+    });
 
-    const messaging = firebase.messaging();
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    // const analytics = getAnalytics(app);
+    const messaging = getMessaging(app);
 
     function initFirebaseMessagingRegistration() {
-        messaging.requestPermission().then(function () {
-            return messaging.getToken()
-        }).then(function (token) {
+        getToken(messaging, { vapidKey: "BLzqPFU-kXeW-UR0UrpP2NZ2TEhBRRxPq-TXhVkJiWBVLPpBtY-8JT-tKGCL0w5sI9weAa_5EMD3_pFpkkTEnhY" })
+            .then((token) => {
+                axios.post("{{ route('update.token') }}",{
+                    _method:"PATCH",
+                    token
+                }).then(({data})=>{
+                    console.log(data)
+                }).catch(({response:{data}})=>{
+                    console.error(data)
+                });
 
-            axios.post("{{ route('fcmToken') }}", {
-                _method: "PATCH",
-                token
-            }).then(({data}) => {
-                console.log(data)
-            }).catch(({response: {data}}) => {
-                console.error(data)
             })
+        .catch(function (err) {
+            //alert(err);
+            console.log("Didn't get notification permission", err);
+        });
 
-        }).catch(function (err) {
-            console.log(`Token Error :: ${err}`);
+        onMessage(messaging, (payload) => {
+            console.log("Message received. ", payload.data);
+            // alert(payload.data.notification);
         });
     }
-
-    initFirebaseMessagingRegistration();
-
-    messaging.onMessage(function ({data: {body, title}}) {
-        new Notification(title, {body});
-    });
 </script>
+
 @yield('script')
 </body>
 </html>

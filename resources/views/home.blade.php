@@ -28,8 +28,7 @@
                             <label for="person" class="col-sm-2 col-form-label">Lead info</label>
                             <label for="fstatus" class="col-sm-1 col-form-label-sm">Status:</label>
                             <div class="col-sm-2">
-                                <select id="fstatus" name="fstatus" class="form-control form-control-sm select2"
-                                        data-dropdown-css-class="select2-info">
+                                <select id="fstatus" name="fstatus" class="form-control form-control-sm select2">
                                     <option value="all">All</option>
                                     @foreach($statuses as $status)
                                         @if (auth()->user()->hasRole('accountant') AND ($status->slug != 'booking' AND $status->slug != 'approved' AND $status->slug != 'sold'))
@@ -44,8 +43,7 @@
 
                             <label for="sales" class="col-sm-1 col-form-label-sm">Sales:</label>
                             <div class="col-sm-2">
-                                <select id="sales" name="sales" class="form-control form-control-sm select2"
-                                        data-dropdown-css-class="select2-info">
+                                <select id="sales" name="sales" class="form-control form-control-sm select2">
                                     <option value="all">All</option>
                                     @foreach($sales as $sale)
                                         <option
@@ -109,12 +107,14 @@
                 <div class="small-box" style="background-color: {{ Config::get('constants.status_colors.' . $key) }};">
                     <div class="inner">
                         @hasanyrole('super-admin|sales-manager')
-                        <h3><a href="#" class="text-light filter-leads">{{$value}}</a></h3>
-                        <p><a href="#" class="text-light filter-leads">{{$key}}</a></p>
+                            <h3><a href="#" class="text-light filter-leads"
+                                   data-status="{{ strtolower($key) }}">{{$value}}</a></h3>
+                            <p><a href="#" class="text-light filter-leads" data-status="{{ strtolower($key) }}">{{$key}}</a>
+                            </p>
                         @else
-                            <h3><a href="/tickets/all?fstatus={{ $value }}" class="text-light">{{ $value }}</a></h3>
-                            <p><a href="/tickets/all?fstatus={{ $key }}" class="text-light">{{ $key }}</a></p>
-                        @endhasanyrole
+                            <h3><a href="/tickets/all?fstatus={{ strtolower($key) }}" class="text-light">{{ $value }}</a></h3>
+                            <p><a href="/tickets/all?fstatus={{ strtolower($key) }}" class="text-light">{{ $key }}</a></p>
+                            @endhasanyrole
                     </div>
                     <div class="icon">
                         <i class="fas fa-ticket-alt"></i>
@@ -128,7 +128,6 @@
 
 @section('script')
     <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
     <script>
         var fromElem = document.getElementById('from') || false;
         var toElem = document.getElementById('to') || false;
@@ -161,7 +160,7 @@
             return [year, month, day].join('-');
         }
 
-        function getParams(url) {
+        function getParams(url, fstatus = null) {
             const form = document.getElementById('filter-form');
             const formData = new FormData(form);
 
@@ -172,6 +171,10 @@
                 }
 
                 if (pair[1] !== '') {
+                    if (fstatus !== null && pair[0] == 'fstatus') {
+                        pair[1] = fstatus;
+                    }
+
                     if (i == 0) {
                         url += '?' + pair[0] + '=' + pair[1];
                     } else {
@@ -190,8 +193,10 @@
                 location.href = url;
             });
 
-            $(".filter-leads").on('click', () => {
-                let url = getParams('/');
+            $(".filter-leads").on('click', function () {
+                let status = $(this).data('status');
+                console.log(status)
+                let url = getParams('/', status);
                 url += '&linkable=1';
                 location.href = url;
             });

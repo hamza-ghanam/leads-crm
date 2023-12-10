@@ -10,6 +10,7 @@ use App\Models\Status;
 use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
+use App\Notifications\SendPushNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Revolution\Google\Sheets\Facades\Sheets;
@@ -31,7 +32,7 @@ class LeadsHelper
         $this->distributeLeads($leads, $jrUserCounts, $srUserCounts);
     }
 
-    public function importCampaingsBased($leads, $statuses)
+    public function importCampaignsBased($leads, $statuses)
     {
         $leads = collect($leads);
 
@@ -237,12 +238,16 @@ class LeadsHelper
 
         $leads = [];
         $newStatus = Status::where('slug', 'new')->first()->id;
-        $duplicatedStatus = Status::whereName('duplicated')->first();
+        $duplicatedStatus = Status::whereName('duplicated')->first()->id;
 
         foreach ($rawLeads as $key => $rawLead) {
             // Phone number
             $rawLead['phone_number'] = str_replace(' ', '', $rawLead['phone_number']);
             $rawLead['phone_number'] = $this->rectifyPhone($rawLead['phone_number']);
+
+            $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$rawLead['phone_number']}%")
+                ->where('phone_number', '!=', '')
+                ->first();
 
             $lead = new Ticket([
                 'number' => $rawLead['id'],
@@ -260,20 +265,12 @@ class LeadsHelper
                 'phone_number' => $rawLead['phone_number'],
                 'email' => $rawLead['email'],
                 'job_title' => $rawLead['job_title'] ?? '',
-                'status_id' => $newStatus,
+                'status_id' => $dupLead ? $duplicatedStatus : $newStatus,
                 'source_id' => $this->getSourceID($rawLead['platform']),
                 'assigner_id' => $manual ? auth()->user()->id : null,
                 'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source)
             ]);
 
-            $dupLead = Ticket::wherePhoneNumber($lead->phone_number)
-                ->where('phone_number', '!=', '')
-                ->where('id', '!=', $lead->id)
-                ->first();
-
-            if ($dupLead and $dupLead !== null) {
-                $lead->status_id = $duplicatedStatus->id;
-            }
             $leads[] = $lead;
         }
 
@@ -303,7 +300,7 @@ class LeadsHelper
         if (!$useCamps) {
             $this->importWithNoCampaigns($leads, $statuses);
         } else {
-            $this->importCampaingsBased($leads, $statuses);
+            $this->importCampaignsBased($leads, $statuses);
         }
     }
 
@@ -379,6 +376,8 @@ class LeadsHelper
         } else if (str_starts_with($phoneNumber, '05')) {
             $phoneNumber = substr($phoneNumber, 1);
             $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
+        } else if (str_starts_with($phoneNumber, '5')) {
+            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
         }
 
         return $phoneNumber;
@@ -397,6 +396,36 @@ class LeadsHelper
                 return Source::where('name', 'Snapchat')->first()->id;
             default:
                 return Source::where('name', 'Unspecified')->first()->id;
+        }
+    }
+
+    public function notifyUser($usersIds, $title, $message, $link)
+    {
+        $usersIds = array_map('intval', explode(',', $usersIds));
+
+        try {
+            $fcmTokens = User::whereNotNull('fcm_token')
+                ->whereIn('id', $usersIds)
+                ->pluck('fcm_token')
+                ->toArray();
+
+            auth()->user()
+                ->notify(new SendPushNotification(
+                    $title,
+                    $message . '|' . $link,
+                    $fcmTokens
+                ));
+
+            /*
+            Larafirebase::withTitle($request->title)
+                ->withBody($request->message)
+                ->sendMessage($fcmTokens);
+            */
+            return response()->json(['Successful' => 'OK!'], 200);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e], 404);
+            // report($e);
         }
     }
 }

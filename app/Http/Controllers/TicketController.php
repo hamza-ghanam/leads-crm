@@ -45,7 +45,7 @@ class TicketController extends Controller
     public function __construct()
     {
         $this->leadsHelper = new LeadsHelper();
-        $this->middleware('auth');
+        $this->middleware('auth')->except('devTest');
     }
 
     /**
@@ -56,6 +56,9 @@ class TicketController extends Controller
      */
     public function index(Request $request)
     {
+        $wnotif = new WebNotificationController();
+        //$wnotif->sendNotification([58], 'Hello 1st alert', 'This is the first alert from WolfGrey!');
+
         //////////////////////////////////////////
         $roles = Role::all()->pluck('name')->toArray();
 
@@ -72,6 +75,7 @@ class TicketController extends Controller
         // Status filter
         if (isset($filterParams['status']) && !empty($filterParams['status']) && $filterParams['status'] !== 'all') {
             $theStatus = Status::whereSlug($filterParams['status'])->first();
+
             $tickets = Ticket::whereStatusId($theStatus->id);
 
             if (auth()->user()->hasRole('admin')) {
@@ -175,6 +179,14 @@ class TicketController extends Controller
             // Now, we don't have TELE
             if (str_ends_with($status->slug, 'tele')) {
                 unset($statuses[$key]);
+            }
+
+            // 10/12/2023 - Sales => No 'dead', 're-shuffled', 'reviewed', 'approved', 'sold' and 'pre-approved'
+            $salesBlocked = ['dead', 're-shuffled', 'reviewed', 'approved', 'sold', 'pre-approved'];
+            if (in_array($status->slug, $salesBlocked)) {
+                if (auth()->user()->hasAnyRole('sale')) {
+                    unset($statuses[$key]);
+                }
             }
         }
 
@@ -384,7 +396,10 @@ class TicketController extends Controller
                 ->pluck('email')
                 ->toArray();
 
-            Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+            //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+
+            $this->sendLeadMail($superAdmins, $data);
+
 
             if ($newTicket->user) {
                 // User himself
@@ -395,7 +410,10 @@ class TicketController extends Controller
                     'ticket' => $newTicket->id
                 ];
 
-                Mail::to($user->email)->send(new LeadNotifyMail($data));
+                // Mail::to($user->email)->send(new LeadNotifyMail($data));
+
+                $this->sendLeadMail($user->email, $data);
+
             }
 
             return redirect()->route('tickets.all');
@@ -424,7 +442,14 @@ class TicketController extends Controller
             return back()->withErrors(['msg' => 'Unauthorised Access.']);
         }
 
-        $users = User::role(['sale', 'tele-sale'])
+        // 10/12/2023 - Accountant -> Approved
+        $roles = ['sale', 'tele-sale'];
+
+        if (auth()->user()->hasRole(['super-admin']) && $ticket->status->slug === 'pre-approved') {
+            array_push($roles, 'accountant');
+        }
+
+        $users = User::role($roles)
             ->where('status', 'permitted')
             ->get();
 
@@ -458,6 +483,13 @@ class TicketController extends Controller
             // Now, we don't have TELE
             if (str_ends_with($status->slug, 'tele')) {
                 unset($statuses[$key]);
+            }
+
+            // 10/12/2023 - Sales => No Dead & Re-shuffle
+            if ($status->slug == 'dead' || $status->slug == 're-shuffled') {
+                if (auth()->user()->hasAnyRole('sale')) {
+                    unset($statuses[$key]);
+                }
             }
         }
 
@@ -496,7 +528,7 @@ class TicketController extends Controller
             'invoice' => $invoice,
             'sources' => $sources
         ];
-
+//dd($booking);
         return view('tickets.show')->with($results);
     }
 
@@ -626,7 +658,7 @@ class TicketController extends Controller
             $data = [
                 'title' => 'Lead Update',
                 'message' => 'Lead has been updated by user: ',
-                'user' => $user->name,
+                'user' => $user ? $user->name : '_',
                 'ticket' => $ticket->id
             ];
 
@@ -635,17 +667,23 @@ class TicketController extends Controller
                 ->pluck('email')
                 ->toArray();
 
-            Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+            // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
-            // User himself
-            $data = [
-                'title' => 'Lead Update',
-                'message' => 'Lead has been updated by you!',
-                'user' => '',
-                'ticket' => $ticket->id
-            ];
+            $this->sendLeadMail($superAdmins, $data);
 
-            Mail::to($user->email)->send(new LeadNotifyMail($data));
+            if ($user) {
+                // User himself
+                $data = [
+                    'title' => 'Lead Update',
+                    'message' => 'Lead has been updated by you!',
+                    'user' => '',
+                    'ticket' => $ticket->id
+                ];
+
+                // Mail::to($user->email)->send(new LeadNotifyMail($data));
+
+                $this->sendLeadMail($user->email, $data);
+            }
 
             return redirect()->route('tickets.show', $ticket->id);
         }
@@ -685,7 +723,10 @@ class TicketController extends Controller
 
         //            dd($data);
 
-        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+        // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+
+        $this->sendLeadMail($superAdmins, $data);
+
 
         // User himself
         $data = [
@@ -695,7 +736,9 @@ class TicketController extends Controller
             'ticket' => $ticket->id
         ];
 
-        Mail::to(auth()->user()->email)->send(new LeadNotifyMail($data));
+        // Mail::to(auth()->user()->email)->send(new LeadNotifyMail($data));
+
+        $this->sendLeadMail(auth()->user()->email, $data);
 
         return response()->json(['OK' => 'Deleted. ' . $id], 200);
     }
@@ -715,16 +758,31 @@ class TicketController extends Controller
                 ->with(['leads' => $leads]);
         }
 
-        [$spread, $sheet] = $this->leadsHelper->getSpreadsheetDetails($source);
+        $temp_arr = $this->leadsHelper->fetchLeadsFromZapier($source, 'Manual');
+        $leads = [];
 
-        $sheets = Sheets::spreadsheet(config('sheets.' . $spread))
-            ->sheet(config('sheets.' . $sheet))
-            ->get();
+        foreach ($temp_arr as $lead) {
+            $keyNum = mt_rand(1, 10000000);
+            $leads += [$keyNum => $lead];
+        }
 
-        $header = $sheets->pull(0);
-        $tickets = Sheets::collection($header, $sheets);
+        Cache::put('leads', $leads, now()->addMinutes(10));
 
-        return view('tickets.showImports', ['facebook'])->with(['tickets' => $tickets]);
+        $sales = null;
+        if (auth()->user()->hasRole('super-admin')) {
+            $sales = User::role(['sale', 'tele-sale'])
+                ->where('status', 'permitted')
+                ->get();
+        } elseif (auth()->user()->hasRole('sales-manager')) {
+            $sales = User::whereManagerId(auth()->user()->id)
+                ->where('status', 'permitted')
+                ->get();
+        }
+
+        return view('tickets.showImports')->with([
+            'tickets' => $leads,
+            'sales' => $sales
+        ]);
     }
 
     public function importFromExcelFile(Request $request): \Illuminate\Http\RedirectResponse
@@ -827,7 +885,7 @@ class TicketController extends Controller
                     return back()->withErrors(['msg' => 'Invalid file.'])->withInput($request->all());
                 }
 
-                Cache::put('leads', $leads, 10);
+                Cache::put('leads', $leads, now()->addMinutes(10));
 
                 return redirect()->back()->withInput($request->all())->with(['leads' => $leads]);
             }
@@ -871,6 +929,55 @@ class TicketController extends Controller
 
             return redirect()->route('tickets.all');
         }
+    }
+
+    public function importLeadsFromZapierV2($source, Request $request): \Illuminate\Http\JsonResponse
+    {
+        parent::hasPermission('facebook import');
+
+        if (!in_array($source, ['facebook', 'tiktok'])) {
+            return response()->json(['ERROR' => 0], 404);
+        }
+
+        $rules = [
+            'details' => 'required|array|min:1',
+            'details.*' => 'required|integer|gt:0',
+        ];
+
+        $messages = [
+            'required' => 'The :attribute field is required.',
+            'gt:0' => 'The :attribute field should be positive.',
+            'min:1' => 'The :attribute should have at least one item.'
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        /**** Call helper function (03/09/2022) ****/
+        $leads = Cache::get('leads');
+
+        // return response()->json(['OK' => $request->details], 200);
+        $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+
+        foreach ($request->details as $leadIndex => $userId) {
+            if (!User::find($userId)) {
+                return response()->json(['msg' => 'Please check all users.'], 400);
+            }
+
+            $leads[$leadIndex]->user_id = $userId;
+            $leads[$leadIndex]->save();
+
+            if ($leads[$leadIndex]->status_id !== $duplicatedStatus) {
+                $this->leadsHelper->createAndAssignLead($leads[$leadIndex], $leads[$leadIndex]->status_id);
+            }
+        }
+
+        $this->leadsHelper->emptyZapierLeadsSheet($source, count($leads));
+
+        return response()->json(['OK' => count($leads)], 200);
     }
 
     public function importLeadsFromZapier($source): \Illuminate\Http\JsonResponse
@@ -988,7 +1095,6 @@ class TicketController extends Controller
         $dead = Status::where('slug', 'dead')->first();
         $deadTele = Status::where('slug', 'dead-tele')->first();
 
-
         $tPath = TicketPath::create([
             'prev_user' => $ticket->user ? $ticket->user->id : null,
             'next_user' => $user->id,
@@ -998,7 +1104,7 @@ class TicketController extends Controller
             'comment' => $request->comment
         ]);
 
-        $mgmtStatuses = Status::whereIn('slug', ['reviewed', 'approved', 'sold', 'pre-approved', 'rejected'])
+        $mgmtStatuses = Status::whereIn('slug', ['reviewed', 'sold', 'pre-approved', 'rejected'])
             ->get()
             ->pluck('id')
             ->toArray();
@@ -1023,7 +1129,6 @@ class TicketController extends Controller
             $mtng->ticket_path_id = $tPath->id;
             $mtng->save();
         }
-
 
         if ($theStatus->slug === 'meeting') {
             $ticketUser->status = 'banned';
@@ -1052,7 +1157,9 @@ class TicketController extends Controller
             ->pluck('email')
             ->toArray();
 
-        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+        $this->sendLeadMail($superAdmins, $data);
+
+        // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
         // User himself
         $data = [
@@ -1062,7 +1169,9 @@ class TicketController extends Controller
             'ticket' => $ticket->id
         ];
 
-        Mail::to($user->email)->send(new LeadNotifyMail($data));
+        $this->sendLeadMail($user->email, $data);
+
+        // Mail::to($user->email)->send(new LeadNotifyMail($data));
 
         if (strpos(strtolower($theStatus->name), 'book') !== false) {
             $booking = Booking::create([
@@ -1281,7 +1390,9 @@ class TicketController extends Controller
                 ->pluck('email')
                 ->toArray();
 
-            Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+            // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+
+            $this->sendLeadMail($superAdmins, $data);
 
             if ($lead->user) {
                 // User himself
@@ -1292,15 +1403,44 @@ class TicketController extends Controller
                     'ticket' => $lead->id
                 ];
 
-                Mail::to($lead->user->email)->send(new LeadNotifyMail($data));
+                // Mail::to($lead->user->email)->send(new LeadNotifyMail($data));
+                $this->sendLeadMail($lead->user->email, $data);
+
             }
         }
 
         return back()->with('successMsg', 'Leads have been forwarded.');
     }
 
-    public function devTest()
+    public function devTest(Request $request)
     {
+        $rules = [
+            'details' => 'required|array|min:1',
+            'details.*' => 'required|integer|gt:0',
+        ];
+
+        $messages = [
+            'required' => 'The :attribute field is required.',
+            'gt:0' => 'The :attribute field should be positive.',
+            'min:1' => 'The :attribute should have at least one item.'
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        if (!User::find(13)) {
+            return response()->json(['msg' => 'Please check all users.'], 400);
+        } else {
+            return response()->json(['OK' => 555], 200);
+        }
+
+        $lead = Ticket::find(2300);
+
+        return response()->json(mt_rand(1, 10000000), 200);
+
         /*
         $leads = [
             [
@@ -1471,7 +1611,27 @@ class TicketController extends Controller
         // Notification::send(null,new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
 
         // auth()->user()->notify(new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
-        dd($this->leadsHelper->rectifyPhone('966555552292'));
+        dd($this->leadsHelper->rectifyPhone('966505228708'));
         //return redirect()->route('home');
+    }
+
+    private function sendLeadMail($recipients, $data)
+    {
+        try {
+            Mail::to($recipients)->send(new LeadNotifyMail($data));
+
+            // Check for failures
+            if (count(Mail::failures()) > 0) {
+                // Handle failures (if any)
+                // You can log or perform any other action here
+                // Note: Failures will only be available if the driver supports it (e.g., SMTP)
+            }
+
+            // Continue execution
+
+        } catch (\Exception $exception) {
+            // Handle exceptions (if any)
+            // Log or perform any other action
+        }
     }
 }

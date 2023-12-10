@@ -55,4 +55,34 @@ class WebNotificationController extends Controller
             return redirect()->back()->with('error', 'Something goes wrong while sending notification.');
         }
     }
+
+    public function sendNotification(Request $request)
+    {
+        $usersIds = array_map('intval', explode(',', $request->usersIds));
+
+        try {
+            $fcmTokens = User::whereNotNull('fcm_token')
+                ->whereIn('id', $usersIds)
+                ->pluck('fcm_token')
+                ->toArray();
+
+            auth()->user()
+                ->notify(new SendPushNotification(
+                    $request->title,
+                    $request->message,
+                    $fcmTokens
+                ));
+
+            /*
+            Larafirebase::withTitle($request->title)
+                ->withBody($request->message)
+                ->sendMessage($fcmTokens);
+            */
+            return response()->json(['Successful' => 'OK!'], 200);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e], 404);
+            // report($e);
+        }
+    }
 }

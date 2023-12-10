@@ -49,7 +49,8 @@ Route::prefix('tickets')->group(function () {
     Route::delete('delete/{id}', [TicketController::class, 'destroy'])->name('tickets.delete');
     Route::post('importFromExcel', [TicketController::class, 'importFromExcelFile'])->name('tickets.excel');
     Route::get('showImports/{source}', [TicketController::class, 'showImportLeads'])->name('tickets.showImports');
-    Route::get('importLeads/{source}', [TicketController::class, 'importLeadsFromZapier'])->name('tickets.doImport');
+    //Route::get('importLeads/{source}', [TicketController::class, 'importLeadsFromZapier'])->name('tickets.doImport');
+    Route::post('importLeads/{source}', [TicketController::class, 'importLeadsFromZapierV2'])->name('tickets.doImport');
     Route::post('moveForward/{id}', [TicketController::class, 'moveForward'])->name('tickets.moveForward');
     Route::post('makeInvoice/{id}', [TicketController::class, 'makeInvoice'])->name('tickets.makeInvoice');
     Route::post('attachPassport/{id}', [TicketController::class, 'attachPassport'])->name('tickets.attachPassport');
@@ -84,9 +85,13 @@ Route::prefix('settings')->group(function () {
 Route::get('devTest', [TicketController::class, 'devTest'])->name('devTest');
 
 
-Route::patch('/fcm-token', [WebNotificationController::class, 'updateToken'])->name('fcmToken');
-Route::post('/send-notification',[WebNotificationController::class,'notification'])->name('notification');
+Route::patch('/fcm-token', [WebNotificationController::class, 'updateToken'])->name('update.token');
+Route::post('/send-notification',[WebNotificationController::class,'notification'])->name('send.notification');
+Route::get('/notify',[WebNotificationController::class,'sendNotification'])->name('notify');
 
 Route::get('/test', function () {
     return view('test');
 });
+
+Route::post('/testpost',[TicketController::class, 'devTest'])->name('testpost');
+

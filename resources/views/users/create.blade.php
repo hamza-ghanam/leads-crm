@@ -46,12 +46,12 @@
                             <div class="form-group">
                                 <label for="password">Password</label>
                                 <input type="password" class="form-control" id="password" name="password"
-                                       placeholder="Password">
+                                       placeholder="Password" autocomplete="new-password">
                             </div>
                             <div class="form-group">
                                 <label for="password">Password Confirmation</label>
                                 <input type="password" class="form-control" id="password_confirmation"
-                                       name="password_confirmation" placeholder="Password Confirmation">
+                                       name="password_confirmation" placeholder="Password Confirmation" autocomplete="new-password">
                             </div>
                             <div class="form-group">
                                 <label for="role">Role</label>

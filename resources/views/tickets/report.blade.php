@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title')
-Report Details
+    Report Details
 @endsection
 
 @section('breadcrumb')
@@ -51,7 +51,7 @@ Report Details
                         <label for="person" class="col-sm-2 col-form-label">Lead info</label>
                         <label for="fstatus" class="col-sm-1 col-form-label-sm">Status:</label>
                         <div class="col-sm-2">
-                            <select id="fstatus" name="fstatus" class="form-control form-control-sm select2" data-dropdown-css-class="select2-info">
+                            <select id="fstatus" name="fstatus" class="form-control form-control-sm select2" >
                                 <option value="all">All</option>
                                 @foreach($statuses as $status)
                                 @if (auth()->user()->hasRole('accountant') AND ($status->slug != 'booking' AND $status->slug != 'approved' AND $status->slug != 'sold'))
@@ -64,7 +64,7 @@ Report Details
                         @hasanyrole('super-admin|sales-manager')
                         <label for="sales" class="col-sm-1 col-form-label-sm">Sales:</label>
                         <div class="col-sm-2">
-                            <select id="sales" name="sales" class="form-control form-control-sm select2" data-dropdown-css-class="select2-info">
+                            <select id="sales" name="sales" class="form-control form-control-sm select2">
                                 <option value="all">All</option>
                                 @foreach($sales as $sale)
                                 <option {{($currentSale == $sale->id) ? 'selected' : ''}} value="{{$sale->id}}">{{$sale->name}}</option>
@@ -187,12 +187,6 @@ Report Details
 @endsection
 
 @section('script')
-
-<!-- PAGE SCRIPTS -->
-<script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
-<!-- Select2 -->
-<script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
-
 <script>
     function getParams(url, formId) {
         console.log(formId);

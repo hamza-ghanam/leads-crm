@@ -67,23 +67,23 @@
                             <div class="form-group">
                                 <label for="password">Password</label>
                                 <small class="text-danger text-bold"> (If you don't want to change it, keep it empty.)</small>
-                                <input type="password" class="form-control" id="password" name="password" />
+                                <input type="password" class="form-control" id="password" name="password" autocomplete="new-password" />
                             </div>
 
                             <div class="form-group">
                                 <label for="password_confirmation">Password Confirmation</label>
                                 <small class="text-danger text-bold"> (If you don't want to change it, keep it empty.)</small>
-                                <input type="password" class="form-control" id="password_confirmation"
+                                <input type="password" class="form-control" id="password_confirmation" autocomplete="new-password"
                                        name="password_confirmation" />
                             </div>
-                            
+
                             <div class="form-group">
                                 <div class="custom-control custom-switch">
                                   <input type="checkbox"  class="custom-control-input" id="customSwitch1" name="ban_check" {{ $user->status === 'permitted' ? 'checked' : '' }} />
                                   <label class="custom-control-label" for="customSwitch1">{{ $user->status === 'banned' ? 'Banned' : 'Permitted' }}</label>
                                 </div>
                             </div>
-                            
+
                             <div class="form-group">
                                 <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
                                     <input type="checkbox" class="custom-control-input" id="customSwitch3" name="delete_check" {{ !$user->deleted_at ? 'checked' : '' }} />

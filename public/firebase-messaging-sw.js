@@ -16,9 +16,29 @@ firebase.initializeApp({
     measurementId: 'G-measurement-id',
 });
 
-// Retrieve an instance of Firebase Messaging so that it can handle background
-// messages.
 const messaging = firebase.messaging();
-messaging.setBackgroundMessageHandler(function ({data: {title, body, icon}}) {
-    return self.registration.showNotification(title, {body, icon});
+messaging.setBackgroundMessageHandler((payload) => {
+    console.log(
+        "[firebase-messaging-sw.js] Received background message ",
+        payload,
+    );
+
+    const notificationTitle = payload.data.title;
+    const bb = payload.data.body.split('|');
+
+    const notificationOptions = {
+        body: bb[0],
+        icon: '/dist/img/leads-logo-bg.png',
+        data: bb[1]
+    };
+
+    return self.registration.showNotification(
+        notificationTitle,
+        notificationOptions,
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    event.waitUntil(self.clients.openWindow(event.notification.data));
 });

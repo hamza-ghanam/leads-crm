@@ -496,7 +496,7 @@
                     OR $ticket->status->slug === 'duplicated') AND (auth()->user()->hasRole('sale') OR (auth()->user()->hasRole('tele-sale'))))
 
                     <div class="alert alert-dismissible alert-danger">
-                        <h4 style="text-align: center;">Your role on this lead has end! Thank you.</h4>
+                        <h4 style="text-align: center;">Your role on this lead is over! Thank you.</h4>
                     </div>
 
                 @else
@@ -604,6 +604,18 @@
                                                             @endif
                                                         @endforeach
                                                     </optgroup>
+                                                    @if($ticket->status->slug == 'pre-approved')
+                                                        <optgroup label="Accountants">
+                                                            @foreach($users as $user)
+                                                                @if ($user->role === 'accountant')
+                                                                    <option value="{{$user->id}}"
+                                                                        {{ ($ticket->user !== null && $user->id === $ticket->user->id) ? 'selected' : '' }}>
+                                                                        {{$user->name}}
+                                                                    </option>
+                                                                @endif
+                                                            @endforeach
+                                                        </optgroup>
+                                                    @endif
                                                 </select>
                                             </div>
                                             @endhasanyrole
