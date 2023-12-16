@@ -6,6 +6,11 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge">
 
     <title>Leads CRM - Management Dashboard</title>
+    <meta property="og:title" content="Leads CRM">
+    <meta property="og:description" content="Manage you Leads from different sources using our advanced CRM">
+    <meta property="og:image" content="{{ asset('dist/img/leads-logo-bg.png') }}">
+    <meta property="og:url" content="{{ env('APP_URL') }}">
+    <meta property="og:type" content="website">
 
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="{{ asset('plugins/fontawesome-free/css/all.min.css') }}">
