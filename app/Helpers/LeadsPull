@@ -1,0 +1,118 @@
+$schedule->call(function () {
+            $pullDate = date('Y-m-d H:i:s');
+            $dateBegin = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 10:29:57"));
+            $dateEnd = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 17:00:03"));
+            if (!($pullDate >= $dateBegin && $pullDate <= $dateEnd)) {
+                return;
+                /*
+                if ($posts < 20) {
+                    return;
+                }
+                */
+            }
+
+            /**** New Method (15/05/2022) ****/
+            /**** Call helper function (03/09/2022) ****/
+            $leadsHelper = new LeadsHelper();
+
+            // Facebook
+            $leads = $leadsHelper->fetchLeadsFromZapier('facebook');
+            $leadsHelper->initiateImport($leads);
+            $leadsHelper->emptyZapierLeadsSheet('facebook', count($leads));
+
+            // TikTok
+            $leads = $leadsHelper->fetchLeadsFromZapier('tiktok');
+            $leadsHelper->initiateImport($leads);
+            $leadsHelper->emptyZapierLeadsSheet('tiktok', count($leads));
+
+            /* Old Method
+            $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])
+                ->get()
+                ->pluck('id')
+                ->toArray();
+
+            $users = User::role('sale')
+                ->whereHas('tickets', function ($query) use ($statuses) {
+                    $query->whereIn('status_id', $statuses);
+                })
+                ->with('tickets')
+                ->get();
+
+            $usersNoTickets = User::role('sale')
+                ->whereDoesntHave('tickets')
+                ->get();
+
+            $users = $users->merge($usersNoTickets);
+
+            $userCounts = [];
+
+            foreach ($users as $key => $user) {
+                $userCounts += [$user->id => count($user->tickets)];
+            }
+
+            asort($userCounts);
+            $userCounts = array_keys($userCounts);
+
+            $startPos = 0;
+            foreach ($tickets as $key => $ticket) {
+                if ($ticket->status_id === $duplicatedStatus->id) {
+                    $ticket->user_id = null;
+                    $ticket->save();
+                    continue;
+                }
+
+                $ticket->user_id = $userCounts[$startPos];
+                $startPos++;
+
+                if ($startPos === count($userCounts)) {
+                    $startPos = 0;
+                }
+
+                $ticket->save();
+
+                $ticketPath = TicketPath::create([
+                    'next_user' => $ticket->user_id,
+                    'next_status' => $newStatus,
+                    'ticket_id' => $ticket->id,
+                    'comment' => 'Initial ticket creation.',
+                ]);
+
+                $ticketPath->save();
+
+                // Notify Users
+                $user = User::find($ticket->user_id);
+
+                // Super admin
+                $data = [
+                    'title' => 'New Lead',
+                    'message' => 'A new lead is automatically assigned to the user: ',
+                    'user' => $user->name,
+                    'ticket' => $ticket->id
+                ];
+
+                $superAdmins = User::role('super-admin')
+                    ->get()
+                    ->pluck('email')
+                    ->toArray();
+
+                Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+
+                // User himself
+                $data = [
+                    'title' => 'New Lead',
+                    'message' => 'A new lead is automatically assigned to you!',
+                    'user' => '',
+                    'ticket' => $ticket->id
+                ];
+
+                Mail::to($user->email)->send(new LeadNotifyMail($data));
+            }
+
+            for ($i = 0; $i < count($tickets); $i++) {
+                Sheets::spreadsheet(config('sheets.fb_spreadsheet_id'))
+                    ->sheet(config('sheets.fb_sheet_id'))
+                    ->range('A' . ($i + 2))
+                    ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
+            }
+            */
+        })->everyThirtyMinutes();

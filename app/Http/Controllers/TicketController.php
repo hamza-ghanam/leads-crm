@@ -30,6 +30,7 @@ use App\Models\ArchivedLead;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Notification;
+use Illuminate\Support\Arr;
 
 //use Carbon\Carbon;
 
@@ -398,7 +399,7 @@ class TicketController extends Controller
 
             //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
-            $this->sendLeadMail($superAdmins, $data);
+            $this->leadsHelper->sendLeadMail($superAdmins, $data);
 
 
             if ($newTicket->user) {
@@ -412,7 +413,7 @@ class TicketController extends Controller
 
                 // Mail::to($user->email)->send(new LeadNotifyMail($data));
 
-                $this->sendLeadMail($user->email, $data);
+                $this->leadsHelper->sendLeadMail($user->email, $data);
 
             }
 
@@ -669,7 +670,7 @@ class TicketController extends Controller
 
             // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
-            $this->sendLeadMail($superAdmins, $data);
+            $this->leadsHelper->sendLeadMail($superAdmins, $data);
 
             if ($user) {
                 // User himself
@@ -682,7 +683,7 @@ class TicketController extends Controller
 
                 // Mail::to($user->email)->send(new LeadNotifyMail($data));
 
-                $this->sendLeadMail($user->email, $data);
+                $this->leadsHelper->sendLeadMail($user->email, $data);
             }
 
             return redirect()->route('tickets.show', $ticket->id);
@@ -725,7 +726,7 @@ class TicketController extends Controller
 
         // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
-        $this->sendLeadMail($superAdmins, $data);
+        $this->leadsHelper->sendLeadMail($superAdmins, $data);
 
 
         // User himself
@@ -738,7 +739,7 @@ class TicketController extends Controller
 
         // Mail::to(auth()->user()->email)->send(new LeadNotifyMail($data));
 
-        $this->sendLeadMail(auth()->user()->email, $data);
+        $this->leadsHelper->sendLeadMail(auth()->user()->email, $data);
 
         return response()->json(['OK' => 'Deleted. ' . $id], 200);
     }
@@ -758,12 +759,14 @@ class TicketController extends Controller
                 ->with(['leads' => $leads]);
         }
 
+        // Other sources (FB, TikTok, etc)
         $temp_arr = $this->leadsHelper->fetchLeadsFromZapier($source, 'Manual');
         $leads = [];
 
-        foreach ($temp_arr as $lead) {
-            $keyNum = mt_rand(1, 10000000);
-            $leads += [$keyNum => $lead];
+        $keyNum = mt_rand(1, 10000000);
+        foreach ($temp_arr as $key => $lead) {
+            $lead->key_index = $key + 1;
+            $leads += [$keyNum++ => $lead];
         }
 
         Cache::put('leads', $leads, now()->addMinutes(10));
@@ -778,6 +781,10 @@ class TicketController extends Controller
                 ->where('status', 'permitted')
                 ->get();
         }
+
+        $leads = collect($leads)->sortByDesc(function ($ticket) {
+            return $ticket->created_at;
+        })->all();
 
         return view('tickets.showImports')->with([
             'tickets' => $leads,
@@ -968,16 +975,18 @@ class TicketController extends Controller
             }
 
             $leads[$leadIndex]->user_id = $userId;
+            $rowIndex = $leads[$leadIndex]->key_index;
+            Arr::forget($leads[$leadIndex], 'key_index');
             $leads[$leadIndex]->save();
 
             if ($leads[$leadIndex]->status_id !== $duplicatedStatus) {
                 $this->leadsHelper->createAndAssignLead($leads[$leadIndex], $leads[$leadIndex]->status_id);
             }
+
+            $this->leadsHelper->deleteZapierLeadsSheetRow($source, $rowIndex);
         }
 
-        $this->leadsHelper->emptyZapierLeadsSheet($source, count($leads));
-
-        return response()->json(['OK' => count($leads)], 200);
+        return response()->json(['OK' => count($request->details)], 200);
     }
 
     public function importLeadsFromZapier($source): \Illuminate\Http\JsonResponse
@@ -1157,7 +1166,7 @@ class TicketController extends Controller
             ->pluck('email')
             ->toArray();
 
-        $this->sendLeadMail($superAdmins, $data);
+        $this->leadsHelper->sendLeadMail($superAdmins, $data);
 
         // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
@@ -1169,7 +1178,7 @@ class TicketController extends Controller
             'ticket' => $ticket->id
         ];
 
-        $this->sendLeadMail($user->email, $data);
+        $this->leadsHelper->sendLeadMail($user->email, $data);
 
         // Mail::to($user->email)->send(new LeadNotifyMail($data));
 
@@ -1392,7 +1401,7 @@ class TicketController extends Controller
 
             // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
-            $this->sendLeadMail($superAdmins, $data);
+            $this->leadsHelper->sendLeadMail($superAdmins, $data);
 
             if ($lead->user) {
                 // User himself
@@ -1404,7 +1413,7 @@ class TicketController extends Controller
                 ];
 
                 // Mail::to($lead->user->email)->send(new LeadNotifyMail($data));
-                $this->sendLeadMail($lead->user->email, $data);
+                $this->leadsHelper->sendLeadMail($lead->user->email, $data);
 
             }
         }
@@ -1613,25 +1622,5 @@ class TicketController extends Controller
         // auth()->user()->notify(new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
         dd($this->leadsHelper->rectifyPhone('966505228708'));
         //return redirect()->route('home');
-    }
-
-    private function sendLeadMail($recipients, $data)
-    {
-        try {
-            Mail::to($recipients)->send(new LeadNotifyMail($data));
-
-            // Check for failures
-            if (count(Mail::failures()) > 0) {
-                // Handle failures (if any)
-                // You can log or perform any other action here
-                // Note: Failures will only be available if the driver supports it (e.g., SMTP)
-            }
-
-            // Continue execution
-
-        } catch (\Exception $exception) {
-            // Handle exceptions (if any)
-            // Log or perform any other action
-        }
     }
 }

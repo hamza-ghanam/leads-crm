@@ -7,6 +7,7 @@ use App\Mail\GeneralNotifyMail;
 use App\Mail\LeadNotifyMail;
 use App\Models\GeneralSettings;
 use App\Models\Meeting;
+use App\Models\SalesCampaign;
 use App\Models\Source;
 use App\Models\Status;
 use App\Models\Ticket;
@@ -29,6 +30,11 @@ class Kernel extends ConsoleKernel
         //
     ];
 
+    protected function scheduleV2(Schedule $schedule)
+    {
+
+    }
+
     /**
      * Define the application's command schedule.
      *
@@ -37,126 +43,11 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
+        /** Start Pending for test */
         // every 30 minutes, Facebook leads (Updated at: 17/5/2022)
         // Adding TikTok leads, at 13/11/2022
-        $schedule->call(function () {
-            $pullDate = date('Y-m-d H:i:s');
-            $dateBegin = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 10:29:57"));
-            $dateEnd = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 17:00:03"));
-            if (!($pullDate >= $dateBegin && $pullDate <= $dateEnd)) {
-                return;
-                /*
-                if ($posts < 20) {
-                    return;
-                }
-                */
-            }
-
-            /**** New Method (15/05/2022) ****/
-            /**** Call helper function (03/09/2022) ****/
-            $leadsHelper = new LeadsHelper();
-
-            // Facebook
-            $leads = $leadsHelper->fetchLeadsFromZapier('facebook');
-            $leadsHelper->initiateImport($leads);
-            $leadsHelper->emptyZapierLeadsSheet('facebook', count($leads));
-
-            // TikTok
-            $leads = $leadsHelper->fetchLeadsFromZapier('tiktok');
-            $leadsHelper->initiateImport($leads);
-            $leadsHelper->emptyZapierLeadsSheet('tiktok', count($leads));
-
-            /* Old Method
-            $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])
-                ->get()
-                ->pluck('id')
-                ->toArray();
-
-            $users = User::role('sale')
-                ->whereHas('tickets', function ($query) use ($statuses) {
-                    $query->whereIn('status_id', $statuses);
-                })
-                ->with('tickets')
-                ->get();
-
-            $usersNoTickets = User::role('sale')
-                ->whereDoesntHave('tickets')
-                ->get();
-
-            $users = $users->merge($usersNoTickets);
-
-            $userCounts = [];
-
-            foreach ($users as $key => $user) {
-                $userCounts += [$user->id => count($user->tickets)];
-            }
-
-            asort($userCounts);
-            $userCounts = array_keys($userCounts);
-
-            $startPos = 0;
-            foreach ($tickets as $key => $ticket) {
-                if ($ticket->status_id === $duplicatedStatus->id) {
-                    $ticket->user_id = null;
-                    $ticket->save();
-                    continue;
-                }
-
-                $ticket->user_id = $userCounts[$startPos];
-                $startPos++;
-
-                if ($startPos === count($userCounts)) {
-                    $startPos = 0;
-                }
-
-                $ticket->save();
-
-                $ticketPath = TicketPath::create([
-                    'next_user' => $ticket->user_id,
-                    'next_status' => $newStatus,
-                    'ticket_id' => $ticket->id,
-                    'comment' => 'Initial ticket creation.',
-                ]);
-
-                $ticketPath->save();
-
-                // Notify Users
-                $user = User::find($ticket->user_id);
-
-                // Super admin
-                $data = [
-                    'title' => 'New Lead',
-                    'message' => 'A new lead is automatically assigned to the user: ',
-                    'user' => $user->name,
-                    'ticket' => $ticket->id
-                ];
-
-                $superAdmins = User::role('super-admin')
-                    ->get()
-                    ->pluck('email')
-                    ->toArray();
-
-                Mail::to($superAdmins)->send(new LeadNotifyMail($data));
-
-                // User himself
-                $data = [
-                    'title' => 'New Lead',
-                    'message' => 'A new lead is automatically assigned to you!',
-                    'user' => '',
-                    'ticket' => $ticket->id
-                ];
-
-                Mail::to($user->email)->send(new LeadNotifyMail($data));
-            }
-
-            for ($i = 0; $i < count($tickets); $i++) {
-                Sheets::spreadsheet(config('sheets.fb_spreadsheet_id'))
-                    ->sheet(config('sheets.fb_sheet_id'))
-                    ->range('A' . ($i + 2))
-                    ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
-            }
-            */
-        })->everyThirtyMinutes();
+        ///// File: App/Helpers/LeadsPull
+        /** End Pending for test */
 
         /// Ban users in meeting, 5 mins.
         // Stopped 16/5/2022
@@ -263,7 +154,7 @@ class Kernel extends ConsoleKernel
             }
 
             $statuses = Status::whereIn('slug', ['new', 'follow-up'])  // re-shuffled has been removed 12/9/2022
-                ->get()
+            ->get()
                 ->pluck('id')
                 ->toArray();
 
@@ -272,6 +163,7 @@ class Kernel extends ConsoleKernel
             //// 01. Status: NEW (3 Hours)
             $newStatusId = Status::where('slug', 'new')->first()->id;
             $tickets = Ticket::where('status_id', $newStatusId)->get();
+            $newPeriodHrs = 3;
 
             /** New method 11/9/2022 */
             $teleSales = User::role('tele-sale')
@@ -299,7 +191,7 @@ class Kernel extends ConsoleKernel
                 $endTime = Carbon::now();
                 $diffHours = $endTime->diffInHours($startTime);
 
-                if ($diffHours >= 3) {
+                if ($diffHours >= $newPeriodHrs) {
                     $oldUser = User::find($ticket->user_id);
 
                     // Lead now is with Sales => tele-sales
@@ -321,7 +213,7 @@ class Kernel extends ConsoleKernel
                         'prev_status' => $newStatusId, // Check
                         'next_status' => $newStatusId, // Check
                         'ticket_id' => $ticket->id,
-                        'comment' => 'Back from NEW after 3 hours inactive.',
+                        'comment' => 'Re-assigned after ' . $newPeriodHrs . ' hours of inactivity.',
                     ]);
                     $ticketPath->save();
 
@@ -498,28 +390,43 @@ class Kernel extends ConsoleKernel
                         'prev_status' => $followUpStatus,
                         'next_status' => $newStatusId,
                         'ticket_id' => $ticket->id,
-                        'comment' => 'Back from FOLLOW-UP after 15 days inactive.',
+                        'comment' => 'Back from FOLLOW-UP after ' . $followUpDays . ' days inactive.',
                     ]);
 
                     $ticketPath->save();
 
                     $data = [
                         'title' => 'Back from FOLLOW-UP',
-                        'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ',
+                        'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after ' . $followUpDays . ' days of inactivity: ',
                         'user' => $ticket->user->name,
                         'ticket' => $ticket->id
                     ];
 
                     $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-                    Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+
+                    LeadsHelper::sendLeadMail($superAdmins, $data);
+                    //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 
                     // User himself
-                    $data = ['title' => 'Back from FOLLOW-UP', 'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                    Mail::to($ticket->user->email)->send(new LeadNotifyMail($data));
+                    $data = [
+                        'title' => 'Back from FOLLOW-UP',
+                        'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after ' . $followUpDays . ' days of inactivity: ',
+                        'user' => '',
+                        'ticket' => $ticket->id
+                    ];
+                    //Mail::to($ticket->user->email)->send(new LeadNotifyMail($data));
+                    LeadsHelper::sendLeadMail($ticket->user->email, $data);
 
                     // Old User himself
-                    $data = ['title' => 'Withdrawn Lead', 'message' => 'Lead has been automatically withdrawn from you!', 'user' => '', 'ticket' => $ticket->id];
-                    Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
+                    $data = [
+                        'title' => 'Withdrawn Lead',
+                        'message' => 'Lead has been automatically withdrawn from you!',
+                        'user' => '',
+                        'ticket' => $ticket->id
+                    ];
+
+                    //Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
+                    LeadsHelper::sendLeadMail($oldUser->email, $data);
 
                     $startPos++;
                     if ($startPos === count($teleUserCounts)) {
@@ -559,6 +466,7 @@ class Kernel extends ConsoleKernel
                 $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
                 $endTime = Carbon::now();
                 $diffDays = $startTime->diffInDays($endTime);
+
                 if ($diffDays >= $meetingDays) {
                     $oldUser = User::find($ticket->user_id);
 
@@ -580,24 +488,32 @@ class Kernel extends ConsoleKernel
                         'prev_status' => $meetingStatus,
                         'next_status' => $newStatusId,
                         'ticket_id' => $ticket->id,
-                        'comment' => 'Back from MEETING after 7 days inactive.',
+                        'comment' => 'Back from MEETING after ' . $meetingDays . ' days inactive.',
                     ]);
 
                     $ticketPath->save();
 
                     ////// Notify Users
                     // Super admin
-                    $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => $user->name, 'ticket' => $ticket->id];
+                    $data = [
+                        'title' => 'Back from MEETING',
+                        'message' => 'Lead has been automatically returned from MEETING to NEW after ' . $meetingDays . ' days of inactivity: ',
+                        'user' => $teleUserCounts[0]->name,
+                        'ticket' => $ticket->id
+                    ];
                     $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-                    Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+                    //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+                    LeadsHelper::sendLeadMail($superAdmins, $data);
 
                     // User himself
-                    $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                    Mail::to($ticket->user->email)->send(new LeadNotifyMail($data));
+                    $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after ' . $meetingDays . ' days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
+                    //Mail::to($ticket->user->email)->send(new LeadNotifyMail($data));
+                    LeadsHelper::sendLeadMail($ticket->user->email, $data);
 
                     // Old User himself
                     $data = ['title' => 'Withdrawn Lead', 'message' => 'Lead has been automatically withdrawn from you!', 'user' => '', 'ticket' => $ticket->id];
-                    Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
+                    //Mail::to($oldUser->email)->send(new LeadNotifyMail($data));
+                    LeadsHelper::sendLeadMail($oldUser->email, $data);
 
                     $startPos++;
                     if ($startPos === count($teleUserCounts)) {
@@ -630,20 +546,32 @@ class Kernel extends ConsoleKernel
                         'prev_status' => $waitingStatus,
                         'next_status' => $deadStatus,
                         'ticket_id' => $ticket->id,
-                        'comment' => 'After WAITING 7 days, it\'s now DEAD.',
+                        'comment' => 'After WAITING ' . $waitingDays . ' days, it\'s now DEAD.',
                     ]);
                     $ticketPath->save();
 
                     /////// Notify Users
                     // 1. Super admin
                     $user = User::find($ticket->user_id);
-                    $data = ['title' => 'Dead Lead', 'message' => 'Lead has been automatically moved from WAITING to DEAD after 7 days of inactivity: ', 'user' => auth()->user()->name, 'ticket' => $ticket->id];
+                    $data = [
+                        'title' => 'Dead Lead',
+                        'message' => 'Lead has been automatically moved from WAITING to DEAD after ' . $waitingDays . ' days of inactivity: ',
+                        'user' => auth()->user()->name,
+                        'ticket' => $ticket->id
+                    ];
                     $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-                    Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+                    //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+                    LeadsHelper::sendLeadMail($superAdmins, $data);
 
                     // 2. User himself
-                    $data = ['title' => 'Dead Lead', 'message' => 'Lead has been automatically moved from WAITING to DEAD after 7 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                    Mail::to($user->email)->send(new LeadNotifyMail($data));
+                    $data = [
+                        'title' => 'Dead Lead',
+                        'message' => 'Lead has been automatically moved from WAITING to DEAD after ' . $waitingDays . ' days of inactivity: ',
+                        'user' => '',
+                        'ticket' => $ticket->id
+                    ];
+                    //Mail::to($user->email)->send(new LeadNotifyMail($data));
+                    LeadsHelper::sendLeadMail($user->email, $data);
                 }
             }
 

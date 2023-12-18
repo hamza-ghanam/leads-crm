@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use App\Mail\LeadNotifyMail;
+use App\Mail\NotifyMail;
 use App\Models\GeneralSettings;
 use App\Models\SalesCampaign;
 use App\Models\Source;
@@ -11,6 +12,7 @@ use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
 use App\Notifications\SendPushNotification;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Revolution\Google\Sheets\Facades\Sheets;
@@ -160,7 +162,10 @@ class LeadsHelper
                 'user' => '',
                 'ticket' => $lead->id
             ];
-            Mail::to($user->email)->send(new LeadNotifyMail($data));
+
+            $this->sendLeadMail($user->email, $data);
+
+            // Mail::to($user->email)->send(new LeadNotifyMail($data));
 
             $message = 'A new lead is automatically assigned to the user: ';
         } else {
@@ -176,7 +181,9 @@ class LeadsHelper
         ];
 
         $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+        $this->sendLeadMail($superAdmins, $data);
+
+        //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
     }
 
     public function prepareJrAndSrSalesLists($salesJR, $salesSR, $statuses): array
@@ -241,22 +248,26 @@ class LeadsHelper
         $duplicatedStatus = Status::whereName('duplicated')->first()->id;
 
         foreach ($rawLeads as $key => $rawLead) {
+            if (empty(array_filter($rawLead->toArray()))) {
+                continue;
+            }
+
             // Phone number
             $rawLead['phone_number'] = str_replace(' ', '', $rawLead['phone_number']);
             $rawLead['phone_number'] = $this->rectifyPhone($rawLead['phone_number']);
 
-            $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$rawLead['phone_number']}%")
+            $dupLead = Ticket::where('phone_number', 'LIKE', "%{$rawLead['phone_number']}%")
                 ->where('phone_number', '!=', '')
                 ->first();
 
             $lead = new Ticket([
                 'number' => $rawLead['id'],
-                'ad_id' => $rawLead['ad_id'],
-                'ad_name' => $rawLead['ad_name'],
-                'adset_id' => $rawLead['ad_name'],
-                'adset_name' => $rawLead['adset_id'],
-                'campaign_id' => $rawLead['campaign_id'],
-                'campaign_name' => $rawLead['campaign_name'],
+                'ad_id' => $rawLead['ad_id'] ?? '',
+                'ad_name' => $rawLead['ad_name'] ?? '',
+                'adset_id' => $rawLead['ad_name'] ?? '',
+                'adset_name' => $rawLead['adset_id'] ?? '',
+                'campaign_id' => $rawLead['campaign_id'] ?? '',
+                'campaign_name' => $rawLead['campaign_name'] ?? '',
                 'form_id' => $rawLead['form_id'],
                 'form_name' => $rawLead['form_name'] ?? '',
                 'is_organic' => $rawLead['is_organic'] ?? '',
@@ -265,11 +276,15 @@ class LeadsHelper
                 'phone_number' => $rawLead['phone_number'],
                 'email' => $rawLead['email'],
                 'job_title' => $rawLead['job_title'] ?? '',
+                'preferred_time' => $rawLead['preferred_time'] ?? '',
+                'remarks' => $rawLead['remarks'] ?? '',
                 'status_id' => $dupLead ? $duplicatedStatus : $newStatus,
                 'source_id' => $this->getSourceID($rawLead['platform']),
                 'assigner_id' => $manual ? auth()->user()->id : null,
-                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source)
+                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
             ]);
+
+            $lead->created_at = $rawLead['created_time'] ? Carbon::parse($rawLead['created_time']) : Carbon::now();
 
             $leads[] = $lead;
         }
@@ -277,16 +292,24 @@ class LeadsHelper
         return $leads;
     }
 
+    // 17/12/2023 - Delete a single row, call it to clear all the rows.
     public function emptyZapierLeadsSheet($source, $leadsLength)
     {
         [$spread, $sheet] = $this->getSpreadsheetDetails($source);
 
         for ($i = 0; $i < $leadsLength; $i++) {
-            Sheets::spreadsheet(config('sheets.' . $spread))
-                ->sheet(config('sheets.' . $sheet))
-                ->range('A' . ($i + 2))
-                ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
+            $this->deleteZapierLeadsSheetRow($source, $i, 2);
         }
+    }
+
+    public function deleteZapierLeadsSheetRow($source, $rowIndex, $offset = 1)
+    {
+        [$spread, $sheet] = $this->getSpreadsheetDetails($source);
+
+        Sheets::spreadsheet(config('sheets.' . $spread))
+            ->sheet(config('sheets.' . $sheet))
+            ->range('A' . ($rowIndex + $offset))
+            ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
     }
 
     public function initiateImport($leads)
@@ -353,6 +376,8 @@ class LeadsHelper
 
     function rectifyPhone($phoneNumber): string
     {
+        return $phoneNumber;
+
         $phoneNumber = str_replace(' ', '', $phoneNumber);
 
         $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
@@ -426,6 +451,33 @@ class LeadsHelper
         } catch (\Exception $e) {
             return response()->json(['error' => $e], 404);
             // report($e);
+        }
+    }
+
+    public static function sendLeadMail($recipients, $data, $template = 'lead_email')
+    {
+        try {
+            switch ($template) {
+                case 'lead_email':
+                    Mail::to($recipients)->send(new LeadNotifyMail($data));
+                    break;
+                case 'register_email':
+                    Mail::to($recipients)->send(new NotifyMail($data));
+                    break;
+            }
+
+            // Check for failures
+            if (count(Mail::failures()) > 0) {
+                // Handle failures (if any)
+                // You can log or perform any other action here
+                // Note: Failures will only be available if the driver supports it (e.g., SMTP)
+            }
+
+            // Continue execution
+
+        } catch (\Exception $exception) {
+            // Handle exceptions (if any)
+            // Log or perform any other action
         }
     }
 }

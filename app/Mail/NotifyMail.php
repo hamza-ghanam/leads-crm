@@ -30,7 +30,7 @@ class NotifyMail extends Mailable
     public function build()
     {
         return $this->subject($this->emails['title'])
-            ->markdown('emails.notify')
+            ->markdown('emails.general')
             ->with('emails', $this->emails);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\LeadsHelper;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -123,9 +124,16 @@ class UserController extends Controller
         }
 
         $createdUser->assignRole($role->name);
-        $createdUser->save();
 
-        if ($createdUser) {
+        if ($createdUser->save()) {
+            $data = [
+                'title' => 'Successful Registration',
+                'message' => 'Congratulations! Your registration was successful. You are now a member of Leads CRM',
+                'user' => $createdUser,
+            ];
+
+            LeadsHelper::sendLeadMail($createdUser->email, $data, 'register_email');
+
             return redirect()->route('users.all');
         }
 

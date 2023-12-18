@@ -7,13 +7,13 @@ importScripts('https://www.gstatic.com/firebasejs/8.3.2/firebase-messaging.js');
 Initialize the Firebase app in the service worker by passing in the messagingSenderId.
 */
 firebase.initializeApp({
-    apiKey: "AIzaSyCJyExVqmT0cLM60nO5HF1my0dopyqRoWI",
-    authDomain: "leads-crm-4553d.firebaseapp.com",
-    projectId: "leads-crm-4553d",
-    storageBucket: "leads-crm-4553d.appspot.com",
-    messagingSenderId: "388756731314",
-    appId: "1:388756731314:web:e147dfc6ec4936c67860ab",
-    measurementId: 'G-measurement-id',
+    apiKey: 'AIzaSyBAjmDC4nj9quHfgqil8cSUEsAUjVk0ZKI',
+    authDomain: 'wjhatna-747c4.firebaseapp.com',
+    projectId: 'wjhatna-747c4',
+    storageBucket: 'wjhatna-747c4.appspot.com',
+    messagingSenderId: '323952113414',
+    appId: '1:323952113414:web:1e1b329ffe90807d4e5087',
+    measurementId: 'G-WLZCRW5X2R',
 });
 
 const messaging = firebase.messaging();

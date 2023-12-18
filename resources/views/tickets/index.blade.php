@@ -384,9 +384,6 @@
 
 @section('script')
 
-    <!-- Toastr -->
-    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
-
     <script>
         const Toast = Swal.mixin({
             toast: true,

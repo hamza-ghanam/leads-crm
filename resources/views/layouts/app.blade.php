@@ -360,6 +360,8 @@
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <!-- Select 2 -->
 <script src="{{ asset('plugins/select2/js/select2.min.js') }}"></script>
+<!-- Toastr -->
+<script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
 
 <script type="module">
     // Import the functions you need from the SDKs you need
@@ -368,16 +370,28 @@
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-messaging.js";
 
     var firebaseConfig = {
-        apiKey: "AIzaSyCJyExVqmT0cLM60nO5HF1my0dopyqRoWI",
-        authDomain: "leads-crm-4553d.firebaseapp.com",
-        projectId: "leads-crm-4553d",
-        storageBucket: "leads-crm-4553d.appspot.com",
-        messagingSenderId: "388756731314",
-        appId: "1:388756731314:web:e147dfc6ec4936c67860ab"
+        apiKey: 'AIzaSyBAjmDC4nj9quHfgqil8cSUEsAUjVk0ZKI',
+        authDomain: 'wjhatna-747c4.firebaseapp.com',
+        projectId: 'wjhatna-747c4',
+        storageBucket: 'wjhatna-747c4.appspot.com',
+        messagingSenderId: '323952113414',
+        appId: '1:323952113414:web:1e1b329ffe90807d4e5087',
+        measurementId: 'G-WLZCRW5X2R',
     };
 
     window.addEventListener("load", (e) => {
-        initFirebaseMessagingRegistration();
+        if (Notification.permission !== "granted") {
+            Swal.fire({
+                title: 'Pleas allow the notifications.',
+                icon: 'info',
+                confirmButtonColor: '#3085d6',
+                confirmButtonText: 'موافق',
+            }).then((result) => {
+                if (result.value) {
+                    initFirebaseMessagingRegistration();
+                }
+            });
+        }
     });
 
     // Initialize Firebase
@@ -386,7 +400,7 @@
     const messaging = getMessaging(app);
 
     function initFirebaseMessagingRegistration() {
-        getToken(messaging, { vapidKey: "BLzqPFU-kXeW-UR0UrpP2NZ2TEhBRRxPq-TXhVkJiWBVLPpBtY-8JT-tKGCL0w5sI9weAa_5EMD3_pFpkkTEnhY" })
+        getToken(messaging, { vapidKey: "BOY5nuv995I4uv81RYIDeH4iXWfNR8aflRYy8Vkrt40a3IfYDSTX1mBhhMUwRPx3FDyWlCqYutJlaRPB4Ocm6AY" })
             .then((token) => {
                 axios.post("{{ route('update.token') }}",{
                     _method:"PATCH",

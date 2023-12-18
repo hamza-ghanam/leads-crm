@@ -49,7 +49,8 @@
                                 <tr>
                                     <th class="fwd-leads">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" checked value="" id="select-all">
+                                            <input class="form-check-input" type="checkbox" checked value=""
+                                                   id="select-all">
                                             <label id="select-all-lbl" class="form-check-label" for="flexCheckDefault">
                                                 Deselect all
                                             </label>
@@ -73,7 +74,8 @@
                                         <td class="fwd-leads">
                                             <div class="form-check">
                                                 <input type="checkbox" name="lead_ids" id="lead-{{ $ticket->id }}"
-                                                       value="{{ $key }}" class="form-check-input" checked/>
+                                                       value="{{ $key }}" class="form-check-input row-checkbox"
+                                                       checked/>
                                             </div>
                                         </td>
                                         <td>
@@ -84,10 +86,13 @@
                                         <td>{{ $ticket['phone_number'] !== null ? $ticket['phone_number'] : '-' }}</td>
                                         <td>{{ $ticket['email'] !== null ? $ticket['email'] : '-' }}</td>
                                         <td>
-                                            <span class="badge bg-primary">New</span>
+                                            <span class="badge"
+                                                  style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $ticket->status->slug) }}">
+                                                    {{$ticket->status->name}}
+                                            </span>
                                         </td>
                                         <td>
-                                            <select class="form-control" required name="sales_ids">
+                                            <select class="form-control-sm select2bs4" required name="sales_ids">
                                                 <option value="-1" disabled selected>Please Select</option>
                                                 <optgroup label="Sales">
                                                     @foreach($sales as $salesEmp)
@@ -110,7 +115,7 @@
                                                 </optgroup>
                                             </select>
                                         </td>
-                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_time'])) }}</td>
+                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
                                     </tr>
                                     @php $k++; @endphp
                                 @endforeach
@@ -130,12 +135,15 @@
 @endsection
 
 @section('script')
-    <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
-    <!-- Toastr -->
-    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
+        $('.select2').select2();
+
+        //Initialize Select2 Elements
+        $('.select2bs4').select2({
+            theme: 'bootstrap4'
+        });
+
         $(function () {
             $('#example2').DataTable({
                 "paging": true,
@@ -157,23 +165,22 @@
         });
 
         const selectAll = document.getElementById('select-all');
-        document.getElementById('select-all').addEventListener('click', () => {
-            const checkBoxes = document.querySelectorAll('.form-check-input');
-            checkBoxes.forEach(box => {
-                if (box.checked) {
+        document.getElementById('select-all').addEventListener('change', () => {
+            const checkBoxes = document.querySelectorAll('.row-checkbox');
+            if (!selectAll.checked) {
+                checkBoxes.forEach(box => {
                     box.checked = false;
-                    selectAll.checked = false;
                     document.getElementById('select-all-lbl').innerHTML = 'Select all';
-                } else {
+                });
+            } else {
+                checkBoxes.forEach(box => {
                     box.checked = true;
-                    selectAll.checked = true;
                     document.getElementById('select-all-lbl').innerHTML = 'Deselect all';
-                }
-            });
+                });
+            }
         }, false);
 
-        function deleteRow(rowId)
-        {
+        function deleteRow(rowId) {
             const row = document.getElementById(rowId);
             row.parentNode.removeChild(row);
         }
@@ -299,14 +306,14 @@
 
                     let result = resp.data;
 
-                    //console.log(result);
+                    console.log(result);
 
                     if (result.OK) {
                         document.getElementById('loader').style.display = 'none';
                         document.getElementById('example2').style.display = '';
                         const table = $('#example2').DataTable();
                         document.getElementById('fb-data-table').style.display = '';
-                        table.clear().draw();
+                        // table.clear().draw();
 
                         let title = '';
                         if (result.OK > 0) {
@@ -319,6 +326,10 @@
                             icon: 'success',
                             title
                         });
+
+                        setTimeout(function () {
+                            location.reload();
+                        }, 2000);
                     }
                 }
             } catch (e) {
@@ -334,6 +345,7 @@
                 });
 
                 document.getElementById('fb-data-table').style.display = '';
+                document.getElementById('loader').style.display = 'none';
             }
         }
 
