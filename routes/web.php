@@ -36,6 +36,8 @@ Route::prefix('users')->group(function () {
     Route::delete('deleteRestore/{id}', [UserController::class, 'destroyRestore'])->name('users.deleteRestore');
     Route::post('store', [UserController::class, 'store'])->name('users.store');
     Route::put('update/{id}', [UserController::class, 'update'])->name('users.update');
+    Route::get('password/edit/{id}', [UserController::class, 'editPassword'])->name('users.password.edit');
+    Route::put('password/update/{id}', [UserController::class, 'updatePassword'])->name('users.password.update');
 //    Route::get('vehicles/{userId}', 'UserController@getVehicles')->name('user.vehicles');
 });
 

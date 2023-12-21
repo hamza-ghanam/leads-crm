@@ -746,6 +746,10 @@ class TicketController extends Controller
 
     public function showImportLeads($source)
     {
+        if($source === 'tiktok') {
+            return back()->withErrors(['msg' => 'Please contact the developer to configure TikTok.']);
+        }
+
         parent::hasPermission('facebook import');
 
         if (!in_array($source, ['excel', 'facebook', 'tiktok'])) {

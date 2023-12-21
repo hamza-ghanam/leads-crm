@@ -69,38 +69,35 @@ class UserController extends Controller
     {
         parent::hasPermission('add user');
 
-        $emailExist = User::where('email', $request->email)->first();
+        $emailExist = User::where('email', 'LIKE', $request->email)->first();
         $emailExistOrig = $emailExist ? $emailExist->email : '';
-
-        if ($emailExist) {
-            $emailExist->email = $emailExist->email . '_old';
-            $emailExist->save();
-        }
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users')->whereNull('deleted_at'),
+            ],
             'phone' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'integer'],
             'manager' => ['nullable', 'integer'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ];
 
         $messages = [
             'required' => 'The :attribute field is required.',
             'integer' => 'The :attribute field should be integer.',
             'string' => 'The :attribute field should be string.',
+            'min' => 'The :attribute field should have 8 at least characters.',
             'gt:0' => 'The :attribute field should be positive.'
         ];
 
         $validator = Validator::make($request->all(), $rules, $messages);
 
         if ($validator->fails()) {
-            if ($emailExist) {
-                $emailExist->email = $emailExistOrig;
-                $emailExist->save();
-            }
-
             return back()->withErrors($validator->errors())->withInput($request->all());
         }
 
@@ -134,7 +131,7 @@ class UserController extends Controller
 
             LeadsHelper::sendLeadMail($createdUser->email, $data, 'register_email');
 
-            return redirect()->route('users.all');
+            return redirect()->route('users.all')->with(['success' => 'User has been created.']);
         }
 
         if ($emailExist) {
@@ -193,7 +190,6 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'integer'],
             'manager' => ['nullable', 'integer'],
         ];
@@ -221,7 +217,11 @@ class UserController extends Controller
 
         $user->name = $request->name;
         $user->email = $request->email;
-        $user->manager_id = $request->manager;
+        $user->phone = $request->phone;
+
+        if ($request->has('manager')) {
+            $user->manager_id = $request->manager;
+        }
 
         $role = Role::find($request->role);
 
@@ -233,10 +233,6 @@ class UserController extends Controller
         $user->forgetCachedPermissions();
 
         $user->assignRole($role->name);
-
-        if (isset($request->password) and $request->password !== '') {
-            $user->password = Hash::make($request->password);
-        }
 
         if (!$request->ban_check) {
             $user->status = 'banned';
@@ -251,7 +247,64 @@ class UserController extends Controller
         }
 
         $user->save();
-        return redirect()->route('users.edit', $id);
+        return redirect()->route('users.all')->with(['success' => "User account has been updated."]);
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param int $id
+     * @return \Illuminate\Http\Response
+     */
+    public function editPassword($id)
+    {
+        parent::hasPermission('edit user');
+
+        $user = User::withTrashed()->find($id);
+
+        if (!$user) {
+            return back()->withErrors(['msg' => 'User is not exists']);
+        }
+
+        return view('users.change-pass')->with(['user' => $user]);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param int $id
+     * @return \Illuminate\Http\Response
+     */
+    public function updatePassword(Request $request, $id)
+    {
+        parent::hasPermission('edit user');
+
+        $rules = [
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ];
+
+        $messages = [
+            'required' => 'The :attribute field is required.',
+            'string' => 'The :attribute field should be string.',
+            'min' => 'The :attribute field should have 8 at least characters.'
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator->errors())->withInput($request->all());
+        }
+
+        $user = User::withTrashed()->find($id);
+
+        if ($request->has('password')) {
+            $user->password = Hash::make($request->password);
+        }
+
+        $user->save();
+
+        return redirect()->route('users.all')->with(['success' => "User password has been changed."]);
     }
 
     /**
@@ -270,13 +323,21 @@ class UserController extends Controller
             return response()->json(['error' => 'No such user.'], 404);
         }
 
+        $status = 'restored';
         if (!$user->deleted_at) {
+            $status = 'deleted';
             User::destroy($id);
         } else {
-            $user = $user->restore();
+            $email = User::where('id', '!=', $id)->whereEmail($user->email)->first();
+
+            if ($email) {
+                return response()->json(['error' => 'The email has already been taken.']);
+            }
+
+            $user->restore();
         }
 
-        return response()->json(['OK' => 'Deleted. ' . $id], 200);
+        return response()->json(['OK' => 'Deleted. ' . $id, 'msg' => 'User has been ' . $status]);
     }
 
     /**
@@ -303,6 +364,6 @@ class UserController extends Controller
 
         $user->save();
 
-        return redirect()->route('users.all');
+        return redirect()->route('users.all')->with(['success' => 'User has been ' . $user->status . '.']);
     }
 }

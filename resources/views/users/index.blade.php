@@ -72,14 +72,14 @@ Users list
                                         <div class="dropdown-menu">
                                             @if (!$user->deleted_at)
                                                 <a class="dropdown-item" tabindex="-1" href="{{ route('users.banPermit', [$user['id']]) }}">
-                                                    <i class="fas {{ $user->status === 'permitted' ? 'fa-ban' : 'fa-check-circle' }}"></i>
-                                                    {{ $user->status === 'permitted' ? 'Ban' : 'Permit' }}
+                                                    <i class="fas {{ $user->status === 'permitted' ? 'fa-ban' : 'fa-check-circle' }} mr-2"></i>{{ $user->status === 'permitted' ? 'Ban' : 'Permit' }}
                                                 </a>
                                             @endif
-                                            <a class="dropdown-item" tabindex="-1" href="{{ route('users.edit', [$user['id']]) }}"><i class="fas fa-pen"></i> Edit</a>
+                                            <a class="dropdown-item" tabindex="-1" href="{{ route('users.edit', [$user['id']]) }}"><i class="fas fa-user-edit mr-2"></i>Edit</a>
+                                            <a class="dropdown-item" tabindex="-1" href="{{ route('users.password.edit', [$user['id']]) }}"><i class="fas fa-edit mr-2"></i>Change password</a>
                                             <div class="dropdown-divider"></div>
                                             <a class="dropdown-item text-{{ $user->deleted_at ? 'success' : 'danger' }}" tabindex="-1" href="#" onclick="deleteRestore({{$user->id}})">
-                                                <i class="fas fa-trash{{ $user->deleted_at ? '-restore' : '' }}"></i> {{ $user->deleted_at ? 'Restore' : 'Delete' }}
+                                                <i class="fas fa-trash{{ $user->deleted_at ? '-restore' : '' }} mr-2"></i>{{ $user->deleted_at ? 'Restore' : 'Delete' }}
                                             </a>
                                         </div>
                                     </li>
@@ -101,6 +101,21 @@ Users list
 <!-- PAGE SCRIPTS -->
 <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
 <script>
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000
+    });
+
+    @if(session('success'))
+    Toast.fire({
+        icon: 'success',
+        title: 'Done!',
+        text: '{{ session('success') }}',
+    });
+    @endif
+
     $(function() {
         $('#example2').DataTable({
             "paging": true,
@@ -132,9 +147,21 @@ Users list
                 response = await response.json();
 
                 if (response.error) {
-                    alert(response.error);
+                    Toast.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: response.error,
+                    });
                 } else if (response.OK) {
-                    location.reload();
+                    Toast.fire({
+                        icon: 'success',
+                        title: 'Done!',
+                        text: response.msg,
+                    });
+
+                    setTimeout(function () {
+                        location.reload();
+                    }, 2000);
                 }
             } catch (e) {
                 console.log(e);
