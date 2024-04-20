@@ -36,8 +36,9 @@
             <div class="card">
                 <div class="card-header">
                     @can('add ticket')
-                        <a href="javascript:void(0);" id="start-btn" onclick="importTickets()" class="btn btn-primary">Start
-                            import</a>
+                        <a href="javascript:void(0);" id="start-btn" onclick="importTickets()" class="btn btn-primary">
+                            Start import
+                        </a>
                     @endcan
                 </div>
                 <!-- /.card-header -->
@@ -64,13 +65,14 @@
                                     <th>Status</th>
                                     <th>Sales</th>
                                     <th>Created at</th>
+                                    <th></th>
                                 </tr>
                                 </thead>
                                 <tbody>
 
                                 @php $k = 1; @endphp
                                 @foreach($tickets as $key => $ticket)
-                                    <tr id="row_{{ $key }}">
+                                    <tr id="row_{{ $ticket->key_index }}">
                                         <td class="fwd-leads">
                                             <div class="form-check">
                                                 <input type="checkbox" name="lead_ids" id="lead-{{ $ticket->id }}"
@@ -92,7 +94,7 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <select class="form-control-sm select2bs4" required name="sales_ids">
+                                            <select class="form-control-sm select2" required name="sales_ids">
                                                 <option value="-1" disabled selected>Please Select</option>
                                                 <optgroup label="Sales">
                                                     @foreach($sales as $salesEmp)
@@ -116,6 +118,22 @@
                                             </select>
                                         </td>
                                         <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
+                                        <td>
+                                            <ul class="nav nav-pills ml-auto p-2">
+                                                <li class="nav-item dropdown" style="line-height: 1;">
+                                                    <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">
+                                                        Actions <span class="caret"></span>
+                                                    </a>
+                                                    <div class="dropdown-menu">
+                                                        @role('super-admin')
+                                                            <a class="dropdown-item text-danger" tabindex="-1"
+                                                               href="javascript:void(0);" onclick="ignoreLead({{ $ticket->key_index }})"><i
+                                                                    class="fas fa-ban"></i> Ignore</a>
+                                                        @endrole
+                                                    </div>
+                                                </li>
+                                            </ul>
+                                        </td>
                                     </tr>
                                     @php $k++; @endphp
                                 @endforeach
@@ -164,9 +182,17 @@
             timer: 3000
         });
 
+        const urlString = window.location.href;
+        const urlParts = urlString.replace(/\/\s*$/, '').split('/');
+        let source = urlParts.at(-1);
+        source = source.replace(/#*$/, '');
+
+        const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
+
         const selectAll = document.getElementById('select-all');
         document.getElementById('select-all').addEventListener('change', () => {
             const checkBoxes = document.querySelectorAll('.row-checkbox');
+
             if (!selectAll.checked) {
                 checkBoxes.forEach(box => {
                     box.checked = false;
@@ -185,7 +211,7 @@
             row.parentNode.removeChild(row);
         }
 
-        async function deleteTicket(id) {
+        async function ignoreLead(keyIndex) {
             Swal.fire({
                 title: 'Are you sure?',
                 text: "You won't be able to revert this!",
@@ -193,7 +219,7 @@
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
                 cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, delete it!'
+                confirmButtonText: 'Yes, ignore it!'
             }).then(async (result) => {
                 if (result.value) {
                     const token = '{{ csrf_token() }}';
@@ -209,7 +235,7 @@
                         });
 
 
-                        let resp = await axios.delete('/tickets/delete/' + id, {
+                        let resp = await axios.delete(`/tickets/zapier/ignore/${source}/${keyIndex}`, {
                             withCredentials: true,
                             headers: {
                                 'Content-Type': 'application/json',
@@ -223,35 +249,25 @@
                         Swal.close();
 
                         if (result.OK) {
-                            deleteRow('row_' + id);
+                           deleteRow('row_' + keyIndex);
 
                             Toast.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
-                                text: 'The ticket has been deleted.',
+                                title: 'Done!',
+                                text: 'The lead has been Ignored.',
                             });
                         }
                     } catch (e) {
                         console.log(e.response);
-                        let errors = '';
-                        Object.keys(e.response?.data).forEach(valInd => {
-                            errors += (e.response?.data[valInd] + '\n');
-                        });
 
                         Toast.fire({
                             icon: 'warning',
-                            title: errors,
+                            title: e.response,
                         });
                     }
                 }
             });
         }
-
-        const urlString = window.location.href;
-        const urlParts = urlString.replace(/\/\s*$/, '').split('/');
-        const source = urlParts.at(-1);
-
-        const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
 
         document.getElementById('sourceName').innerHTML = sourceLabel;
 

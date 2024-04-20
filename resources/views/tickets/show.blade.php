@@ -396,7 +396,7 @@
                 <div class="card">
                     <div class="card-body">
                         <ul class="list-group">
-                            <h3 class="mb-4">Lead Path</h3>
+                            <h3 class="mb-4">Lead Timeline</h3>
                             <!-- The time line -->
                             <div class="timeline">
                                 <!-- timeline time label -->
@@ -514,7 +514,7 @@
                                             <div class="form-group">
                                                 <label for="status">Next status</label><sup>*</sup>
                                                 @hasrole('accountant')
-                                                <select name="status" id="status" class="form-control"
+                                                <select name="status" id="status" class="form-control select2"
                                                         required="required">
                                                     <option value="-1" disabled selected>Please select..</option>
                                                     @foreach($statuses as $status)
@@ -525,7 +525,7 @@
                                                 </select>
                                                 @else
                                                     @hasrole('admin')
-                                                    <select name="status" id="status" class="form-control"
+                                                    <select name="status" id="status" class="form-control select2"
                                                             required="required">
                                                         <option value="-1" disabled selected>Please select..</option>
                                                         @foreach($statuses as $status)
@@ -537,7 +537,7 @@
                                                     </select>
                                                     @else
                                                         @hasrole('sales-manager')
-                                                        <select name="status" id="status" class="form-control"
+                                                        <select name="status" id="status" class="form-control select2"
                                                                 required="required">
                                                             <option value="-1" disabled selected>Please select..
                                                             </option>
@@ -549,7 +549,8 @@
                                                             @endforeach
                                                         </select>
                                                         @else
-                                                            <select name="status" id="status" class="form-control"
+                                                            <select name="status" id="status"
+                                                                    class="form-control select2"
                                                                     required="required">
                                                                 <option value="-1" disabled selected>Please select..
                                                                 </option>
@@ -583,7 +584,7 @@
                                             @hasanyrole('super-admin')
                                             <div class="form-group">
                                                 <label for="user">Assign to</label><sup>*</sup>
-                                                <select name="user" id="user" class="form-control" required>
+                                                <select name="user" id="user" class="form-control select2" required>
                                                     <optgroup label="Sales">
                                                         @foreach($users as $user)
                                                             @if ($user->role === 'sale')
@@ -724,6 +725,8 @@
 
 @section('script')
     <script>
+        $('.select2').select2();
+
         $(function () {
             $('input[name="datetimes"]').daterangepicker({
                 timePicker: true,
@@ -744,31 +747,38 @@
         });
 
         const areaSelect = document.querySelector(`[id="status"]`);
-        areaSelect.addEventListener(`change`, (e) => {
-            const select = e.target;
-            const desc = select.selectedOptions[0].text;
 
-            if (desc.toLocaleLowerCase().includes('book')) {
-                $('#modal-lg').modal('show');
-            } else {
-                if (desc.toLocaleLowerCase().includes('meet')) {
-                    $('#modal-lg2').modal('show');
+        if (areaSelect !== null) {
+            areaSelect.addEventListener(`change`, (e) => {
+                const select = e.target;
+                const desc = select.selectedOptions[0].text;
+
+                if (desc.toLocaleLowerCase().includes('book')) {
+                    $('#modal-lg').modal('show');
                 } else {
-                    $('#modal-lg2').modal('hide');
-                }
+                    if (desc.toLocaleLowerCase().includes('meet')) {
+                        $('#modal-lg2').modal('show');
+                    } else {
+                        $('#modal-lg2').modal('hide');
+                    }
 
-                $('#modal-lg').modal('hide');
-            }
-        });
+                    $('#modal-lg').modal('hide');
+                }
+            });
+        }
 
         const saveBtn = document.querySelector(`[id="saveBtn"]`);
-        saveBtn.addEventListener(`click`, () => {
-            $("#modal-lg").modal('hide');
-        });
+        if (saveBtn !== null) {
+            saveBtn.addEventListener(`click`, () => {
+                $("#modal-lg").modal('hide');
+            });
+        }
 
         const saveBtn2 = document.querySelector(`[id="saveBtn2"]`);
-        saveBtn2.addEventListener(`click`, () => {
-            $("#modal-lg2").modal('hide');
-        });
+        if (saveBtn2 !== null) {
+            saveBtn2.addEventListener(`click`, () => {
+                $("#modal-lg2").modal('hide');
+            });
+        }
     </script>
 @endsection

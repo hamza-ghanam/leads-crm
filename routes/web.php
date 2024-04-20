@@ -62,7 +62,7 @@ Route::prefix('tickets')->group(function () {
     Route::post('multipleForward', [TicketController::class, 'multipleForward'])->name('tickets.multipleForward');
 //    Route::match(['get', 'post'], '/report', [TicketController::class, 'getReport'])->name('tickets.report');
 
-//    Route::get('vehicles/{userId}', 'UserController@getVehicles')->name('user.vehicles');
+    Route::delete('zapier/ignore/{source}/{keyIndex}', [TicketController::class, 'ignoreFromZapierSheet'])->name('tickets.delete');
 });
 Route::get('/ticket/pdf', [TicketController::class, 'createPDF']);
 Route::get('/ttt', function () {

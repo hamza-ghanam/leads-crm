@@ -46,7 +46,7 @@
                                     archive
                                 </button>
                                 <button type="submit" id="b3" name="b3" class="btn btn-secondary submit-btn">Save to
-                                    center
+                                    centre
                                 </button>
                             @endisset
                             <input type="hidden" name="operation" id="operation" value="view"/>

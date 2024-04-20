@@ -35,25 +35,32 @@
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header row">
-                        <div class="col-1">
+                    <div class="card-header row mt-3">
+                        <div class="col-12 col-md-1 mb-3">
                             <a href="{{ route('tickets.create') }}" class="btn btn-primary">Add New</a>
                         </div>
-                        <div class="col-2">
-                            <button type="button" id="enable-fwd" class="btn btn-secondary">Enable multiple forwarding
+                        <div class="col-12 col-md-2 mb-3">
+                            <button type="button" id="enable-fwd" class="btn btn-secondary">
+                                Enable multiple forwarding
                             </button>
                         </div>
                         @hasanyrole('super-admin|sales-manager')
-                        <div class="col-9">
-                            <div class="float-right">
-                                <a href="{{ route('tickets.showImports', ['excel']) }}" class="btn btn-info">Excel
-                                    Import</a>
-                                <a href="{{ route('tickets.showImports', ['facebook']) }}" class="btn btn-primary ml-3">Facebook
-                                    Import</a>
+                        <div class="col-12 col-md-9">
+                            <div class="float-md-right mb-3"> <!-- Use float-md-right to float on larger screens -->
+                                <div class="dropdown">
+                                    <button class="btn btn-info dropdown-toggle" type="button" id="importDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                        Imports
+                                    </button>
+                                    <div class="dropdown-menu" aria-labelledby="importDropdown">
+                                        <a class="dropdown-item" href="{{ route('tickets.showImports', ['excel']) }}">Excel Import</a>
+                                        <a class="dropdown-item" href="{{ route('tickets.showImports', ['facebook']) }}">Facebook Import</a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         @endhasanyrole
                     </div>
+
                     <!-- /.card-header -->
                 </div>
             </div>
@@ -209,7 +216,7 @@
                     <form name="fwd-form" action="{{ route('tickets.multipleForward') }}" method="post" id="fwd-form">
                         @csrf
                         @endhasanyrole
-                        <table id="example20" class="table table-bordered table-hover">
+                        <table id="example2" class="table table-bordered table-hover">
                             <thead>
                             <tr>
                                 <th class="fwd-leads" style="display:none !important;">
@@ -239,7 +246,7 @@
                                     <td class="fwd-leads" style="display:none !important;">
                                         <div class="form-check">
                                             <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
-                                                   value="{{ $ticket->id }}" class="form-check-input"/>
+                                                   value="{{ $ticket->id }}" class="form-check-input row-checkbox"/>
                                         </div>
                                     </td>
                                     <td><a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket->id }}</a>
@@ -358,7 +365,7 @@
                     </form>
                     @endhasanyrole
 
-                    <!-- Changing from here -->
+                    <!-- Pagination Footer -->
                     <div class="row mt-3">
                         <div class="col-sm-12 col-md-5">
                             <div class="dataTables_info" role="status" aria-live="polite">
@@ -482,17 +489,13 @@
             });
 
             $('#example2').DataTable({
-                "paging": true,
+                "paging": false,
                 "lengthChange": false,
                 "searching": false,
                 "ordering": true,
-                "info": true,
+                "info": false,
                 "autoWidth": false,
                 "responsive": true,
-                "pageLength": 15,
-                "order": [
-                    [0, "desc"]
-                ]
             });
         });
 
@@ -582,14 +585,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             initBoxes(boxes);
 
-            $('#example20').DataTable({
-                paging: false,
-                lengthChange: false,
-                searching: false,
-                ordering: true,
-                info: false,
-                autoWidth: false,
-            });
+
         }, false);
 
         function toggleFwdBtn(fwdBtn, boxes) {
@@ -623,21 +619,20 @@
         }, false);
 
         const selectAll = document.getElementById('select-all');
-        selectAll.checked = false;
         document.getElementById('select-all').addEventListener('click', () => {
-            const checkBoxes = document.querySelectorAll('.form-check-input');
+            const checkBoxes = document.querySelectorAll('.row-checkbox');
 
-            checkBoxes.forEach(box => {
-                if (box.checked) {
+            if (!selectAll.checked) {
+                checkBoxes.forEach(box => {
                     box.checked = false;
-                    selectAll.checked = false;
                     document.getElementById('select-all-lbl').innerHTML = 'Select all';
-                } else {
+                });
+            } else {
+                checkBoxes.forEach(box => {
                     box.checked = true;
-                    selectAll.checked = true;
                     document.getElementById('select-all-lbl').innerHTML = 'Deselect all';
-                }
-            });
+                });
+            }
         }, false);
 
     </script>

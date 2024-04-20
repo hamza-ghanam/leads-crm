@@ -170,7 +170,7 @@
                            class="nav-link {{ strpos(Route::currentRouteName(), 'tickets') !== false && strpos(Route::currentRouteName(), 'showImports') === false  ? 'active' : ''}}">
                             <i class="nav-icon fas fa-ticket-alt"></i>
                             <p>
-                                Leads Center
+                                Leads Centre
                                 <i class="right fas fa-angle-left"></i>
                             </p>
                         </a>

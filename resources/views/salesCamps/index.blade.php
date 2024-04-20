@@ -47,7 +47,8 @@
                             </ul>
                         </div>
                     @endif
-                    <table id="example2" class="table table-bordered table-hover">
+                    @if(count($salesCamps) > 0)
+                        <table id="example2" class="table table-bordered table-hover">
                         <thead>
                         <tr>
                             <th>#</th>
@@ -61,8 +62,11 @@
                         @foreach($salesCamps as $key => $salesCamp)
                             <tr>
                                 <td>{{ $key + 1 }}</td>
-                                <td><a target="_blank"
-                                       href="{{ route('users.edit', [$salesCamp->user_id]) }}"> {{ $salesCamp->user->name }}</a>
+                                <td>
+                                    <a target="_blank"
+                                       href="{{ route('users.edit', [$salesCamp->user_id]) }}">
+                                        {{ optional($salesCamp->user)->name ?? 'User Not Found' }}
+                                    </a>
                                 </td>
                                 <td>{{ $salesCamp->campaign_name }}</td>
                                 <td>{{ date('d/m/Y h:i A', strtotime($salesCamp->created_at)) }}</td>
@@ -76,6 +80,9 @@
                         @endforeach
                         </tbody>
                     </table>
+                    @else
+                        <h4>No sales campaigns yet</h4>
+                    @endif
                     <div class="modal fade" id="modal-lg">
                         <form name="ff" action="{{ route('salesCamps.store') }}" method="post">
                             @csrf

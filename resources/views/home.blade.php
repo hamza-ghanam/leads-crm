@@ -117,7 +117,7 @@
                             @endhasanyrole
                     </div>
                     <div class="icon">
-                        <i class="fas fa-ticket-alt"></i>
+                        <i class="{{ Config::get('constants.status_icons.' . strtolower($key)) }}"></i>
                     </div>
                 </div>
             </div>

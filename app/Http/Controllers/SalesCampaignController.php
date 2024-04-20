@@ -28,8 +28,12 @@ class SalesCampaignController extends Controller
      */
     public function index()
     {
+        $salesCamps = SalesCampaign::whereHas('user', function ($query) {
+            $query->whereNotNull('id')->whereNull('deleted_at');
+        })->get();
+
         return view('salesCamps.index')->with([
-            'salesCamps' => SalesCampaign::all(),
+            'salesCamps' => $salesCamps,
             'sales' => User::role(['sale', 'tele-sale'])->get(),
             'use_camps' => boolval(GeneralSettings::whereName('use_camps')->first()->value),
         ]);

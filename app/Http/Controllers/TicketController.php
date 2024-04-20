@@ -520,6 +520,14 @@ class TicketController extends Controller
 
         $ticket->paths = $ticketPaths;
 
+        krsort($ticketPaths);
+        foreach ($ticketPaths as &$subArray) {
+            usort($subArray, function ($a, $b) {
+                return strtotime($b->created_at) - strtotime($a->created_at);
+            });
+        }
+
+        $ticket->paths = $ticketPaths;
         $results = [
             'ticket' => $ticket,
             'users' => $users,
@@ -746,9 +754,11 @@ class TicketController extends Controller
 
     public function showImportLeads($source)
     {
-        if($source === 'tiktok') {
+        /*
+        if ($source === 'tiktok') {
             return back()->withErrors(['msg' => 'Please contact the developer to configure TikTok.']);
         }
+        */
 
         parent::hasPermission('facebook import');
 
@@ -1423,6 +1433,32 @@ class TicketController extends Controller
         }
 
         return back()->with('successMsg', 'Leads have been forwarded.');
+    }
+
+    public function ignoreFromZapierSheet($source, $keyIndex)
+    {
+        if (!in_array($source, ['facebook', 'tiktok'])) {
+            return response()->json(['ERROR' => 'Incorrect source value.'], 404);
+        }
+
+        $leads = Cache::get('leads');
+        $originalCount = count($leads);
+
+        $this->leadsHelper->deleteZapierLeadsSheetRow($source, $keyIndex);
+
+        $filteredLeads = array_filter($leads, function ($lead) use ($keyIndex) {
+            return (int)$lead['key_index'] !== (int)$keyIndex;
+        });
+
+        $filteredLeads = array_values($filteredLeads);
+
+        $filteredCount = count($filteredLeads);
+
+        if ($originalCount === $filteredCount) {
+            return response()->json(['ERROR' => 'Incorrect key_index value.'], 404);
+        }
+
+        return response()->json(['OK' => 'Successfully ignored.']);
     }
 
     public function devTest(Request $request)
