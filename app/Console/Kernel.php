@@ -54,17 +54,25 @@ class Kernel extends ConsoleKernel
 
             /**** New Method (15/05/2022) ****/
             /**** Call helper function (03/09/2022) ****/
+            /** 28/11/2024 New Zapier Webhook **/
+
             $leadsHelper = new LeadsHelper();
 
             // Facebook
             $leads = $leadsHelper->fetchLeadsFromZapier('facebook');
             $leadsHelper->initiateImport($leads);
-            $leadsHelper->emptyZapierLeadsSheet('facebook', count($leads));
+            //$leadsHelper->emptyZapierLeadsSheet('facebook', count($leads));
+
+            $leadIds = array_column($leads, 'key');
+            $leadsHelper->removeZapierTempLeads($leadIds);
 
             // TikTok
             $leads = $leadsHelper->fetchLeadsFromZapier('tiktok');
             $leadsHelper->initiateImport($leads);
-            $leadsHelper->emptyZapierLeadsSheet('tiktok', count($leads));
+            // $leadsHelper->emptyZapierLeadsSheet('tiktok', count($leads));
+
+            $leadIds = array_column($leads, 'key');
+            $leadsHelper->removeZapierTempLeads($leadIds);
 
             /* Old Method
             $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])

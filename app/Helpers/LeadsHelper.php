@@ -7,6 +7,7 @@ use App\Models\GeneralSettings;
 use App\Models\SalesCampaign;
 use App\Models\Source;
 use App\Models\Status;
+use App\Models\TempLead;
 use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
@@ -160,7 +161,7 @@ class LeadsHelper
                 'user' => '',
                 'ticket' => $lead->id
             ];
-            Mail::to($user->email)->send(new LeadNotifyMail($data));
+            // Mail::to($user->email)->send(new LeadNotifyMail($data));
 
             $message = 'A new lead is automatically assigned to the user: ';
         } else {
@@ -176,7 +177,7 @@ class LeadsHelper
         ];
 
         $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
-        Mail::to($superAdmins)->send(new LeadNotifyMail($data));
+        //Mail::to($superAdmins)->send(new LeadNotifyMail($data));
     }
 
     public function prepareJrAndSrSalesLists($salesJR, $salesSR, $statuses): array
@@ -226,7 +227,7 @@ class LeadsHelper
         return [$spread, $sheet];
     }
 
-    public function fetchLeadsFromZapier($source, $manual = null): array
+    public function fetchLeadsFromZapierOLD($source, $manual = null): array
     {
         [$spread, $sheet] = $this->getSpreadsheetDetails($source);
 
@@ -277,6 +278,51 @@ class LeadsHelper
         return $leads;
     }
 
+    public function fetchLeadsFromZapier($source, $manual = null): array
+    {
+        $source = Source::whereRaw('LOWER(name) = ?', [strtolower($source)])->first();
+        $rawLeads = TempLead::where('source_id', $source->id)->get();
+
+        $newStatus = Status::where('slug', 'new')->first()->id;
+        $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+
+        $leads = [];
+        foreach ($rawLeads as $key => $rawLead) {
+            // Phone number
+            $rawLead->phone_number = str_replace(' ', '', $rawLead['phone_number']);
+            $rawLead->phone_number = $this->rectifyPhone($rawLead['phone_number']);
+
+            $lead = new Ticket([
+                'number' => $rawLead->id,
+                'ad_id' => $rawLead->ad_id,
+                'ad_name' => $rawLead->ad_name,
+                'adset_id' => $rawLead->ad_name,
+                'adset_name' => $rawLead->adset_id,
+                'campaign_id' => $rawLead->campaign_id,
+                'campaign_name' => $rawLead->campaign_name,
+                'form_id' => $rawLead->form_id,
+                'form_name' => $rawLead->form_name ?? '',
+                'is_organic' => $rawLead->is_organic ?? '',
+                'platform' => $rawLead->platform,
+                'full_name' => $rawLead->full_name,
+                'phone_number' => $rawLead->phone_number,
+                'email' => $rawLead->email,
+                'job_title' => $rawLead->job_title ?? '',
+                'status_id' => $rawLead->status->id,
+                'source_id' => $this->getSourceID($rawLead->platform),
+                'assigner_id' => $manual ? auth()->user()->id : null,
+                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
+            ]);
+
+            $lead->key = $rawLead->id;
+            $lead->created_at = $rawLead->created_at;
+
+            $leads[] = $lead;
+        }
+
+        return $leads;
+    }
+
     public function emptyZapierLeadsSheet($source, $leadsLength)
     {
         [$spread, $sheet] = $this->getSpreadsheetDetails($source);
@@ -285,7 +331,7 @@ class LeadsHelper
             Sheets::spreadsheet(config('sheets.' . $spread))
                 ->sheet(config('sheets.' . $sheet))
                 ->range('A' . ($i + 2))
-                ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
+                ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
         }
     }
 
@@ -427,5 +473,10 @@ class LeadsHelper
             return response()->json(['error' => $e], 404);
             // report($e);
         }
+    }
+
+    public function removeZapierTempLeads($leadIds)
+    {
+        return TempLead::whereIn('id', $leadIds)->delete();
     }
 }

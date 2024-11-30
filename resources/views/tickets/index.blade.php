@@ -627,20 +627,16 @@
 
         const selectAll = document.getElementById('select-all');
         selectAll.checked = false;
+
         document.getElementById('select-all').addEventListener('click', () => {
             const checkBoxes = document.querySelectorAll('.form-check-input');
+            const isSelectAllChecked = selectAll.checked;
 
             checkBoxes.forEach(box => {
-                if (box.checked) {
-                    box.checked = false;
-                    selectAll.checked = false;
-                    document.getElementById('select-all-lbl').innerHTML = 'Select all';
-                } else {
-                    box.checked = true;
-                    selectAll.checked = true;
-                    document.getElementById('select-all-lbl').innerHTML = 'Deselect all';
-                }
+                box.checked = isSelectAllChecked;
             });
+
+            document.getElementById('select-all-lbl').innerHTML = isSelectAllChecked ? 'Deselect all' : 'Select all';
         }, false);
 
     </script>

@@ -38,6 +38,8 @@
                     @can('add ticket')
                         <a href="javascript:void(0);" id="start-btn" onclick="importTickets()" class="btn btn-primary">Start
                             import</a>
+                            <a href="javascript:void(0);" id="start-btn" onclick="ignoreLeads()"
+                               class="btn btn-danger ml-4">Ignore Leads</a>
                     @endcan
                 </div>
                 <!-- /.card-header -->
@@ -49,7 +51,8 @@
                                 <tr>
                                     <th class="fwd-leads">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" checked value="" id="select-all">
+                                            <input class="form-check-input" type="checkbox" checked value=""
+                                                   id="select-all">
                                             <label id="select-all-lbl" class="form-check-label" for="flexCheckDefault">
                                                 Deselect all
                                             </label>
@@ -72,8 +75,8 @@
                                     <tr id="row_{{ $key }}">
                                         <td class="fwd-leads">
                                             <div class="form-check">
-                                                <input type="checkbox" name="lead_ids" id="lead-{{ $ticket->id }}"
-                                                       value="{{ $key }}" class="form-check-input" checked/>
+                                                <input type="checkbox" name="lead_ids" id="lead-{{ $ticket->key }}"
+                                                       value="{{ $ticket->key }}" class="form-check-input" checked/>
                                             </div>
                                         </td>
                                         <td>
@@ -84,7 +87,8 @@
                                         <td>{{ $ticket['phone_number'] !== null ? $ticket['phone_number'] : '-' }}</td>
                                         <td>{{ $ticket['email'] !== null ? $ticket['email'] : '-' }}</td>
                                         <td>
-                                            <span class="badge bg-primary">New</span>
+                                            <span
+                                                class="badge bg-{{ $ticket->status->name === 'New' ? 'primary' : 'danger' }}">{{ $ticket->status->name }}</span>
                                         </td>
                                         <td>
                                             <select class="form-control" required name="sales_ids">
@@ -110,7 +114,7 @@
                                                 </optgroup>
                                             </select>
                                         </td>
-                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_time'])) }}</td>
+                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
                                     </tr>
                                     @php $k++; @endphp
                                 @endforeach
@@ -157,23 +161,20 @@
         });
 
         const selectAll = document.getElementById('select-all');
+        selectAll.checked = false;
+
         document.getElementById('select-all').addEventListener('click', () => {
             const checkBoxes = document.querySelectorAll('.form-check-input');
+            const isSelectAllChecked = selectAll.checked;
+
             checkBoxes.forEach(box => {
-                if (box.checked) {
-                    box.checked = false;
-                    selectAll.checked = false;
-                    document.getElementById('select-all-lbl').innerHTML = 'Select all';
-                } else {
-                    box.checked = true;
-                    selectAll.checked = true;
-                    document.getElementById('select-all-lbl').innerHTML = 'Deselect all';
-                }
+                box.checked = isSelectAllChecked;
             });
+
+            document.getElementById('select-all-lbl').innerHTML = isSelectAllChecked ? 'Deselect all' : 'Select all';
         }, false);
 
-        function deleteRow(rowId)
-        {
+        function deleteRow(rowId) {
             const row = document.getElementById(rowId);
             row.parentNode.removeChild(row);
         }
@@ -225,7 +226,7 @@
                             });
                         }
                     } catch (e) {
-                        console.log(e.response);
+                        //  console.log(e.response);
                         let errors = '';
                         Object.keys(e.response?.data).forEach(valInd => {
                             errors += (e.response?.data[valInd] + '\n');
@@ -281,12 +282,15 @@
                     });
                 } else {
                     let data = {
-                        details: {}
+                        details: {},
+                        manual: 'Manual',
                     };
 
                     for (let i = 0; i < leadIds.length; i++) {
                         data.details[leadIds[i]] = salesIds[i];
                     }
+
+                    //      console.log('data', data)
 
                     let resp = await axios.post('/tickets/importLeads/' + source, data, {
                         withCredentials: true,
@@ -299,7 +303,7 @@
 
                     let result = resp.data;
 
-                    //console.log(result);
+                    //  console.log(result);
 
                     if (result.OK) {
                         document.getElementById('loader').style.display = 'none';
@@ -319,10 +323,14 @@
                             icon: 'success',
                             title
                         });
+
+                        setTimeout(function () {
+                            window.location.reload();
+                        }, 2000);
                     }
                 }
             } catch (e) {
-                console.log(e.response);
+                //  console.log(e.response);
                 let errors = '';
                 Object.keys(e.response?.data).forEach(valInd => {
                     errors += (e.response?.data[valInd] + '\n');
@@ -334,6 +342,84 @@
                 });
 
                 document.getElementById('fb-data-table').style.display = '';
+            }
+        }
+
+        async function ignoreLeads() {
+            try {
+                const form = document.getElementById('form1');
+                const formData = new FormData(form);
+
+                const leadIds = formData.getAll('lead_ids');
+
+                if (leadIds.length === 0) {
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('example2').style.display = '';
+                    document.getElementById('fb-data-table').style.display = '';
+
+                    Toast.fire({
+                        icon: 'warning',
+                        title: 'No selected leads!'
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Are you sure?',
+                        text: "You CANNOT restore ignored leads.",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: 'Yes, proceed',
+                        cancelButtonText: 'Cancel'
+                    }).then(async (result) => {
+                        if (result.value) {
+                            const token = '{{ csrf_token() }}';
+
+                            let resp = await axios.put('/tickets/ignoreLeads/', { leadIds }, {
+                                withCredentials: true,
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-Token': token,
+                                }
+                            });
+
+                            let response = resp.data;
+
+                            console.log('result', response);
+
+                            if (response.OK) {
+                                let title = '';
+                                if (response.OK > 0) {
+                                    title = response.OK + ' ' + ' leads ' + (response.OK > 1 ? 'have' : 'has') + ' been successfully ignored';
+                                } else if (response.OK && response.OK === 0) {
+                                    title = 'No leads for now!';
+                                }
+
+                                Toast.fire({
+                                    icon: 'success',
+                                    title
+                                });
+
+                                setTimeout(function () {
+                                    window.location.reload();
+                                }, 2000);
+                            }
+
+                        }
+                    });
+                }
+            } catch (e) {
+                //  console.log(e.response);
+                let errors = '';
+                Object.keys(e.response?.data).forEach(valInd => {
+                    errors += (e.response?.data[valInd] + '\n');
+                });
+
+                Toast.fire({
+                    icon: 'warning',
+                    title: errors,
+                });
             }
         }
 

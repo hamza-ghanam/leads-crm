@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\Meeting;
 use App\Models\Source;
 use App\Models\Status;
+use App\Models\TempLead;
 use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
@@ -16,7 +17,9 @@ use App\Notifications\SendPushNotification;
 use Carbon\Carbon;
 use Google\Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -45,7 +48,7 @@ class TicketController extends Controller
     public function __construct()
     {
         $this->leadsHelper = new LeadsHelper();
-        $this->middleware('auth')->except('devTest');
+        $this->middleware('auth')->except(['devTest', 'storeLead']);
     }
 
     /**
@@ -294,29 +297,7 @@ class TicketController extends Controller
     {
         parent::hasPermission('add ticket');
 
-        $rules = [
-            'full_name' => ['required', 'string', 'max:255'],
-            'campaign_name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'string', 'email', 'max:255'],
-            'phone_number' => ['required', 'string', 'max:255'],
-            'source' => ['required', 'integer', 'gt:0'],
-            'user' => ['nullable', 'integer', 'gt:0'],
-            'preferred_time' => ['required', 'string', 'max:255'],
-            'remarks' => ['nullable', 'string', 'max:65535'],
-        ];
-
-        $messages = [
-            'required' => 'The :attribute field is required.',
-            'integer' => 'The :attribute field should be integer.',
-            'string' => 'The :attribute field should be string.',
-            'gt:0' => 'The :attribute field should be positive.'
-        ];
-
-        $validator = Validator::make($request->all(), $rules, $messages);
-
-        if ($validator->fails()) {
-            return back()->withErrors($validator->errors())->withInput($request->all());
-        }
+        $this->validateLead($request);
 
         $source = Source::find($request->source);
 
@@ -758,17 +739,10 @@ class TicketController extends Controller
                 ->with(['leads' => $leads]);
         }
 
-        $temp_arr = $this->leadsHelper->fetchLeadsFromZapier($source, 'Manual');
-        $leads = [];
-
-        foreach ($temp_arr as $lead) {
-            $keyNum = mt_rand(1, 10000000);
-            $leads += [$keyNum => $lead];
-        }
-
-        Cache::put('leads', $leads, now()->addMinutes(10));
+        $leads = $this->leadsHelper->fetchLeadsFromZapier($source, 'Manual');
 
         $sales = null;
+
         if (auth()->user()->hasRole('super-admin')) {
             $sales = User::role(['sale', 'tele-sale'])
                 ->where('status', 'permitted')
@@ -781,7 +755,8 @@ class TicketController extends Controller
 
         return view('tickets.showImports')->with([
             'tickets' => $leads,
-            'sales' => $sales
+            'sales' => $sales,
+            'source' => $source,
         ]);
     }
 
@@ -931,6 +906,102 @@ class TicketController extends Controller
         }
     }
 
+    public function importLeadsFromZapierV3($source, Request $request): \Illuminate\Http\JsonResponse
+    {
+        parent::hasPermission('facebook import');
+
+        if (!in_array($source, ['facebook', 'tiktok'])) {
+            return response()->json(['ERROR' => 0], 404);
+        }
+
+        $rules = [
+            'details' => 'required|array|min:1',
+            'details.*' => 'required|integer|gt:0',
+        ];
+
+        $messages = [
+            'required' => 'The :attribute field is required.',
+            'gt:0' => 'The :attribute field should be positive.',
+            'min:1' => 'The :attribute should have at least one item.'
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
+
+        /**** Call helper function (28/11/2042) ****/
+        DB::beginTransaction();
+
+        try {
+            if (is_array($request->details)) {
+                $leadIds = array_keys($request->details);
+            } else {
+                return response()->json(['error' => 'Invalid details form!'], 422);
+            }
+
+            $leads = TempLead::whereIn('id', $leadIds)->get();
+
+            // return response()->json(['OK' => $request->details], 200);
+            $newStatus = Status::where('slug', 'new')->first()->id;
+           // $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+
+            foreach ($leads as $rawLead) {
+                if (!User::find($request->details[$rawLead->id])) {
+                    return response()->json(['msg' => 'Please check all users.'], 400);
+                }
+
+                $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$rawLead->phone_number}%")
+                    ->where('phone_number', '!=', '')
+                    ->first();
+
+                $dupTempLead = TempLead::where('phone_number', 'LIKE', "%{$rawLead->phone_number}%")
+                    ->where('phone_number', '!=', '')
+                    ->where('id', '!=', $rawLead->id)
+                    ->first();
+
+                if (!$dupLead && !$dupTempLead) {
+                    $lead = Ticket::create([
+                        'number' => $rawLead->number,
+                        'user_id' => $request->details[$rawLead->id],
+                        'ad_id' => $rawLead->ad_id,
+                        'ad_name' => $rawLead->ad_name,
+                        'adset_id' => $rawLead->ad_name,
+                        'adset_name' => $rawLead->adset_id,
+                        'campaign_id' => $rawLead->campaign_id,
+                        'campaign_name' => $rawLead->campaign_name,
+                        'form_id' => $rawLead->form_id,
+                        'form_name' => $rawLead->form_name ?? '',
+                        'is_organic' => $rawLead->is_organic ?? '',
+                        'platform' => $rawLead->platform,
+                        'full_name' => $rawLead->full_name,
+                        'phone_number' => $rawLead->phone_number,
+                        'email' => $rawLead->email,
+                        'job_title' => $rawLead->job_title ?? '',
+                        'status_id' => $newStatus,
+                        'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
+                        'assigner_id' => $request->manual ? auth()->user()->id : null,
+                        'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source)
+                    ]);
+
+                    $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
+                }
+
+                TempLead::destroy($rawLead->id);
+            }
+
+            DB::commit();
+
+            return response()->json(['OK' => count($leads)], 200);
+        } catch (\Exception $e) {
+            // Rollback the transaction if there's an error
+            DB::rollBack();
+
+            return response()->json(['error' => 'Failed to import a lead or more: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function importLeadsFromZapierV2($source, Request $request): \Illuminate\Http\JsonResponse
     {
         parent::hasPermission('facebook import');
@@ -968,6 +1039,8 @@ class TicketController extends Controller
             }
 
             $leads[$leadIndex]->user_id = $userId;
+            $rowIndex = $leads[$leadIndex]->key_index;
+            Arr::forget($leads[$leadIndex], 'key_index');
             $leads[$leadIndex]->save();
 
             if ($leads[$leadIndex]->status_id !== $duplicatedStatus) {
@@ -1634,4 +1707,99 @@ class TicketController extends Controller
             // Log or perform any other action
         }
     }
+
+    public function storeLead(Request $request)
+    {
+        if ($request->header('X-Zapier-Token') !== env('ZAPIER_SECRET')) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            //$this->validateLead($request);
+
+            $newStatus = Status::where('slug', 'new')->first()->id;
+            $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+
+            $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$request->phone_number}%")
+                ->where('phone_number', '!=', '')
+                ->first();
+
+            $dupTempLead = TempLead::where('phone_number', 'LIKE', "%{$request->phone_number}%")
+                ->where('phone_number', '!=', '')
+                ->first();
+
+            $lead = TempLead::create([
+                'number' => $request->id ?? 0,
+                'ad_id' => $request->ad_id ?? 0,
+                'ad_name' => $request->ad_name,
+                'adset_id' => $request->adset_id,
+                'adset_name' => $request->adset_name,
+                'campaign_id' => $request->campaign_id,
+                'campaign_name' => $request->campaign_name,
+                'form_id' => $request->form_id,
+                'form_name' => $request->form_name ?? '',
+                'is_organic' => $request->is_organic ?? '',
+                'platform' => $request->platform,
+                'full_name' => $request->full_name,
+                'phone_number' => $request->phone_number,
+                'email' => $request->email,
+                'job_title' => $request->job_title ?? '',
+                'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
+                'source_id' => $this->leadsHelper->getSourceID($request->platform),
+                'method' => 'Automatic ' . ucfirst($request->source_name) . ' - Webhook',
+            ]);
+
+            DB::commit();
+
+            // Return a success response
+            return response()->json(['message' => 'Lead stored successfully', 'lead' => $lead], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Rollback the transaction if there's an error
+            DB::rollBack();
+
+            return response()->json(['error' => $e->getMessage()], 500);
+        } catch (\Exception $e) {
+            // Rollback the transaction if there's an error
+            DB::rollBack();
+
+            return response()->json(['error' => 'فشل إضافة الطالب: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function ignoreLeads(Request $request)
+    {
+        $deletedRowsCount = TempLead::whereIn('id', $request->leadIds)->delete();
+
+        return response()->json(['OK' => $deletedRowsCount], 200);
+    }
+
+    private function validateLead(Request $request)
+    {
+        $rules = [
+            'full_name' => ['required', 'string', 'max:255'],
+            'campaign_name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'string', 'email', 'max:255'],
+            'phone_number' => ['required', 'string', 'max:255'],
+            'source' => ['required', 'integer', 'gt:0'],
+            'user' => ['nullable', 'integer', 'gt:0'],
+            'preferred_time' => ['nullable', 'string', 'max:255'],
+            'remarks' => ['nullable', 'string', 'max:65535'],
+        ];
+
+        $messages = [
+            'required' => 'The :attribute field is required.',
+            'integer' => 'The :attribute field should be integer.',
+            'string' => 'The :attribute field should be string.',
+            'gt:0' => 'The :attribute field should be positive.'
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            throw new \Illuminate\Validation\ValidationException($validator);
+        }
+    }
+
 }
