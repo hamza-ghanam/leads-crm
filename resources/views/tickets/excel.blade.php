@@ -42,11 +42,11 @@
                             <button type="submit" id="b1" name="b1" class="btn btn-success mr-4 submit-btn">View
                             </button>
                             @isset($leads)
-                                <button type="submit" id="b2" name="b2" class="btn btn-primary mr-4 submit-btn">Save to
-                                    archive
+                                <button type="submit" id="b2" name="b2" class="btn btn-primary mr-4 submit-btn">
+                                    Save to archive
                                 </button>
-                                <button type="submit" id="b3" name="b3" class="btn btn-secondary submit-btn">Save to
-                                    center
+                                <button type="submit" id="b3" name="b3" class="btn btn-secondary submit-btn">
+                                    Save to center
                                 </button>
                             @endisset
                             <input type="hidden" name="operation" id="operation" value="view"/>
