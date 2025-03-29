@@ -261,6 +261,16 @@
                                     </a>
                                 </li>
                             @endcan
+
+                                @can('facebook import')
+                                    <li class="nav-item">
+                                        <a href="{{ route('tickets.showImports', ['googleAds']) }}"
+                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.showImports') !== false && strpos(request()->route('source'), 'googleAds') !== false ? 'active' : ''}}">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>Google Ads import</p>
+                                        </a>
+                                    </li>
+                                @endcan
                         </ul>
                     </li>
 

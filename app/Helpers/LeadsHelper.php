@@ -26,11 +26,14 @@ class LeadsHelper
     public function importWithNoCampaigns($leads, $statuses)
     {
         // Junior
-        $jrUsers = User::role('sale')->where('status', 'permitted')->get();
+        $jrUsers = User::role('sale')->where('status', 'permitted')->pluck('id');
         // Senior
-        $srUsers = User::role('sales-senior')->where('status', 'permitted')->get();
+        $srUsers = User::role('sales-senior')->where('status', 'permitted')->pluck('id');
+
+        // Send IDs only
         [$jrUserCounts, $srUserCounts] = $this->prepareJrAndSrSalesLists($jrUsers, $srUsers, $statuses);
-        $this->distributeLeads($leads, $jrUserCounts, $srUserCounts);
+
+        return $this->distributeLeads($leads, $jrUserCounts, $srUserCounts);
     }
 
     public function importCampaignsBased($leads, $statuses)
@@ -60,7 +63,7 @@ class LeadsHelper
 
             if (count($campSalesSR[$campName]) + count($campSalesJR[$campName]) > 0) {
                 [$jrUserCounts, $srUserCounts] = $this->prepareJrAndSrSalesLists($campSalesJR[$campName], $campSalesSR[$campName], $statuses);
-                $this->distributeLeads($campLeads[$campName], $jrUserCounts, $srUserCounts);
+                [$assignmentsCountJR, $assignmentsCountSR] = $this->distributeLeads($campLeads[$campName], $jrUserCounts, $srUserCounts);
                 unset($campLeads[$campName]);
                 unset($campNames[$campName]);
             }
@@ -71,6 +74,8 @@ class LeadsHelper
         //$leadsNoCamp = $leadsNoCamp->merge($leads->where('campaign_name', ''));
 
         $this->storeUnassignedLeads($campLeads);
+
+        return [$assignmentsCountJR, $assignmentsCountSR];
     }
 
     public function distributeLeads($leads, $jrUserCounts, $srUserCounts)
@@ -79,28 +84,48 @@ class LeadsHelper
         $jrCount = count($srUserCounts) > 0 ? floor(count($leads) / 3) : count($leads);
         $duplicatedStatus = Status::whereName('duplicated')->first();
         $newStatus = Status::where('slug', 'new')->first();
+        $tempLeads = [];
 
         // Junior Distribution
+        $assignmentsCountJR = []; // To track assignments per user
+
         $startPos = 0;
         foreach ($leads as $key => $lead) {
             if ($key === $jrCount) {
                 break;
             }
+
             if ($lead->status_id === $duplicatedStatus->id) {
                 $lead->user_id = null;
+                $tempLeads[] = $lead->key;
+                unset($lead->key);
                 $lead->save();
+
                 continue;
             }
 
             // Assign a user
-            $lead->user_id = $jrUserCounts[$startPos];
-            $startPos++;
+            $currentUser = $jrUserCounts[$startPos]; // Get the current user ID
+            $lead->user_id = $currentUser;
+            $tempLeads[] = $lead->key;
+            unset($lead->key);  // Removes the 'key' attribute from the $lead instance
             $lead->save();
             $this->createAndAssignLead($lead, $newStatus->id);
+
+            // Track the assignment count
+            if (!isset($assignmentsCountJR[$currentUser])) {
+                $assignmentsCountJR[$currentUser] = 0; // Initialize if not set
+            }
+            $assignmentsCountJR[$currentUser]++; // Increment count
+
+            $startPos++;
+
             if ($startPos === count($jrUserCounts)) {
                 $startPos = 0;
             }
         }
+
+        $assignmentsCountSR = []; // To track assignments per user
 
         // Senior Distribution
         if (count($srUserCounts) > 0) {
@@ -111,20 +136,36 @@ class LeadsHelper
                 }
                 if ($lead->status_id === $duplicatedStatus->id) {
                     $lead->user_id = null;
+                    $tempLeads[] = $lead->key;
+                    unset($lead->key);
                     $lead->save();
+
                     continue;
                 }
 
                 // Assign a user
-                $lead->user_id = $srUserCounts[$startPos];
+                $currentUser = $srUserCounts[$startPos];
+                $lead->user_id = $currentUser;
+                $tempLeads[] = $lead->key;
+                unset($lead->key);
+                $lead->save();
+
+                $this->createAndAssignLead($lead, $newStatus->id);
+
+                // Track the assignment count
+                if (!isset($assignmentsCountSR[$currentUser])) {
+                    $assignmentsCountSR[$currentUser] = 0; // Initialize if not set
+                }
+                $assignmentsCountSR[$currentUser]++; // Increment count
+
                 $startPos++;
                 if ($startPos === count($srUserCounts)) {
                     $startPos = 0;
                 }
-                $lead->save();
-                $this->createAndAssignLead($lead, $newStatus->id);
             }
         }
+
+        return [$assignmentsCountJR, $assignmentsCountSR, $tempLeads];
     }
 
     public function storeUnassignedLeads($campLeads)
@@ -134,6 +175,7 @@ class LeadsHelper
         foreach ($campLeads as $leads) {
             foreach ($leads as $lead) {
                 $lead->user_id = null;
+                unset($lead->key);
                 $lead->save();
                 $this->createAndAssignLead($lead, $newStatus->id, 'Unassigned Lead.');
             }
@@ -188,8 +230,9 @@ class LeadsHelper
                 ->whereIn('status_id', $statuses)
                 ->count();
 
-            $jrUserCounts += [$userJR => $tCount];
+            $jrUserCounts[$userJR] = $tCount;
         }
+
         asort($jrUserCounts);
         $jrUserCounts = array_keys($jrUserCounts);
 
@@ -199,7 +242,7 @@ class LeadsHelper
             $tCount = Ticket::where('user_id', $userSR)
                 ->whereIn('status_id', $statuses)
                 ->count();
-            $srUserCounts += [$userSR => $tCount];
+            $srUserCounts[$userSR] = $tCount;
         }
         asort($srUserCounts);
         $srUserCounts = array_keys($srUserCounts);
@@ -312,6 +355,7 @@ class LeadsHelper
                 'source_id' => $this->getSourceID($rawLead->platform),
                 'assigner_id' => $manual ? auth()->user()->id : null,
                 'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
+                'extra_data' => $rawLead->extra_data,
             ]);
 
             $lead->key = $rawLead->id;
@@ -338,15 +382,16 @@ class LeadsHelper
     public function initiateImport($leads)
     {
         $statuses = Status::whereIn('slug', ['new', 'follow-up']) // re-shuffled has been removed 12/9/2022
-        ->get()
-            ->pluck('id')
-            ->toArray();
+                    ->get()
+                    ->pluck('id')
+                    ->toArray();
 
         $useCamps = boolval(GeneralSettings::whereName('use_camps')->first()->value);
+
         if (!$useCamps) {
-            $this->importWithNoCampaigns($leads, $statuses);
+            return $this->importWithNoCampaigns($leads, $statuses);
         } else {
-            $this->importCampaignsBased($leads, $statuses);
+            return $this->importCampaignsBased($leads, $statuses);
         }
     }
 
@@ -440,6 +485,8 @@ class LeadsHelper
                 return Source::where('name', 'TikTok')->first()->id;
             case 'sc':
                 return Source::where('name', 'Snapchat')->first()->id;
+            case 'ga':  // 30/11/2024 - Google Ads
+                return Source::where('name', 'GoogleAds')->first()->id;
             default:
                 return Source::where('name', 'Unspecified')->first()->id;
         }

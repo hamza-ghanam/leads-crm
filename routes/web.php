@@ -94,6 +94,3 @@ Route::get('/notify',[WebNotificationController::class,'sendNotification'])->nam
 Route::get('/test', function () {
     return view('test');
 });
-
-Route::post('/testpost',[TicketController::class, 'devTest'])->name('testpost');
-
