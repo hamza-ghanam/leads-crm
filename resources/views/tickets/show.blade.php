@@ -270,6 +270,22 @@
                                         <th>Last update date</th>
                                         <td>{{ date('d/m/Y h:i A', strtotime($ticket['updated_at'])) }}</td>
                                     </tr>
+                                    <tr>
+                                        <th>Extra data</th>
+                                        <td>
+                                            @if($ticket->extra_data)
+                                                <ul>
+                                                    @foreach($ticket->extra_data as $key => $value)
+                                                        <li>
+                                                            <strong>{{ $key }}</strong>: {{ is_array($value) ? implode(', ', $value) : $value }}
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @else
+                                                <i>No extra data available.</i>
+                                            @endif
+                                        </td>
+                                    </tr>
                                     @hasanyrole('admin|super-admin|sale|tele-sale')
                                     <tr>
                                         <td colspan="2">

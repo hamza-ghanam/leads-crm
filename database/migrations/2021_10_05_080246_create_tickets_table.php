@@ -52,6 +52,7 @@ class CreateTicketsTable extends Migration
             $table->string('method')->nullable();
             $table->string('preferred_time')->nullable();
             $table->text('remarks')->nullable();
+            $table->json('extra_data')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

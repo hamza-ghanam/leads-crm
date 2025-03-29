@@ -37,6 +37,7 @@ class Ticket extends Model
         'method',
         'preferred_time',
         'remarks',
+        'extra_data',
     ];
 
     /**

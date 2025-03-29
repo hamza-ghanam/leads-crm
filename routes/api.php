@@ -21,3 +21,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 
 Route::post('/webhook/leads', [TicketController::class, 'storeLead'])->name('webhook.leads');
+//Route::post('/webhook/leads-test', [TicketController::class, 'storeLeadTest'])->name('webhook.leadstest');
+Route::get('/testme', [TicketController::class, 'devTest'])->name('testme');

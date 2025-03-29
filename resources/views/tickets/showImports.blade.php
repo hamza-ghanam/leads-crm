@@ -91,27 +91,17 @@
                                                 class="badge bg-{{ $ticket->status->name === 'New' ? 'primary' : 'danger' }}">{{ $ticket->status->name }}</span>
                                         </td>
                                         <td>
-                                            <select class="form-control" required name="sales_ids">
-                                                <option value="-1" disabled selected>Please Select</option>
-                                                <optgroup label="Sales">
-                                                    @foreach($sales as $salesEmp)
-                                                        @if ($salesEmp->getRoleNames()[0] === 'sale')
+                                            <select class="form-control select2" required name="sales_ids" id="sales_ids_{{ $key }}">
+                                                <option value=""></option> <!-- Placeholder option -->
+                                                @foreach ($sales as $role => $employees)
+                                                    <optgroup label="{{ ucfirst(str_replace('-', ' ', $role)) }}">
+                                                        @foreach ($employees as $salesEmp)
                                                             <option value="{{ $salesEmp->id }}">
                                                                 {{ $salesEmp->name }}
                                                             </option>
-                                                        @endif
-                                                    @endforeach
-                                                </optgroup>
-
-                                                <optgroup label="Tele-Sales">
-                                                    @foreach($sales as $salesEmp)
-                                                        @if ($salesEmp->getRoleNames()[0] === 'tele-sale')
-                                                            <option value="{{ $salesEmp->id }}">
-                                                                {{ $salesEmp->name }}
-                                                            </option>
-                                                        @endif
-                                                    @endforeach
-                                                </optgroup>
+                                                        @endforeach
+                                                    </optgroup>
+                                                @endforeach
                                             </select>
                                         </td>
                                         <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
@@ -151,6 +141,12 @@
                 "responsive": true,
                 "pageLength": 50
             });
+
+            $('.select2').select2({
+                placeholder: 'Select sales',
+            });
+
+
         });
 
         const Toast = Swal.mixin({
@@ -259,8 +255,8 @@
                 const form = document.getElementById('form1');
                 const formData = new FormData(form);
 
-                const leadIds = formData.getAll('lead_ids');
-                const salesIds = formData.getAll('sales_ids');
+                const leadIds = formData.getAll('lead_ids').filter(id => id !== '');
+                const salesIds = formData.getAll('sales_ids').filter(id => id !== '');
 
                 if (leadIds.length === 0 && salesIds.length === 0) {
                     document.getElementById('loader').style.display = 'none';
@@ -271,7 +267,7 @@
                         icon: 'warning',
                         title: 'No leads for now!'
                     });
-                } else if (salesIds.length < leadIds.length) {
+                } else if (salesIds.length !== leadIds.length) {
                     document.getElementById('loader').style.display = 'none';
                     document.getElementById('example2').style.display = '';
                     document.getElementById('fb-data-table').style.display = '';

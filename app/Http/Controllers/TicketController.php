@@ -499,6 +499,7 @@ class TicketController extends Controller
         }
 
         $ticket->paths = $ticketPaths;
+        $ticket->extra_data = json_decode($ticket->extra_data, true); // Decode JSON
 
         $results = [
             'ticket' => $ticket,
@@ -728,7 +729,7 @@ class TicketController extends Controller
     {
         parent::hasPermission('facebook import');
 
-        if (!in_array($source, ['excel', 'facebook', 'tiktok'])) {
+        if (!in_array($source, ['excel', 'facebook', 'tiktok', 'googleAds'])) { // 30-11-2024 GoogleAds
             return redirect()->route('tickets.all');
         }
 
@@ -744,18 +745,28 @@ class TicketController extends Controller
         $sales = null;
 
         if (auth()->user()->hasRole('super-admin')) {
-            $sales = User::role(['sale', 'tele-sale'])
+            $salesAll = User::role(['sale', 'tele-sale'])
                 ->where('status', 'permitted')
                 ->get();
+
+            $sales = $salesAll->groupBy(function ($salesEmp) {
+                return $salesEmp->getRoleNames()->first();
+            });
         } elseif (auth()->user()->hasRole('sales-manager')) {
-            $sales = User::whereManagerId(auth()->user()->id)
+            $salesAll = User::whereManagerId(auth()->user()->id)
                 ->where('status', 'permitted')
                 ->get();
+
+            $sales = $salesAll->groupBy(function ($salesEmp) {
+                return $salesEmp->getRoleNames()[0];
+            });
         }
 
         return view('tickets.showImports')->with([
             'tickets' => $leads,
-            'sales' => $sales,
+            'sales' => $sales->map(function ($group) {
+                return $group->toArray();
+            })->toArray(),
             'source' => $source,
         ]);
     }
@@ -831,14 +842,14 @@ class TicketController extends Controller
                         $row['phone_number'] = $this->leadsHelper->rectifyPhone($this->removeColon($row['phone_number']));
 
                         $lead = [
-                            'number' => $row['id'],
-                            'ad_id' => $row['ad_id'],
+                            'number' => $row['id'] ?? '',
+                            'ad_id' => $row['ad_id'] ?? '',
                             'ad_name' => $row['ad_name'],
-                            'adset_id' => $row['ad_name'],
+                            'adset_id' => $row['ad_name'] ?? '',
                             'adset_name' => $row['adset_id'],
-                            'campaign_id' => $row['campaign_id'],
+                            'campaign_id' => $row['campaign_id'] ?? '',
                             'campaign_name' => $row['campaign_name'],
-                            'form_id' => $row['form_id'],
+                            'form_id' => $row['form_id'] ?? '',
                             'form_name' => $row['form_name'],
                             'is_organic' => $row['is_organic'],
                             'platform' => $row['platform'],
@@ -848,8 +859,8 @@ class TicketController extends Controller
                             'job_title' => $row['job_title'] ?? null,
                             'created_time' => date('Y-m-d H:i:s', strtotime($row['created_time'])),
                             'source' => $row['platform'],
-                            'preferred_time' => $row['preferred_time'],
-                            'remarks' => $row['interested_in'],
+                            'preferred_time' => $row['preferred_time'] ?? '',
+                            'remarks' => $row['interested_in'] ?? '',
                             'created_at' => Carbon::now(),
                             'updated_at' => Carbon::now(),
                         ];
@@ -910,8 +921,8 @@ class TicketController extends Controller
     {
         parent::hasPermission('facebook import');
 
-        if (!in_array($source, ['facebook', 'tiktok'])) {
-            return response()->json(['ERROR' => 0], 404);
+        if (!in_array($source, ['facebook', 'tiktok', 'googleAds'])) {
+            return response()->json(['ERROR' => 'Unkown Source'], 404);
         }
 
         $rules = [
@@ -945,7 +956,7 @@ class TicketController extends Controller
 
             // return response()->json(['OK' => $request->details], 200);
             $newStatus = Status::where('slug', 'new')->first()->id;
-           // $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+            // $duplicatedStatus = Status::whereName('duplicated')->first()->id;
 
             foreach ($leads as $rawLead) {
                 if (!User::find($request->details[$rawLead->id])) {
@@ -982,7 +993,8 @@ class TicketController extends Controller
                         'status_id' => $newStatus,
                         'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
                         'assigner_id' => $request->manual ? auth()->user()->id : null,
-                        'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source)
+                        'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
+                        'extra_data' => $rawLead->extra_data,
                     ]);
 
                     $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
@@ -1071,193 +1083,193 @@ class TicketController extends Controller
 
     public function moveForward(Request $request, $id): \Illuminate\Http\RedirectResponse
     {
+        // Check permission
         parent::hasPermission('change status');
 
+        // Retrieve ticket early; return error if not found.
         $ticket = Ticket::find($id);
+        if (!$ticket) {
+            return back()->withErrors(['msg' => 'Ticket does not exist!'])->withInput($request->all());
+        }
 
+        // Determine status id: use request value if provided, otherwise use ticket's next status.
+        $statusId = $request->input('status') ?? ($ticket->status->next->id ?? null);
+        $theStatus = Status::find($statusId);
+        if (!$theStatus) {
+            return back()->withErrors(['msg' => 'No such status.'])->withInput($request->all());
+        }
+
+        // Build base validation rules.
         $rules = [
             'comment' => ['required', 'string'],
-            'user' => ['integer', 'gt:0'],
-            'status' => ['required', 'nullable', 'integer', 'gt:0'],
+            'user'    => ['integer', 'gt:0', 'exists:users,id'],
+            'status'  => ['required', 'nullable', 'integer', 'gt:0', 'exists:statuses,id'],
         ];
 
-        $theStatus = Status::find($request->has('status') ? $request->status : $ticket->status->next->id);
-
-        if (strpos(strtolower($theStatus->name), 'book') !== false) {
-            $rules += ['client-unit' => ['required']];
-            $rules += ['client-price' => ['required', 'integer', 'gt:0']];
-            $rules += ['client-project' => ['required']];
-            $rules += ['client-developer' => ['required']];
+        // If status name contains 'book', add additional booking validation rules.
+        if (stripos($theStatus->name, 'book') !== false) {
+            $rules = array_merge($rules, [
+                'client-unit'      => ['required'],
+                'client-price'     => ['required', 'integer', 'gt:0'],
+                'client-project'   => ['required'],
+                'client-developer' => ['required'],
+            ]);
         }
 
         $messages = [
             'required' => 'The :attribute field is required.',
-            'integer' => 'The :attribute field should be integer.',
-            'string' => 'The :attribute field should be string.',
-            'gt:0' => 'The :attribute field should be positive.'
+            'integer'  => 'The :attribute field must be an integer.',
+            'string'   => 'The :attribute field must be a string.',
+            'gt'       => 'The :attribute field must be greater than zero.',
+            'exists'   => 'The selected :attribute is invalid.',
         ];
 
         $validator = Validator::make($request->all(), $rules, $messages);
-
         if ($validator->fails()) {
             return back()->withErrors($validator->errors())->withInput($request->all());
         }
 
+        // Role-specific status restrictions.
         if ($theStatus->name === 'approved' && !auth()->user()->hasRole('super-admin')) {
             return back()->withErrors(['msg' => 'Unauthorized Operation!'])->withInput($request->all());
         }
 
-        if (!$ticket) {
-            return back()->withErrors(['msg' => 'Ticket is not exists!'])->withInput($request->all());
-        }
-
-        // $user = $request->has('user') ? User::find($request->user) : auth()->user();
-        $user = $request->has('user') ? User::find($request->user) : User::find($ticket->user->id);
-
+        // Determine user: if not provided use ticket's user.
+        $userId = $request->input('user') ?? ($ticket->user->id ?? null);
+        $user   = User::find($userId);
         if (!$user) {
-            return back()->withErrors(['msg' => 'User is not exists!'])->withInput($request->all());
+            return back()->withErrors(['msg' => 'User does not exist!'])->withInput($request->all());
         }
 
+        // Additional restrictions for accountant and admin roles.
         if (auth()->user()->hasRole('accountant')) {
             $soldStatus = Status::whereSlug('sold')->first();
-
-            if ($request->status != $soldStatus->id) {
+            if ($request->input('status') != $soldStatus->id) {
                 return back()->withErrors(['msg' => 'Accountant can only change lead to sold status!'])->withInput($request->all());
             }
         }
 
         if (auth()->user()->hasRole('admin')) {
             $reviewStatus = Status::whereSlug('reviewed')->first();
-
-            if ($request->status != $reviewStatus->id) {
+            if ($request->input('status') != $reviewStatus->id) {
                 return back()->withErrors(['msg' => 'Admin can only change lead to reviewed status!'])->withInput($request->all());
             }
         }
 
-        if (!$theStatus) {
-            return back()->withErrors(['msg' => 'No such status.'])->withInput($request->all());
-        }
+        // Begin a DB transaction to ensure atomicity.
+        DB::beginTransaction();
 
-        if (strpos(strtolower($theStatus->name), 'meet') !== false) {
-            $rangeParts = explode(' - ', $request->datetimes);
-            $startParts = explode(' ', $rangeParts[0]);
-            $endParts = explode(' ', $rangeParts[1]);
+        try {
+            // If meeting scheduling is needed.
+            if (stripos($theStatus->name, 'meet') !== false) {
+                $rangeParts = explode(' - ', $request->datetimes);
+                if (count($rangeParts) < 2) {
+                    throw new \Exception('Invalid meeting datetime format.');
+                }
+                $startDate = \Carbon\Carbon::createFromFormat('d/m Y g:i A', $rangeParts[0]);
+                $endDate   = \Carbon\Carbon::createFromFormat('d/m Y g:i A', $rangeParts[1]);
 
-            $startOn = $startParts[0] . '/' . date('Y') . ' ' . $startParts[1] . ' ' . $startParts[2];
-            $startOn = strtotime($startOn);
-            $startDate = date('Y-m-d H:i:s', $startOn);
+                if ($endDate->lessThan($startDate)) {
+                    throw new \Exception('Start date & time must be before end date & time.');
+                }
 
-            $endOn = $endParts[0] . '/' . date('Y') . ' ' . $endParts[1] . ' ' . $endParts[2];
-            $endOn = strtotime($endOn);
-            $endDate = date('Y-m-d H:i:s', $endOn);
-
-            if ($endDate < $startDate) {
-                return back()->withErrors(['msg' => 'Start date & time must be before end date & time..'])
-                    ->withInput($request->all());
+                $mtng = Meeting::create([
+                    'started_at'  => $startDate->toDateTimeString(),
+                    'ended_at'    => $endDate->toDateTimeString(),
+                    'method'      => 'automatic',
+                    'reminder_at' => $startDate->copy()->subMinutes(30)->toDateTimeString(),
+                ]);
             }
 
-            $mtng = Meeting::create([
-                'started_at' => $startDate,
-                'ended_at' => $endDate,
-                'method' => 'automatic',
-                'reminder_at' => date("Y-m-d H:i", strtotime("-30 minutes", strtotime($startDate)))
-                // MySQL: UPDATE meetings SET `reminder_at` = DATE_SUB(STR_TO_DATE(`started_at`, '%Y-%m-%d %H:%i:%s'), INTERVAL 30 MINUTE)
+            // Create ticket path record.
+            $tPath = TicketPath::create([
+                'prev_user'   => $ticket->user->id ?? null,
+                'next_user'   => $user->id,
+                'prev_status' => $ticket->status->id,
+                'next_status' => $statusId,
+                'ticket_id'   => $ticket->id,
+                'comment'     => $request->comment,
             ]);
-        }
 
-        $dead = Status::where('slug', 'dead')->first();
-        $deadTele = Status::where('slug', 'dead-tele')->first();
+            // Adjust ticket user based on status.
+            $mgmtStatuses = Status::whereIn('slug', ['reviewed', 'sold', 'pre-approved', 'rejected'])
+                ->pluck('id')
+                ->toArray();
+            $dead     = Status::where('slug', 'dead')->first();
+            $deadTele = Status::where('slug', 'dead-tele')->first();
 
-        $tPath = TicketPath::create([
-            'prev_user' => $ticket->user ? $ticket->user->id : null,
-            'next_user' => $user->id,
-            'prev_status' => $ticket->status->id,
-            'next_status' => $request->has('status') ? $request->status : $ticket->status->next->id,
-            'ticket_id' => $ticket->id,
-            'comment' => $request->comment
-        ]);
+            if ($request->input('status') == $dead->id || $request->input('status') == $deadTele->id) {
+                $ticket->user_id = null;
+            } elseif (in_array($request->input('status'), $mgmtStatuses)) {
+                $ticket->user_id = auth()->user()->id;
+                $tPath->next_user = auth()->user()->id;
+            } else {
+                $ticket->user_id = $user->id;
+            }
+            $tPath->save();
 
-        $mgmtStatuses = Status::whereIn('slug', ['reviewed', 'sold', 'pre-approved', 'rejected'])
-            ->get()
-            ->pluck('id')
-            ->toArray();
+            // Update ticket status.
+            $ticket->status_id = $statusId;
+            $ticket->save();
 
-        if ($request->status == $dead->id or $request->status == $deadTele->id) {
-            $ticket->user_id = null;
-        } elseif (in_array($request->status, $mgmtStatuses)) {
-            $ticket->user_id = auth()->user()->id;
-            $tPath->next_user = auth()->user()->id;
-        } else {
-            $ticket->user_id = $user->id;
-        }
+            // If a meeting was created, link it to the ticket path.
+            if (isset($mtng)) {
+                $mtng->ticket_path_id = $tPath->id;
+                $mtng->save();
+            }
 
-        $tPath->save();
-
-        $ticket->status_id = $request->status;
-
-        $ticket->save();
-        $ticketUser = User::find($ticket->user_id);
-
-        if (strpos(strtolower($theStatus->name), 'meet') !== false) {
-            $mtng->ticket_path_id = $tPath->id;
-            $mtng->save();
-        }
-
-        if ($theStatus->slug === 'meeting') {
-            $ticketUser->status = 'banned';
-            $ticketUser->save();
-        } else {
-            if ($ticketUser and $ticketUser->status === 'banned') {
-                $ticketUser->status = 'permitted';
+            // Update ticket user's status based on meeting.
+            $ticketUser = User::find($ticket->user_id);
+            if ($ticketUser) {
+                if (stripos($theStatus->name, 'meet') !== false) {
+                    $ticketUser->status = 'banned';
+                } elseif ($ticketUser->status === 'banned') {
+                    $ticketUser->status = 'permitted';
+                }
                 $ticketUser->save();
             }
-        }
 
-        // Notify Users
-        /** 1. Super admin */
-        $nxt = Status::find($tPath->next_status)->name;
-        $prv = Status::find($tPath->prev_status)->name;
+            // Notify users.
+            $prevStatusName = Status::find($tPath->prev_status)->name;
+            $nextStatusName = Status::find($tPath->next_status)->name;
+            $data = [
+                'title'   => 'Lead Status Update',
+                'message' => 'A new lead status has been updated from "' . $prevStatusName . '" to "' . $nextStatusName . '"',
+                'user'    => auth()->user()->name,
+                'ticket'  => $ticket->id,
+            ];
 
-        $data = [
-            'title' => 'Lead Status Update',
-            'message' => 'A new lead status has been updated from "' . $prv . '" to "' . $nxt . '" by user: ',
-            'user' => auth()->user()->name,
-            'ticket' => $ticket->id
-        ];
+            // Notify super-admins.
+            $superAdmins = User::role('super-admin')->pluck('email')->toArray();
+            $this->sendLeadMail($superAdmins, $data);
 
-        $superAdmins = User::role('super-admin')
-            ->get()
-            ->pluck('email')
-            ->toArray();
-
-        $this->sendLeadMail($superAdmins, $data);
-
-        // Mail::to($superAdmins)->send(new LeadNotifyMail($data));
-
-        // User himself
-        $data = [
-            'title' => 'Lead Status Update',
-            'message' => 'A new lead status has been updated from "' . $prv . '" to "' . $nxt . '". ',
-            'user' => '',
-            'ticket' => $ticket->id
-        ];
-
-        $this->sendLeadMail($user->email, $data);
-
-        // Mail::to($user->email)->send(new LeadNotifyMail($data));
-
-        if (strpos(strtolower($theStatus->name), 'book') !== false) {
-            $booking = Booking::create([
-                'project_name' => $request['client-project'],
-                'unit_number' => $request['client-unit'],
-                'price' => $request['client-price'],
-                'developer_name' => $request['client-developer'],
-                'user_id' => auth()->user()->id,
-                'ticket_id' => $ticket->id
+            // Notify assigned user.
+            $this->sendLeadMail($user->email, [
+                'title'   => 'Lead Status Update',
+                'message' => 'Your lead status has been updated from "' . $prevStatusName . '" to "' . $nextStatusName . '".',
+                'user'    => '',
+                'ticket'  => $ticket->id,
             ]);
 
-            $booking->save();
+            // Create booking if status indicates booking.
+            if (stripos($theStatus->name, 'book') !== false) {
+                $booking = Booking::create([
+                    'project_name'   => $request->input('client-project'),
+                    'unit_number'    => $request->input('client-unit'),
+                    'price'          => $request->input('client-price'),
+                    'developer_name' => $request->input('client-developer'),
+                    'user_id'        => auth()->user()->id,
+                    'ticket_id'      => $ticket->id,
+                ]);
+                $booking->save();
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['msg' => $e->getMessage()])->withInput($request->all());
         }
+
         return redirect()->route('tickets.show', [$ticket->id]);
     }
 
@@ -1267,7 +1279,7 @@ class TicketController extends Controller
             $inputString = trim(explode(':', $inputString)[1]);
         }
 
-        return $inputString;
+        return $inputString ?? '';
     }
 
     public function makeInvoice($id, Request $request)
@@ -1485,8 +1497,27 @@ class TicketController extends Controller
         return back()->with('successMsg', 'Leads have been forwarded.');
     }
 
-    public function devTest(Request $request)
+    public function devTest()
     {
+        $pullDate = date('Y-m-d H:i:s');
+        $dateBegin = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 10:29:57"));
+        $dateEnd = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 23:00:03"));
+        if (!($pullDate >= $dateBegin && $pullDate <= $dateEnd)) {
+            return response()->json(['msg' => 'Out of time!'], 422);
+        }
+
+        // Facebook
+        $leads = $this->leadsHelper->fetchLeadsFromZapier('facebook');
+
+        [$assignmentsCountJR, $assignmentsCountSR, $tempLeads] = $this->leadsHelper->initiateImport($leads);
+        //$res = $this->leadsHelper->initiateImport($leads);
+
+        $this->leadsHelper->removeZapierTempLeads($tempLeads);
+
+        return response()->json([$tempLeads], 200);
+
+
+        /*
         $rules = [
             'details' => 'required|array|min:1',
             'details.*' => 'required|integer|gt:0',
@@ -1514,7 +1545,6 @@ class TicketController extends Controller
 
         return response()->json(mt_rand(1, 10000000), 200);
 
-        /*
         $leads = [
             [
                 "number" => "203924041859471",
@@ -1684,7 +1714,7 @@ class TicketController extends Controller
         // Notification::send(null,new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
 
         // auth()->user()->notify(new SendPushNotification("New Lead", "A new lead has been assigned to you!", $fcmTokens));
-        dd($this->leadsHelper->rectifyPhone('966505228708'));
+        //   dd($this->leadsHelper->rectifyPhone('966505228708'));
         //return redirect()->route('home');
     }
 
@@ -1730,25 +1760,54 @@ class TicketController extends Controller
                 ->where('phone_number', '!=', '')
                 ->first();
 
+            $commonKeys = [
+                'id', 'lead_id',
+                'ad_id',
+                'ad_name',
+                'adset_id', 'adgroup_id',
+                'adset_name', 'adgroup_name',
+                'campaign_id',
+                'campaign_name',
+                'form_id',
+                'form_name',
+                'is_organic',
+                'platform',
+                'full_name', 'name',
+                'phone_number',
+                'email',
+                'status_id',
+                'source_id',
+                'method',
+                'created_time', 'create_time',
+                'page_id',
+                'page_name',
+                'retailer_item_id',
+            ];
+
+            $filteredData = collect($request->request->all())->reject(function ($value, $key) use ($commonKeys) {
+                return str_starts_with($key, 'raw') || in_array($key, $commonKeys);
+            })->toArray();
+
             $lead = TempLead::create([
-                'number' => $request->id ?? 0,
+                'number' => $request->id ?? $request->lead_id ?? 0,
                 'ad_id' => $request->ad_id ?? 0,
                 'ad_name' => $request->ad_name,
-                'adset_id' => $request->adset_id,
-                'adset_name' => $request->adset_name,
+                'adset_id' => $request->adset_id ?? $request->adgroup_id,
+                'adset_name' => $request->adset_name ?? $request->adgroup_name,
                 'campaign_id' => $request->campaign_id,
                 'campaign_name' => $request->campaign_name,
                 'form_id' => $request->form_id,
                 'form_name' => $request->form_name ?? '',
                 'is_organic' => $request->is_organic ?? '',
                 'platform' => $request->platform,
-                'full_name' => $request->full_name,
+                'full_name' => $request->full_name ?? $request->name,
                 'phone_number' => $request->phone_number,
                 'email' => $request->email,
                 'job_title' => $request->job_title ?? '',
                 'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
-                'source_id' => $this->leadsHelper->getSourceID($request->platform),
-                'method' => 'Automatic ' . ucfirst($request->source_name) . ' - Webhook',
+                'source_id' => $this->leadsHelper->getSourceID($request->query('pf')),
+                'extra_data' => json_encode($filteredData, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'method' => 'Automatic ' . ucfirst($request->query('sc')) . ' - Webhook',
             ]);
 
             DB::commit();
@@ -1764,7 +1823,7 @@ class TicketController extends Controller
             // Rollback the transaction if there's an error
             DB::rollBack();
 
-            return response()->json(['error' => 'فشل إضافة الطالب: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'فشل إضافة الطلب: ' . $e->getMessage()], 500);
         }
     }
 
