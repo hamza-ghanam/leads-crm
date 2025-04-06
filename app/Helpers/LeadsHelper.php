@@ -321,9 +321,9 @@ class LeadsHelper
         return $leads;
     }
 
-    public function fetchLeadsFromZapier($source, $manual = null): array
+    public function fetchLeadsFromZapier($sourceName, $manual = null): array
     {
-        $source = Source::whereRaw('LOWER(name) = ?', [strtolower($source)])->first();
+        $source = Source::whereRaw('LOWER(name) = ?', [strtolower($sourceName)])->first();
         $rawLeads = TempLead::where('source_id', $source->id)->get();
 
         $newStatus = Status::where('slug', 'new')->first()->id;
@@ -354,7 +354,7 @@ class LeadsHelper
                 'status_id' => $rawLead->status->id,
                 'source_id' => $this->getSourceID($rawLead->platform),
                 'assigner_id' => $manual ? auth()->user()->id : null,
-                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
+                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source->name),
                 'extra_data' => $rawLead->extra_data,
             ]);
 
