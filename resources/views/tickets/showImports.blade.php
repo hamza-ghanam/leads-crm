@@ -96,8 +96,8 @@
                                                 @foreach ($sales as $role => $employees)
                                                     <optgroup label="{{ ucfirst(str_replace('-', ' ', $role)) }}">
                                                         @foreach ($employees as $salesEmp)
-                                                            <option value="{{ $salesEmp->id }}">
-                                                                {{ $salesEmp->name }}
+                                                            <option value="{{ $salesEmp['id'] }}">
+                                                                {{ $salesEmp['name'] }}
                                                             </option>
                                                         @endforeach
                                                     </optgroup>
@@ -144,6 +144,7 @@
 
             $('.select2').select2({
                 placeholder: 'Select sales',
+                width: '100%',
             });
 
 

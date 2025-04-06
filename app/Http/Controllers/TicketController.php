@@ -764,9 +764,9 @@ class TicketController extends Controller
 
         return view('tickets.showImports')->with([
             'tickets' => $leads,
-            'sales' => $sales->map(function ($group) {
+            'sales' => $sales ? $sales->map(function ($group) {
                 return $group->toArray();
-            })->toArray(),
+            })->toArray() : [],
             'source' => $source,
         ]);
     }

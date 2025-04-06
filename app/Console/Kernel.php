@@ -37,19 +37,17 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // every 30 minutes, Facebook leads (Updated at: 17/5/2022)
-        // Adding TikTok leads, at 13/11/2022
+        // every 30 minutes, Facebook leads (Updated on: 17/5/2022)
+        // Adding TikTok leads, on 13/11/2022
+        // Adding Google Ads leads, on 06/04/2025
         $schedule->call(function () {
-            $pullDate = date('Y-m-d H:i:s');
-            $dateBegin = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 10:29:57"));
-            $dateEnd = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 17:00:03"));
-            if (!($pullDate >= $dateBegin && $pullDate <= $dateEnd)) {
+            $today = date('Y-m-d');
+            $dateBegin = "$today 10:29:57";
+            $dateEnd   = "$today 17:00:03";
+            $pullDate  = date('Y-m-d H:i:s');
+
+            if ($pullDate < $dateBegin || $pullDate > $dateEnd) {
                 return;
-                /*
-                if ($posts < 20) {
-                    return;
-                }
-                */
             }
 
             /**** New Method (15/05/2022) ****/
@@ -57,22 +55,14 @@ class Kernel extends ConsoleKernel
             /** 28/11/2024 New Zapier Webhook **/
 
             $leadsHelper = new LeadsHelper();
+            $sources = ['facebook', 'tiktok', 'googleAds'];
 
-            // Facebook
-            $leads = $leadsHelper->fetchLeadsFromZapier('facebook');
-            $leadsHelper->initiateImport($leads);
-            //$leadsHelper->emptyZapierLeadsSheet('facebook', count($leads));
-
-            $leadIds = array_column($leads, 'key');
-            $leadsHelper->removeZapierTempLeads($leadIds);
-
-            // TikTok
-            $leads = $leadsHelper->fetchLeadsFromZapier('tiktok');
-            $leadsHelper->initiateImport($leads);
-            // $leadsHelper->emptyZapierLeadsSheet('tiktok', count($leads));
-
-            $leadIds = array_column($leads, 'key');
-            $leadsHelper->removeZapierTempLeads($leadIds);
+            foreach ($sources as $source) {
+                $leads = $leadsHelper->fetchLeadsFromZapier($source);
+                $leadsHelper->initiateImport($leads);
+                $leadIds = array_column($leads, 'key');
+                $leadsHelper->removeZapierTempLeads($leadIds);
+            }
 
             /* Old Method
             $statuses = Status::whereIn('slug', ['new', 'follow-up', 'meeting'])
