@@ -43,8 +43,8 @@ class Kernel extends ConsoleKernel
         $schedule->call(function () {
             $today = date('Y-m-d');
             $dateBegin = "$today 10:29:57";
-            $dateEnd   = "$today 17:00:03";
-            $pullDate  = date('Y-m-d H:i:s');
+            $dateEnd = "$today 17:00:03";
+            $pullDate = date('Y-m-d H:i:s');
 
             if ($pullDate < $dateBegin || $pullDate > $dateEnd) {
                 return;
@@ -55,7 +55,16 @@ class Kernel extends ConsoleKernel
             /** 28/11/2024 New Zapier Webhook **/
 
             $leadsHelper = new LeadsHelper();
-            $sources = ['facebook', 'tiktok', 'googleAds'];
+
+            $sources = GeneralSettings::where('name', 'like', 'auto_import_%')
+                ->where('value', 1)
+                ->pluck('value', 'name')
+                ->keys()
+                ->map(function ($key) {
+                    return str_replace('auto_import_', '', $key);
+                })
+                ->values()
+                ->toArray();
 
             foreach ($sources as $source) {
                 $leads = $leadsHelper->fetchLeadsFromZapier($source);
@@ -261,7 +270,7 @@ class Kernel extends ConsoleKernel
             }
 
             $statuses = Status::whereIn('slug', ['new', 'follow-up'])  // re-shuffled has been removed 12/9/2022
-                ->get()
+            ->get()
                 ->pluck('id')
                 ->toArray();
 
@@ -585,7 +594,12 @@ class Kernel extends ConsoleKernel
 
                     ////// Notify Users
                     // Super admin
-                    $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => $user->name, 'ticket' => $ticket->id];
+                    $data = [
+                        'title' => 'Back from MEETING',
+                        'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ',
+                        'user' => $tPath->next_user->name,
+                        'ticket' => $ticket->id
+                    ];
                     $superAdmins = User::role('super-admin')->get()->pluck('email')->toArray();
                     Mail::to($superAdmins)->send(new LeadNotifyMail($data));
 

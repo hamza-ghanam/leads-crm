@@ -323,8 +323,17 @@ class LeadsHelper
 
     public function fetchLeadsFromZapier($sourceName, $manual = null): array
     {
-        $source = Source::whereRaw('LOWER(name) = ?', [strtolower($sourceName)])->first();
-        $rawLeads = TempLead::where('source_id', $source->id)->get();
+        $sourceName = strtolower($sourceName);
+
+        if ($sourceName === 'facebook') {
+            // Get source IDs for Facebook + Instagram
+            $sourceIds = Source::whereIn('name', ['Facebook', 'Instagram'])->pluck('id');
+        } else {
+            // Normal case
+            $sourceIds = Source::whereRaw('LOWER(name) = ?', [$sourceName])->pluck('id');
+        }
+
+        $rawLeads = TempLead::whereIn('source_id', $sourceIds)->get();
 
         $newStatus = Status::where('slug', 'new')->first()->id;
         $duplicatedStatus = Status::whereName('duplicated')->first()->id;
@@ -354,7 +363,7 @@ class LeadsHelper
                 'status_id' => $rawLead->status->id,
                 'source_id' => $this->getSourceID($rawLead->platform),
                 'assigner_id' => $manual ? auth()->user()->id : null,
-                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($source->name),
+                'method' => ($manual ? 'Manual ' : 'Automatic ') . ucfirst($sourceName),
                 'extra_data' => $rawLead->extra_data,
             ]);
 

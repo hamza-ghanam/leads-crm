@@ -64,6 +64,10 @@ class GeneralSettingsController extends Controller
             $setting->save();
         }
 
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Setting successfully saved.']);
+        }
+
         return back()->with('successMsg', 'Setting successfully saved.');
     }
 }

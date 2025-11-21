@@ -43,8 +43,8 @@ class SendPushNotification extends Notification
         return (new FirebaseMessage)
             ->withTitle($this->title)
             ->withBody($this->message)
-            ->withIcon('https://crm.greywolf.ae/dist/img/leads-logo-bg.png')
-            ->withImage('https://crm.greywolf.ae/dist/img/leads-logo-bg.png')
+            ->withIcon('')        // https://leads-crm.uniquesaray.ae/dist/img/leads-logo-bg.png
+            ->withImage('')      // https://leads-crm.uniquesaray.ae/dist/img/leads-logo-bg.png
             ->withPriority('high')
             ->asMessage($this->fcmTokens);
     }

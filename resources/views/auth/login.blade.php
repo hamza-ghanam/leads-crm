@@ -17,11 +17,17 @@
     <link rel="stylesheet" href="{{ asset('dist/css/adminlte.min.css') }}">
     <!-- Google Font: Source Sans Pro -->
     <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ asset('dist/img/favicons/favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ asset('dist/img/favicons/site.webmanifest') }}">
 </head>
 <body class="hold-transition login-page">
 <div class="login-box">
     <div class="login-logo">
-	    <img src="{{ asset('dist/img/leads-logo.png') }}" alt="charity" width="200" class="mb-4" /><br/>
+	    <img src="{{ asset('dist/img/wrsae_logo.png') }}" alt="charity" width="300" class="mb-4" /><br/>
         <strong style="font-weight: bold;">Leads CRM </strong><b>Dashboard</b>
     </div>
     <!-- /.login-logo -->

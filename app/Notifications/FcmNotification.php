@@ -36,7 +36,7 @@ class FcmNotification extends Notification
             ->setNotification(\NotificationChannels\Fcm\Resources\Notification::create()
                 ->setTitle($this->title)
                 ->setBody($this->message)
-                ->setImage('https://crm.greywolf.ae/dist/img/leads-logo-bg.png'))
+                ->setImage('')) // https://leads-crm.uniquesaray.ae/dist/img/leads-logo-bg.png
             ->setAndroid(
                 AndroidConfig::create()
                     ->setFcmOptions(AndroidFcmOptions::create()->setAnalyticsLabel('analytics'))

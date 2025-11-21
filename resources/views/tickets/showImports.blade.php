@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title')
-    <span id="sourceName"></span> Leads List
+    <span class="sourceName"></span> Leads List
 @endsection
 
 @section('breadcrumb')
@@ -37,9 +37,26 @@
                 <div class="card-header">
                     @can('add ticket')
                         <a href="javascript:void(0);" id="start-btn" onclick="importTickets()" class="btn btn-primary">Start
-                            import</a>
-                            <a href="javascript:void(0);" id="start-btn" onclick="ignoreLeads()"
-                               class="btn btn-danger ml-4">Ignore Leads</a>
+                            import
+                        </a>
+                        <a href="javascript:void(0);" id="start-btn" onclick="ignoreLeads()"
+                           class="btn btn-danger ml-4">Ignore Leads
+                        </a>
+
+                        <form method="post" name="settings-form" id="settings-form" class="float-right"
+                              action="{{ route('settings.update') }}">
+                            @csrf
+                            @method('PUT')
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="customSwitch1"
+                                           name="settings_values[]" {{ $auto_import ? 'checked' : '' }}
+                                           value="{{ $auto_import ? 'on' : 'off' }}"/>
+                                    <label class="custom-control-label" for="customSwitch1">Auto <span class="sourceName"></span> import</label>
+                                    <input type="hidden" name="settings_names[]" value="auto_import_{{ $source }}">
+                                </div>
+                            </div>
+                        </form>
                     @endcan
                 </div>
                 <!-- /.card-header -->
@@ -91,7 +108,8 @@
                                                 class="badge bg-{{ $ticket->status->name === 'New' ? 'primary' : 'danger' }}">{{ $ticket->status->name }}</span>
                                         </td>
                                         <td>
-                                            <select class="form-control select2" required name="sales_ids" id="sales_ids_{{ $key }}">
+                                            <select class="form-control select2" required name="sales_ids"
+                                                    id="sales_ids_{{ $key }}">
                                                 <option value=""></option> <!-- Placeholder option -->
                                                 @foreach ($sales as $role => $employees)
                                                     <optgroup label="{{ ucfirst(str_replace('-', ' ', $role)) }}">
@@ -244,7 +262,33 @@
 
         const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
 
-        document.getElementById('sourceName').innerHTML = sourceLabel;
+        document.querySelectorAll('.sourceName').forEach(elem => {
+            elem.textContent = sourceLabel; // safer than innerHTML if it’s plain text
+        });
+
+        document.getElementById('customSwitch1').addEventListener('change', async (e) => {
+            const form = document.forms['settings-form'];
+            const formData = new FormData(form);
+
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+
+                const jsonRes = await res.json();
+
+                // show success notification
+                Toast.fire({
+                    icon: 'success',
+                    title: jsonRes.message
+                });
+            } catch (err) {
+                console.error(err);
+                alert('Failed to save setting.');
+            }
+        });
 
         async function importTickets() {
             document.getElementById('fb-data-table').style.display = 'none';
@@ -372,7 +416,7 @@
                         if (result.value) {
                             const token = '{{ csrf_token() }}';
 
-                            let resp = await axios.put('/tickets/ignoreLeads/', { leadIds }, {
+                            let resp = await axios.put('/tickets/ignoreLeads/', {leadIds}, {
                                 withCredentials: true,
                                 headers: {
                                     'Content-Type': 'application/json',

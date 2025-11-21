@@ -8,7 +8,7 @@
     <title>Leads CRM - Management Dashboard</title>
     <meta property="og:title" content="Leads CRM">
     <meta property="og:description" content="Manage you Leads from different sources using our advanced CRM">
-    <meta property="og:image" content="{{ asset('dist/img/leads-logo-bg.png') }}">
+    <meta property="og:image" content="{{ asset('dist/img/wrsae_thumb.png') }}">
     <meta property="og:url" content="{{ env('APP_URL') }}">
     <meta property="og:type" content="website">
 
@@ -37,6 +37,14 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css"/>
 
     <style>
+        .sidebar {
+            background-color: #2d3955 !important;
+        }
+
+        .brand-link {
+            background-color: #2d3955 !important;
+        }
+
         .custom-map-control-button {
             appearance: button;
             background-color: #fff;
@@ -61,6 +69,7 @@
     </style>
 
     <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ asset('dist/img/favicons/favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}">
@@ -101,7 +110,7 @@
         <!-- Brand Logo -->
         <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
            class="brand-link">
-            <img src="{{ asset('dist/img/leads-logo-bg.png') }}" alt="AdminLTE Logo"
+            <img src="{{ asset('dist/img/wrsae_thumb.png') }}" alt="AdminLTE Logo"
                  class="brand-image img-circle elevation-3"
                  style="opacity: .8">
             <span class="brand-text font-weight-light"><strong
@@ -113,7 +122,7 @@
             <!-- Sidebar user panel (optional) -->
             <div class="user-panel mt-3 pb-3 mb-3 d-flex">
                 <div class="image">
-                    <img src="{{ asset('dist/img/user2-160x160.jpg') }}" class="img-circle elevation-2"
+                    <img src="{{ asset('dist/img/user_placeholder.jpg') }}" class="img-circle elevation-2"
                          alt="User Image">
                 </div>
                 <div class="info">
@@ -262,37 +271,9 @@
                                 </li>
                             @endcan
 
-                                @can('facebook import')
-                                    <li class="nav-item">
-                                        <a href="{{ route('tickets.showImports', ['googleAds']) }}"
-                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.showImports') !== false && strpos(request()->route('source'), 'googleAds') !== false ? 'active' : ''}}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Google Ads import</p>
-                                        </a>
-                                    </li>
-                                @endcan
                         </ul>
                     </li>
 
-                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'salesCamps') !== false)  ? 'menu-open' : '' }}">
-                        <a href="#"
-                           class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps') !== false  ? 'active' : ''}}">
-                            <i class="nav-icon fas fa-map-signs"></i>
-                            <p>
-                                Sales Campaigns
-                                <i class="right fas fa-angle-left"></i>
-                            </p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="{{ route('salesCamps.index') }}"
-                                   class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps.index') !== false  ? 'active' : '' }}">
-                                    <i class="far fa-circle nav-icon"></i>
-                                    <p>Show All</p>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
                     @endhasrole
                 </ul>
             </nav>

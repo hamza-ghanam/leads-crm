@@ -15,7 +15,7 @@
     <div class="row">
         <div class="col-12">
             <div class="card card-secondary">
-                <div id="flip" class="card-header" style="cursor: pointer;">
+                <div id="flip" class="card-header" style="cursor: pointer; background-color: #2d3955 !important;">
                     <h3 class="card-title">Filter</h3>
                     <span class="float-right"><i id="angle1" class="fas fa-angle-down"></i></span>
                 </div>

@@ -38,7 +38,7 @@
 <div class="row">
     <div class="col-12">
         <div class="card card-secondary">
-            <div id="flip" class="card-header" style="cursor: pointer;">
+            <div id="flip" class="card-header" style="cursor: pointer; background-color: #2d3955 !important;">
                 <h3 class="card-title">Filter</h3>
                 <span class="float-right"><i id="angle1" class="fas fa-angle-down"></i></span>
             </div>
@@ -135,7 +135,7 @@
                         @foreach($stats as $key0 => $tickets)
                             @foreach($tickets as $key => $ticket)
                                 <tr @if($ticket->status->slug === 'duplicated') class="table-danger"
-                                @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif)>
+                                @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif>
                                 <td><a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket->id }}</a></td>
                                 <td><a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket['campaign_name'] !== null ? $ticket['campaign_name'] : '-' }}</a></td>
                                 <td>{{ $ticket['full_name'] !== null ? $ticket['full_name'] : '-' }}</td>

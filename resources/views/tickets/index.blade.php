@@ -40,7 +40,7 @@
                             <a href="{{ route('tickets.create') }}" class="btn btn-primary">Add New</a>
                         </div>
                         <div class="col-2">
-                            <button type="button" id="enable-fwd" class="btn btn-secondary">Enable multiple forwarding
+                            <button type="button" id="enable-fwd" class="btn btn-secondary">Enable multi forward
                             </button>
                         </div>
                         @hasanyrole('super-admin|sales-manager')
@@ -209,7 +209,7 @@
                     <form name="fwd-form" action="{{ route('tickets.multipleForward') }}" method="post" id="fwd-form">
                         @csrf
                         @endhasanyrole
-                        <table id="example20" class="table table-bordered table-hover">
+                        <table id="example20" style="width: 100%;" class="table table-bordered table-hover table-responsive">
                             <thead>
                             <tr>
                                 <th class="fwd-leads" style="display:none !important;">
@@ -235,7 +235,7 @@
                             <tbody>
                             @foreach($tickets as $key => $ticket)
                                 <tr id="row_{{ $ticket->id }}" @if($ticket->status->slug === 'duplicated') class="table-danger"
-                                    @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif)>
+                                    @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif>
                                     <td class="fwd-leads" style="display:none !important;">
                                         <div class="form-check">
                                             <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
@@ -596,12 +596,12 @@
         }, false);
 
         function toggleFwdBtn(fwdBtn, boxes) {
-            if (fwdBtn.innerText === 'Enable multiple forwarding') {
-                fwdBtn.innerText = 'Disable multiple forwarding';
+            if (fwdBtn.innerText === 'Enable multi forward') {
+                fwdBtn.innerText = 'Disable multi forward';
                 fwdBtn.classList.remove('btn-secondary');
                 fwdBtn.classList.add('btn-danger');
             } else {
-                fwdBtn.innerText = 'Enable multiple forwarding';
+                fwdBtn.innerText = 'Enable multi forward';
                 fwdBtn.classList.remove('btn-danger');
                 fwdBtn.classList.add('btn-secondary');
             }

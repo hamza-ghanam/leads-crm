@@ -6,6 +6,7 @@ use App\Helpers\LeadsHelper;
 use App\Imports\TicketsImport;
 use App\Mail\LeadNotifyMail;
 use App\Models\Booking;
+use App\Models\GeneralSettings;
 use App\Models\Meeting;
 use App\Models\Source;
 use App\Models\Status;
@@ -768,6 +769,7 @@ class TicketController extends Controller
                 return $group->toArray();
             })->toArray() : [],
             'source' => $source,
+            'auto_import' => boolval(GeneralSettings::whereName('auto_import_' . $source)->first()->value),
         ]);
     }
 
@@ -1740,9 +1742,20 @@ class TicketController extends Controller
 
     public function storeLead(Request $request)
     {
-        if ($request->header('X-Zapier-Token') !== env('ZAPIER_SECRET')) {
+        if (!$request->header('X-Make-Token') || $request->header('X-Make-Token') !== env('MAKE_SECRET')) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
+
+        /*
+        $tl = TempLead::create([
+            'full_name' => 'test',
+            'phone_number' => '099999999',
+            'status_id' => Status::where('slug', 'new')->first()->id,
+            'source_id' => $this->leadsHelper->getSourceID('fb'),
+            'extra_data' => json_encode($request->all(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        ]);
+        return response()->json($tl, 200);
+        */
 
         try {
             DB::beginTransaction();
@@ -1784,9 +1797,17 @@ class TicketController extends Controller
                 'retailer_item_id',
             ];
 
-            $filteredData = collect($request->request->all())->reject(function ($value, $key) use ($commonKeys) {
-                return str_starts_with($key, 'raw') || in_array($key, $commonKeys);
-            })->toArray();
+            $payload = $request->input('extra_data');
+
+            if (is_array($payload)) {
+                $filteredData = collect($payload)->reject(function ($value, $key) use ($commonKeys) {
+                    return str_starts_with($key, 'raw') || in_array($key, $commonKeys);
+                })->toArray();
+
+                $payload = json_encode($filteredData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            }
+
+            // If it's an array, encode it:
 
             $lead = TempLead::create([
                 'number' => $request->id ?? $request->lead_id ?? 0,
@@ -1806,7 +1827,7 @@ class TicketController extends Controller
                 'job_title' => $request->job_title ?? '',
                 'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
                 'source_id' => $this->leadsHelper->getSourceID($request->query('pf')),
-                'extra_data' => json_encode($filteredData, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'extra_data' => $payload,
                 'method' => 'Automatic ' . ucfirst($request->query('sc')) . ' - Webhook',
             ]);
 
@@ -1823,7 +1844,7 @@ class TicketController extends Controller
             // Rollback the transaction if there's an error
             DB::rollBack();
 
-            return response()->json(['error' => 'فشل إضافة الطلب: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'Request execution failed: ' . $e->getMessage()], 500);
         }
     }
 
