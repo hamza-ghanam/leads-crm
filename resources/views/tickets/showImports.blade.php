@@ -164,8 +164,6 @@
                 placeholder: 'Select sales',
                 width: '100%',
             });
-
-
         });
 
         const Toast = Swal.mixin({
@@ -416,7 +414,7 @@
                         if (result.value) {
                             const token = '{{ csrf_token() }}';
 
-                            let resp = await axios.put('/tickets/ignoreLeads/', {leadIds}, {
+                            let resp = await axios.put('/tickets/ignoreLeads/temp', {leadIds}, {
                                 withCredentials: true,
                                 headers: {
                                     'Content-Type': 'application/json',

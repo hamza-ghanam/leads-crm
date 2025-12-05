@@ -416,12 +416,12 @@
                             <!-- The time line -->
                             <div class="timeline">
                                 <!-- timeline time label -->
-                                @foreach($ticket->paths as $key => $path)
+                                @foreach($ticketPaths as $key => $path)
                                     <div class="time-label">
                                         <span class="bg-info">{{date('d/m/Y', strtotime($key))}}</span>
                                     </div>
                                     <!-- /.timeline-label -->
-                                    @foreach($path as $key2 => $pathDetails)
+                                    @foreach($path as $date => $pathDetails)
                                         <!-- timeline item -->
                                         <div>
                                             <i class="{{ Config::get('constants.status_icons.' . $pathDetails->nextStatus->slug) }}"
@@ -465,12 +465,18 @@
                                                                 -
                                                             @endif
                                                         </li>
-                                                        @if($pathDetails->nextStatus->slug === 'meeting' AND $pathDetails->meeting != null)
+                                                        @if($pathDetails->nextStatus->slug === 'meeting' && $pathDetails->meeting != null)
                                                             <li>
                                                                 <b>Meeting Start time:</b>
                                                                 {{ date('d/m/Y h:i A', strtotime($pathDetails->meeting->started_at)) }}
                                                                 <b> & Meeting End time:</b>
                                                                 {{ date('d/m/Y h:i A', strtotime($pathDetails->meeting->ended_at)) }}
+                                                            </li>
+                                                        @endif
+                                                        @if($pathDetails->nextStatus->slug === 'follow-up' && $pathDetails->reminder_at != null)
+                                                            <li>
+                                                                <b>Reminder at:</b>
+                                                                {{ date('d/m/Y h:i A', strtotime($pathDetails->reminder_at)) }}
                                                             </li>
                                                         @endif
                                                         @hasrole('super-admin|sales-manager')
@@ -529,66 +535,73 @@
                                         <fieldset>
                                             <div class="form-group">
                                                 <label for="status">Next status</label><sup>*</sup>
-                                                @hasrole('accountant')
+
+                                                @php
+                                                    $user = auth()->user();
+
+                                                    $availableStatuses = $statuses->filter(function ($status) use ($user, $ticket) {
+                                                        // 1) Accountant → يظهر له فقط "sold"
+                                                        if ($user->hasRole('accountant')) {
+                                                            return $status->slug === 'sold';
+                                                        }
+
+                                                        // 2) Admin → يظهر له فقط "reviewed"
+                                                        if ($user->hasRole('admin')) {
+                                                            return $status->slug === 'reviewed';
+                                                        }
+
+                                                        // 3) Sales Manager → "pre-approved" + "rejected"
+                                                        if ($user->hasRole('sales-manager')) {
+                                                            return in_array($status->slug, ['pre-approved', 'rejected']);
+                                                        }
+
+                                                        // 4) باقي المستخدمين (Sales عادي مثلاً)
+
+                                                        // ممنوع "approved" لغير الـ super-admin
+                                                        if ($status->slug === 'approved' && !$user->hasRole('super-admin')) {
+                                                            return false;
+                                                        }
+
+                                                        // لا تعرض نفس الحالة الحالية (إلا إذا كانت new أو follow-up)
+                                                        if (
+                                                            $status->slug !== 'new'
+                                                            && $status->slug !== 'follow-up'
+                                                            && $status->id === $ticket->status->id
+                                                        ) {
+                                                            return false;
+                                                        }
+
+                                                        // لا تعرض "pre-approved" إلا للـ super-admin أو sales-manager
+                                                        if (
+                                                            $status->slug === 'pre-approved'
+                                                            && !$user->hasAnyRole(['super-admin', 'sales-manager'])
+                                                        ) {
+                                                            return false;
+                                                        }
+
+                                                        return true;
+                                                    });
+                                                @endphp
+
                                                 <select name="status" id="status" class="form-control"
                                                         required="required">
                                                     <option value="-1" disabled selected>Please select..</option>
-                                                    @foreach($statuses as $status)
-                                                        @if($status->slug === 'sold')
-                                                            <option value="{{$status->id}}">{{$status->name}}</option>
-                                                        @endif
+                                                    @foreach($availableStatuses as $status)
+                                                        <option
+                                                            value="{{ $status->id }}"
+                                                            data-slug="{{ $status->slug }}">
+                                                            {{ $status->name }}
+                                                        </option>
                                                     @endforeach
                                                 </select>
-                                                @else
-                                                    @hasrole('admin')
-                                                    <select name="status" id="status" class="form-control"
-                                                            required="required">
-                                                        <option value="-1" disabled selected>Please select..</option>
-                                                        @foreach($statuses as $status)
-                                                            @if($status->slug === 'reviewed')
-                                                                <option
-                                                                    value="{{$status->id}}">{{$status->name}}</option>
-                                                            @endif
-                                                        @endforeach
-                                                    </select>
-                                                    @else
-                                                        @hasrole('sales-manager')
-                                                        <select name="status" id="status" class="form-control"
-                                                                required="required">
-                                                            <option value="-1" disabled selected>Please select..
-                                                            </option>
-                                                            @foreach($statuses as $status)
-                                                                @if($status->slug === 'pre-approved' OR $status->slug === 'rejected')
-                                                                    <option
-                                                                        value="{{$status->id}}">{{$status->name}}</option>
-                                                                @endif
-                                                            @endforeach
-                                                        </select>
-                                                        @else
-                                                            <select name="status" id="status" class="form-control"
-                                                                    required="required">
-                                                                <option value="-1" disabled selected>Please select..
-                                                                </option>
-                                                                @foreach($statuses as $status)
-                                                                    @if($status->slug === 'approved')
-                                                                        @unlessrole('super-admin')
-                                                                        @continue
-                                                                        @endunlessrole
-                                                                    @endif
-                                                                    @if($status->slug != 'new' AND $status->id == $ticket->status->id AND $status->slug !== 'follow-up')
-                                                                        @continue
-                                                                    @endif
-                                                                    @if($status->slug === 'pre-approved' AND !auth()->user()->hasAnyRole(['super-admin', 'sales-manager']))
-                                                                        @continue
-                                                                    @endif
-                                                                    <option
-                                                                        value="{{$status->id}}">{{$status->name}}</option>
-                                                                @endforeach
-                                                            </select>
-                                                            @endhasrole
-                                                            @endhasrole
-                                                            @endhasrole
                                             </div>
+
+                                            <p id="reminderPreview" class="form-text text-muted"
+                                               style="display:none; font-size: 1em;"></p>
+
+                                            <p id="meetingPreview" class="form-text text-muted"
+                                               style="display:none; font-size: 1em;"></p>
+
                                             <div class="form-group">
                                                 <label for="comment">Comment</label><sup>*</sup>
                                                 <textarea cols="2" rows="3" class="form-control" id="comment"
@@ -706,7 +719,7 @@
                                                                     <span class="input-group-text"><i
                                                                             class="far fa-clock"></i></span>
                                                                 </div>
-                                                                <input type="text" name="datetimes"
+                                                                <input type="text" name="meeting_range"
                                                                        class="form-control float-right"
                                                                        id="reservationtime">
                                                             </div>
@@ -727,6 +740,52 @@
                                             </div>
                                             <!-- /.modal-dialog -->
                                         </div>
+
+                                        <div class="modal fade" id="modal-lg3">
+                                            <div class="modal-dialog modal-lg">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h4 class="modal-title">Follow-up Reminder</h4>
+                                                        <button type="button" class="close" data-dismiss="modal"
+                                                                aria-label="Close">
+                                                            <span aria-hidden="true">&times;</span>
+                                                        </button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="form-group">
+                                                            <label>Reminder date and time:</label>
+
+                                                            <div class="input-group date" id="reminder_datetime-div"
+                                                                 data-target-input="nearest">
+                                                                <input type="text"
+                                                                       id="reminder_datetime"
+                                                                       name="reminder_datetime"
+                                                                       class="form-control datetimepicker-input"
+                                                                       data-target="#reminder_datetime-div"/>
+                                                                <div class="input-group-append"
+                                                                     data-target="#reminder_datetime-div"
+                                                                     data-toggle="datetimepicker">
+                                                                    <div class="input-group-text">
+                                                                        <i class="fa fa-calendar"></i>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <!-- /.input group -->
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer justify-content-between">
+                                                        <button type="button" class="btn btn-default"
+                                                                data-dismiss="modal">
+                                                            Close
+                                                        </button>
+                                                        <button type="button" class="btn btn-primary" id="saveBtn3">
+                                                            OK
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                     </form>
                                 </div>
                             </div>
@@ -739,9 +798,20 @@
 @endsection
 
 @section('script')
+    <!-- Toastr -->
+    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
+
     <script>
+        const Toast = Swal.mixin({
+            toast: true,
+            background: '#E3E5E8',
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+        });
+
         $(function () {
-            $('input[name="datetimes"]').daterangepicker({
+            $('input[name="meeting_range"]').daterangepicker({
                 timePicker: true,
                 startDate: moment().startOf('hour'),
                 endDate: moment().startOf('hour').add(32, 'hour'),
@@ -749,6 +819,15 @@
                     format: 'M/DD hh:mm A'
                 }
             });
+        });
+
+        $('#reminder_datetime-div').datetimepicker({
+            icons: {
+                time: 'far fa-clock',
+                date: 'far fa-calendar',
+                up: 'fas fa-arrow-up',
+                down: 'fas fa-arrow-down'
+            }
         });
 
         var modal = document.getElementById("modal-lg");
@@ -759,21 +838,49 @@
             modal2.classList.remove("hidden");
         });
 
-        const areaSelect = document.querySelector(`[id="status"]`);
-        areaSelect.addEventListener(`change`, (e) => {
-            const select = e.target;
-            const desc = select.selectedOptions[0].text;
+        function resetPreviews() {
+            // أخفي الـ preview تبع follow-up
+            document.getElementById('reminderPreview').style.display = 'none';
+            document.getElementById('reminderPreview').textContent = '';
 
-            if (desc.toLocaleLowerCase().includes('book')) {
-                $('#modal-lg').modal('show');
-            } else {
-                if (desc.toLocaleLowerCase().includes('meet')) {
-                    $('#modal-lg2').modal('show');
-                } else {
-                    $('#modal-lg2').modal('hide');
-                }
+            // أخفي الـ preview تبع meeting
+            document.getElementById('meetingPreview').style.display = 'none';
+            document.getElementById('meetingPreview').textContent = '';
 
-                $('#modal-lg').modal('hide');
+            // لو عندك booking preview
+            const bookingPreview = document.getElementById('bookingPreview');
+            if (bookingPreview) {
+                bookingPreview.style.display = 'none';
+                bookingPreview.textContent = '';
+            }
+        }
+
+        const statusSelect = document.getElementById('status');
+
+        const statusModalMap = {
+            'booking': '#modal-lg',
+            'meeting': '#modal-lg2',
+            'follow-up': '#modal-lg3',
+        };
+
+        const allModals = ['#modal-lg', '#modal-lg2', '#modal-lg3'];
+
+        let lastValue = null;
+
+        statusSelect.addEventListener('change', (e) => {
+            const option = e.target.selectedOptions[0];
+            const slug = option.dataset.slug;
+
+            resetPreviews();
+
+            const modalId = statusModalMap[slug];
+
+            // سكّر كل المودالات قبل أي شيء
+            allModals.forEach(id => $(id).modal('hide'));
+
+            // لو في مودال مرتبط بالـ slug
+            if (modalId) {
+                $(modalId).modal('show');
             }
         });
 
@@ -784,7 +891,51 @@
 
         const saveBtn2 = document.querySelector(`[id="saveBtn2"]`);
         saveBtn2.addEventListener(`click`, () => {
+            resetPreviews();
+
+            const input = document.getElementById('reservationtime');
+            const preview = document.getElementById('meetingPreview');
+
+            const value = input.value.trim();
+
+            if (!value) {
+                Toast.fire({
+                    icon: 'warning',
+                    title: 'Please select meeting date and time range.'
+                });
+                return;
+            }
+
+            // اعرضها تحت الـ select
+            preview.style.display = 'block';
+            preview.textContent = 'Meeting: ' + value;
+
             $("#modal-lg2").modal('hide');
+        });
+
+        const saveBtn3 = document.querySelector(`[id="saveBtn3"]`);
+        saveBtn3.addEventListener(`click`, () => {
+            resetPreviews();
+
+            const input = document.getElementById('reminder_datetime');
+            const preview = document.getElementById('reminderPreview');
+
+            const value = input.value.trim();
+
+            if (!value) {
+                // ممكن تستعمل Toast أو alert حسب ستايلك
+                Toast.fire({
+                    icon: 'warning',
+                    title: 'Please select reminder date & time.'
+                });
+                return;
+            }
+
+            // عرضها تحت الـ select
+            preview.style.display = 'block';
+            preview.textContent = 'Reminder: ' + value;
+
+            $("#modal-lg3").modal('hide');
         });
     </script>
 @endsection

@@ -35,24 +35,42 @@
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header row">
-                        <div class="col-1">
-                            <a href="{{ route('tickets.create') }}" class="btn btn-primary">Add New</a>
-                        </div>
-                        <div class="col-2">
-                            <button type="button" id="enable-fwd" class="btn btn-secondary">Enable multi forward
-                            </button>
-                        </div>
-                        @hasanyrole('super-admin|sales-manager')
-                        <div class="col-9">
-                            <div class="float-right">
-                                <a href="{{ route('tickets.showImports', ['excel']) }}" class="btn btn-info">Excel
-                                    Import</a>
-                                <a href="{{ route('tickets.showImports', ['facebook']) }}" class="btn btn-primary ml-3">Facebook
-                                    Import</a>
+                    <div class="card-header">
+                        <div class="row">
+                            {{-- Add New --}}
+                            <div class="col-6 col-md-3 mb-2">
+                                <a href="{{ route('tickets.create') }}"
+                                   class="btn btn-primary btn-block">
+                                    Add New
+                                </a>
                             </div>
+
+                            {{-- Enable multi forward --}}
+                            <div class="col-6 col-md-3 mb-2">
+                                <button type="button" id="enable-fwd"
+                                        class="btn btn-secondary btn-block">
+                                    Enable multi forward
+                                </button>
+                            </div>
+
+                            @hasanyrole('super-admin|sales-manager')
+                            {{-- Excel Import --}}
+                            <div class="col-6 col-md-3 mb-2">
+                                <a href="{{ route('tickets.showImports', ['excel']) }}"
+                                   class="btn btn-info btn-block">
+                                    Excel Import
+                                </a>
+                            </div>
+
+                            {{-- Facebook Import --}}
+                            <div class="col-6 col-md-3 mb-2">
+                                <a href="{{ route('tickets.showImports', ['facebook']) }}"
+                                   class="btn btn-primary btn-block">
+                                    Facebook Import
+                                </a>
+                            </div>
+                            @endhasanyrole
                         </div>
-                        @endhasanyrole
                     </div>
                     <!-- /.card-header -->
                 </div>
@@ -111,7 +129,7 @@
                                         <label for="sales" class="col-sm-1 col-form-label-sm">Sales:</label>
                                         <div class="col-sm-2">
                                             <select id="sales" name="sales" class="form-control form-control-sm select2"
-                                                    >
+                                            >
                                                 <option value="all">All</option>
                                                 @foreach($sales as $sale)
                                                     <option
@@ -204,18 +222,19 @@
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-body">
+                <div class="card-body table-responsive">
                     @hasanyrole('super-admin|sales-manager')
                     <form name="fwd-form" action="{{ route('tickets.multipleForward') }}" method="post" id="fwd-form">
                         @csrf
                         @endhasanyrole
-                        <table id="example20" style="width: 100%;" class="table table-bordered table-hover table-responsive">
+                        <table id="example20" style="width: 100%;"
+                               class="table table-bordered table-hover table-responsive">
                             <thead>
                             <tr>
                                 <th class="fwd-leads" style="display:none !important;">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" value="" id="select-all">
-                                        <label id="select-all-lbl" class="form-check-label" for="flexCheckDefault">
+                                        <label id="select-all-lbl" class="form-check-label" for="select-all">
                                             Select all
                                         </label>
                                     </div>
@@ -234,18 +253,19 @@
                             </thead>
                             <tbody>
                             @foreach($tickets as $key => $ticket)
-                                <tr id="row_{{ $ticket->id }}" @if($ticket->status->slug === 'duplicated') class="table-danger"
-                                    @elseif($ticket->status->slug == 'dead' OR $ticket->status->slug == 'dead-tele') class="table-warning" @endif>
+                                <tr id="row_{{ $ticket->id }}"
+                                    @if($ticket->status->slug === 'duplicated') class="table-danger"
+                                    @elseif($ticket->status->slug === 'dead' || $ticket->status->slug === 'dead-tele') class="table-warning" @endif>
                                     <td class="fwd-leads" style="display:none !important;">
                                         <div class="form-check">
                                             <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
                                                    value="{{ $ticket->id }}" class="form-check-input"/>
                                         </div>
                                     </td>
-                                    <td><a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket->id }}</a>
+                                    <td><a href="{{ route('tickets.show', [$ticket->id]) }}">{{ $ticket->id }}</a>
                                     </td>
                                     <td>
-                                        <a href="{{ route('tickets.show', [$ticket['id']]) }}">{{ $ticket['campaign_name'] !== null ? $ticket['campaign_name'] : '-' }}</a>
+                                        <a href="{{ route('tickets.show', [$ticket->id]) }}">{{ $ticket['campaign_name'] !== null ? $ticket['campaign_name'] : '-' }}</a>
                                     </td>
                                     <td>{{ $ticket['full_name'] !== null ? $ticket['full_name'] : '-' }}</td>
                                     <td>{{ $ticket['phone_number'] !== null ? $ticket['phone_number'] : '-' }}</td>
@@ -273,7 +293,7 @@
                                                 <div class="dropdown-menu">
                                                     @can('show ticket')
                                                         <a class="dropdown-item" tabindex="-1"
-                                                           href="{{ route('tickets.show', [$ticket['id']]) }}"><i
+                                                           href="{{ route('tickets.show', [$ticket->id]) }}"><i
                                                                 class="fas fa-info-circle"></i> Details</a>
                                                     @endcan
                                                     <div class="dropdown-divider"></div>
@@ -362,8 +382,7 @@
                     <div class="row mt-3">
                         <div class="col-sm-12 col-md-5">
                             <div class="dataTables_info" role="status" aria-live="polite">
-                                Showing {{ ($tickets->currentPage() - 1) * $tickets->perPage() + 1 }}
-                                to {{ $tickets->perPage() * $tickets->currentPage() <= $tickets->total() ? $tickets->perPage() * $tickets->currentPage() : $tickets->total() }}
+                                Showing {{ $tickets->firstItem() }} to {{ $tickets->lastItem() }}
                                 of {{ $tickets->total() }} entries
                             </div>
                         </div>
@@ -499,8 +518,7 @@
             });
         });
 
-        function deleteRow(rowId)
-        {
+        function deleteRow(rowId) {
             const row = document.getElementById(rowId);
             row.parentNode.removeChild(row);
         }

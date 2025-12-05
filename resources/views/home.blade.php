@@ -106,18 +106,18 @@
                 <!-- small box -->
                 <div class="small-box" style="background-color: {{ Config::get('constants.status_colors.' . $key) }};">
                     <div class="inner">
-                        @hasanyrole('super-admin|sales-manager')
-                            <h3><a href="#" class="text-light filter-leads"
-                                   data-status="{{ strtolower($key) }}">{{$value}}</a></h3>
-                            <p><a href="#" class="text-light filter-leads" data-status="{{ strtolower($key) }}">{{$key}}</a>
-                            </p>
+                        @hasanyrole('super-admin')
+                        <h3><a href="#" class="text-light filter-leads"
+                               data-status="{{ strtolower($key) }}">{{$value}}</a></h3>
+                        <p><a href="#" class="text-light filter-leads" data-status="{{ strtolower($key) }}">{{$key}}</a>
+                        </p>
                         @else
                             <h3><a href="/tickets/all?fstatus={{ strtolower($key) }}" class="text-light">{{ $value }}</a></h3>
                             <p><a href="/tickets/all?fstatus={{ strtolower($key) }}" class="text-light">{{ $key }}</a></p>
                             @endhasanyrole
                     </div>
                     <div class="icon">
-                        <i class="fas fa-ticket-alt"></i>
+                        <i class="{{ Config::get('constants.status_icons.' . strtolower($key)) }}"></i>
                     </div>
                 </div>
             </div>

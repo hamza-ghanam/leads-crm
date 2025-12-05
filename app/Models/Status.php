@@ -10,6 +10,10 @@ class Status extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const NEW = 'New';
+    public const FOLLOW_UP = 'Follow-up';
+    public const MEETING = 'Meeting';
+
     /**
      * Get the tickets for the status.
      */

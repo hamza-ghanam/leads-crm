@@ -58,12 +58,12 @@ class User extends Authenticatable
 
     public function manager()
     {
-        return $this->belongsTo('User', 'manager_id');
+        return $this->belongsTo(User::class, 'manager_id');
     }
 
     public function employees()
     {
-        return $this->hasMany('User', 'manager_id');
+        return $this->hasMany(User::class, 'manager_id');
     }
 
     /**
@@ -72,5 +72,15 @@ class User extends Authenticatable
     public function salesCampaigns()
     {
         return $this->hasMany(SalesCampaign::class, 'user_id');
+    }
+
+    public function fcmTokens()
+    {
+        return $this->hasMany(FcmToken::class);
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class)->latest();
     }
 }

@@ -18,6 +18,9 @@
     <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
     <!-- DataTables -->
     <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <!-- Tempusdominus Bootstrap 4 -->
+    <link rel="stylesheet"
+          href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
     <!-- Select2 -->
     <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
@@ -99,6 +102,59 @@
                       style="display: none;">
                     @csrf
                 </form>
+            </li>
+        </ul>
+
+        <!-- Right navbar links -->
+        <ul class="navbar-nav ml-auto" style="margin-right: 20px;">
+            <!-- Notifications Dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link" data-toggle="dropdown" href="#">
+                    <i class="far fa-bell"></i>
+
+                    <span
+                        id="notif-count-badge"
+                        class="badge badge-warning navbar-badge {{ ($headerUnreadCount ?? 0) > 0 ? '' : 'd-none' }}"
+                        data-count="{{ $headerUnreadCount ?? 0 }}"
+                    >
+                        {{ $headerUnreadCount ?? 0 }}
+                    </span>
+
+                </a>
+
+                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+                    <span class="dropdown-item dropdown-header">
+                        {{ isset($headerNotifications) ? $headerNotifications->count() : 0 }} Notifications
+                    </span>
+
+                    <div class="dropdown-divider"></div>
+
+                    <div id="notif-dropdown-container">
+                        @forelse($headerNotifications ?? [] as $notif)
+                            <a href="{{ route('notifications.show', $notif->id) }}"
+                               class="dropdown-item {{ $notif->is_read ? '' : 'font-weight-bold' }}">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                {{ $notif->title }}
+
+                                <br>
+                                <small class="text-muted">
+                                    {{ \Illuminate\Support\Str::limit($notif->body, 40) }}
+                                </small>
+
+                                <span class="float-right text-muted text-sm">
+                                    {{ $notif->created_at->diffForHumans() }}
+                                </span>
+                            </a>
+
+                            <div class="dropdown-divider"></div>
+                        @empty
+                            <span class="dropdown-item text-center text-muted"> No notifications </span>
+                        @endforelse
+                    </div>
+                    <a href="{{ route('notifications.index') }}" class="dropdown-item dropdown-footer">
+                        See All Notifications
+                    </a>
+                </div>
             </li>
         </ul>
 
@@ -274,6 +330,27 @@
                         </ul>
                     </li>
 
+                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'salesCamps') !== false)  ? 'menu-open' : '' }}">
+                        <a href="#"
+                           class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps') !== false  ? 'active' : ''}}">
+                            <i class="nav-icon fas fa-map-signs"></i>
+                            <p>
+                                Sales Campaigns
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('salesCamps.index') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'salesCamps.index') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Show All</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+
                     @endhasrole
                 </ul>
             </nav>
@@ -349,24 +426,285 @@
 <script src="{{ asset('dist/js/demo.js') }}"></script>
 
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<!-- Tempusdominus Bootstrap 4 -->
+<script src="{{ asset('plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js') }}"></script>
+
 <!-- Select 2 -->
 <script src="{{ asset('plugins/select2/js/select2.min.js') }}"></script>
 
-<script type="module">
-    // Import the functions you need from the SDKs you need
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-analytics.js";
-    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-messaging.js";
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+<script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
 
+<script type="module">
     var firebaseConfig = {
-        apiKey: "AIzaSyCJyExVqmT0cLM60nO5HF1my0dopyqRoWI",
-        authDomain: "leads-crm-4553d.firebaseapp.com",
-        projectId: "leads-crm-4553d",
-        storageBucket: "leads-crm-4553d.appspot.com",
-        messagingSenderId: "388756731314",
-        appId: "1:388756731314:web:e147dfc6ec4936c67860ab"
+        apiKey: "AIzaSyDkHR17YYFalO2XmQJ9xqrg5madLpntIuc",
+        authDomain: "wrs-ae-leads.firebaseapp.com",
+        projectId: "wrs-ae-leads",
+        storageBucket: "wrs-ae-leads.firebasestorage.app",
+        messagingSenderId: "1039605684936",
+        appId: "1:1039605684936:web:7fd3e40af79c0a2c13e3fd",
     };
 
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
+
+    // لازم تسجّل الـ service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then(function (registration) {
+                // console.log("SW registered:", registration);
+            })
+            .catch((err) => console.log("SW registration failed:", err));
+    }
+
+    function initFirebaseMessagingRegistration() {
+        messaging.getToken({
+            vapidKey: 'BGxpOp_utb49WjMA5lMaOD5IM2n1MX_-i3wymmKnSMHuMIp4JuCMrPcLnfZN9IeJtPVwAcqNjo8eW_D_uWR-lYk'
+        }).then((currentToken) => {
+            if (currentToken) {
+                if (!currentToken) {
+                    console.log('No registration token available. Request permission to generate one.');
+                    return;
+                }
+
+                // 👇 كشف إذا الجهاز موبايل
+                var ua = navigator.userAgent || navigator.vendor || window.opera;
+                var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
+                var deviceType = isMobile ? 'mobile-browser' : 'desktop'; // أو 'desktop' بدل 'web' لو حاب تفرق
+
+                var lastToken = localStorage.getItem('fcm_token');
+                var lastDeviceType = localStorage.getItem('fcm_device_type');
+
+                // نفس التوكن ونفس النوع؟ لا ترسل شي
+                if (lastToken === currentToken && lastDeviceType === deviceType) {
+                    return;
+                }
+
+                fetch('{{ url('/fcm/token') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token: currentToken,
+                        device_type: deviceType
+                    })
+                })
+                    .then(function (res) {
+                        return res.json();
+                    })
+                    .then(function (data) {
+                        console.log('FCM token saved:', data);
+                        localStorage.setItem('fcm_token', currentToken);
+                        localStorage.setItem('fcm_device_type', deviceType);
+                    })
+                    .catch(function (err) {
+                        console.error('Error saving FCM token:', err);
+                    });
+            }
+        }).catch((err) => {
+            console.log('Error retrieving FCM token:', err);
+        });
+    }
+
+    function askForNotificationPermission() {
+        const status = Notification.permission; // granted, default, denied
+
+        // Already enabled
+        if (status === 'granted') {
+            initFirebaseMessagingRegistration();
+            return;
+        }
+
+        if (status === 'denied') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Notifications are blocked!',
+                text: 'Please enable notifications manually from your browser settings.',
+            });
+            return;
+        }
+
+        // status === 'default' → نطلب الإذن عبر Swal
+        Swal.fire({
+            title: 'Enable Notifications?',
+            text: "We'll enable notifications permission.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Enable'
+        }).then((result) => {
+            if (result.value) {
+                // ⚠️ مهم جداً: هذا طلب الإذن الآن داخل event ناتج عن المستخدم!
+                Notification.requestPermission().then((permission) => {
+                    if (permission === 'granted') {
+                        initFirebaseMessagingRegistration();
+
+                        Swal.fire(
+                            'Enabled!',
+                            'Desktop notifications have been enabled successfully.',
+                            'success'
+                        );
+                    } else {
+                        Swal.fire(
+                            'Not enabled',
+                            'Notifications permission was not granted.',
+                            'info'
+                        );
+                    }
+
+                });
+
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        askForNotificationPermission();
+    });
+
+    const Toast = Swal.mixin({
+        toast: true,
+        background: '#E3E5E8',
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 4000,
+    });
+
+    function updateNotificationCountFromPayload(payload) {
+        var badge = document.getElementById('notif-count-badge');
+        if (!badge) {
+            return;
+        }
+
+        var currentCount = parseInt(
+            badge.getAttribute('data-count') || badge.textContent || '0',
+            10
+        );
+
+        var currentCount = parseInt(
+            badge.getAttribute('data-count') || badge.textContent || '0',
+            10
+        );
+
+        var newCount = currentCount;
+
+        if (payload && payload.data && typeof payload.data.unread_count !== 'undefined') {
+            newCount = parseInt(payload.data.unread_count, 10);
+
+            if (isNaN(newCount) || newCount < 0) {
+                newCount = 0;
+            }
+        } else {
+            newCount = currentCount + 1;
+        }
+
+        badge.setAttribute('data-count', newCount);
+
+        if (newCount === 0) {
+            badge.classList.add('d-none');
+            badge.textContent = '0';
+        } else {
+            badge.classList.remove('d-none');
+            badge.textContent = newCount;
+        }
+    }
+
+    function prependNotificationToDropdown(payload) {
+        var container = document.getElementById('notif-dropdown-container');
+        if (!container) return;
+
+        // لو الإشعار بدون عنوان/جسم → تجاهله
+        if (!payload?.data?.title) return;
+
+        // تحضير الرابط عبر show()
+        var notifId = payload?.data?.notification_id ?? null;
+        var notifUrl = notifId
+            ? '/notifications/' + notifId      // يمر عبر Laravel → يحدّث is_read & clicked_at
+            : (payload?.data?.url ?? '#');
+
+        // نص مختصر للجسم
+        var bodyShort = payload.data.body.length > 40
+            ? payload.data.body.substring(0, 40) + '...'
+            : payload.data.body;
+
+        // بناء HTML للإشعار الجديد (غير مقروء)
+        var html = `
+        <a href="${notifUrl}" class="dropdown-item font-weight-bold"
+           style="background-color: #f5f7fa;">
+            <i class="fas fa-info-circle mr-2"></i>
+            ${payload.data.title}
+            <div class="text-muted text-sm">${bodyShort}</div>
+            <span class="float-right text-muted text-sm">Just now</span>
+        </a>
+        <div class="dropdown-divider"></div>
+    `;
+
+        // إضافة الإشعار أعلى القائمة (prepend)
+        container.insertAdjacentHTML('afterbegin', html);
+    }
+
+    function trimNotificationDropdown(limit = 10) {
+        var container = document.getElementById('notif-dropdown-container');
+        if (!container) return;
+
+        // اجلب كل العناصر من نوع dropdown-item (كل إشعار)
+        var items = container.querySelectorAll('.dropdown-item');
+
+        if (items.length <= limit) {
+            return; // تمام، ما في شي لقصّه
+        }
+
+        // نحذف الزايد (من آخر القائمة)
+        for (var i = limit; i < items.length; i++) {
+            var item = items[i];
+
+            // نحذف الـ divider اللي بعدو (إن وجد)
+            var divider = item.nextElementSibling;
+            if (divider && divider.classList.contains('dropdown-divider')) {
+                divider.remove();
+            }
+
+            // نحذف الإشعار نفسه
+            item.remove();
+        }
+    }
+
+    // استقبال إشعارات foreground
+    messaging.onMessage(function (payload) {
+        console.log('Message received. ', payload);
+
+        updateNotificationCountFromPayload(payload);
+        prependNotificationToDropdown(payload);
+        trimNotificationDropdown(10);
+
+        Swal.fire({
+            toast: true,
+            title: payload.data.title,
+            text: payload.data.body,
+            imageUrl: "/dist/img/notif_icon.png",
+            imageWidth: 40,
+            imageHeight: 40,
+            imageAlt: "Notifications",
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 4000,
+
+            onOpen: (toast) => {
+                toast.style.cursor = 'pointer';
+                toast.addEventListener('click', () => {
+                    if (payload.data.url) {
+                        window.open(payload.data.url, '_blank');
+                    }
+                });
+            }
+        });
+    });
+
+    /*
     window.addEventListener("load", (e) => {
         initFirebaseMessagingRegistration();
     });
@@ -399,6 +737,7 @@
             // alert(payload.data.notification);
         });
     }
+    */
 </script>
 
 @yield('script')

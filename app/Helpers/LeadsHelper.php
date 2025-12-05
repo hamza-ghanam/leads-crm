@@ -14,7 +14,13 @@ use App\Models\User;
 use App\Notifications\SendPushNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Kreait\Firebase\Exception\FirebaseException;
+use Kreait\Firebase\Exception\MessagingException;
+use Kreait\Firebase\Messaging\CloudMessage;
+use Kreait\Firebase\Messaging\Notification;
 use Revolution\Google\Sheets\Facades\Sheets;
+use Illuminate\Support\Facades\Http;
+use App\Models\FcmToken;
 
 class LeadsHelper
 {
@@ -391,9 +397,9 @@ class LeadsHelper
     public function initiateImport($leads)
     {
         $statuses = Status::whereIn('slug', ['new', 'follow-up']) // re-shuffled has been removed 12/9/2022
-                    ->get()
-                    ->pluck('id')
-                    ->toArray();
+        ->get()
+            ->pluck('id')
+            ->toArray();
 
         $useCamps = boolval(GeneralSettings::whereName('use_camps')->first()->value);
 
@@ -535,4 +541,60 @@ class LeadsHelper
     {
         return TempLead::whereIn('id', $leadIds)->delete();
     }
+
+    public function sendFcmNotification(int $userId, string $title, string $body, ?string $url = null, ?int $ticketId = null)
+    {
+        $tokens = FcmToken::where('user_id', 97)->get()->pluck('token')->toArray();
+
+        if (empty($tokens)) {
+            return;
+        }
+
+        /** @var \Kreait\Firebase\Messaging $messaging */
+        $messaging = app('firebase.messaging');
+
+        $payloadData = [
+            'title' => $title,
+            'body' => $body,
+            'url' => $url ?? url('/tickets'), // مثال
+            'ticket_id' => $ticketId ?? 0,
+        ];
+
+        $uniqueTokens = array_values(array_unique($tokens));
+        foreach ($uniqueTokens as $token) {
+            try {
+                $message = CloudMessage::withTarget('token', $token)
+                    ->withData($payloadData);
+
+                $messaging->send($message);
+            } catch (MessagingException $e) {
+            } catch (FirebaseException $e) {
+                return ['error' => $e->getMessage()];
+            }
+        }
+
+
+    }
+
+    public function sendLeadMail($recipients, $data)
+    {
+        try {
+            Mail::to($recipients)->send(new LeadNotifyMail($data));
+
+            // Check for failures
+            if (count(Mail::failures()) > 0) {
+                // Handle failures (if any)
+                // You can log or perform any other action here
+                // Note: Failures will only be available if the driver supports it (e.g., SMTP)
+            }
+
+            // Continue execution
+
+        } catch (\Exception $exception) {
+            // Handle exceptions (if any)
+            // Log or perform any other action
+        }
+    }
+
+
 }

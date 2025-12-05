@@ -7,6 +7,8 @@ use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 use App\Mail\LeadNotifyMail;
 use App\Http\Controllers\WebNotificationController;
+use App\Http\Controllers\FcmController;
+use App\Http\Controllers\NotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -49,7 +51,7 @@ Route::prefix('tickets')->group(function () {
     //Route::get('importLeads/{source}', [TicketController::class, 'importLeadsFromZapier'])->name('tickets.doImport');
    // Route::post('importLeads/{source}', [TicketController::class, 'importLeadsFromZapierV2'])->name('tickets.doImport');
     Route::post('importLeads/{source}', [TicketController::class, 'importLeadsFromZapierV3'])->name('tickets.doImport');
-    Route::put('ignoreLeads', [TicketController::class, 'ignoreLeads'])->name('tickets.ignoreLeads');
+    Route::put('ignoreLeads/{type}', [TicketController::class, 'ignoreLeads'])->name('tickets.ignoreLeads');
     Route::post('moveForward/{id}', [TicketController::class, 'moveForward'])->name('tickets.moveForward');
     Route::post('makeInvoice/{id}', [TicketController::class, 'makeInvoice'])->name('tickets.makeInvoice');
     Route::post('attachPassport/{id}', [TicketController::class, 'attachPassport'])->name('tickets.attachPassport');
@@ -57,6 +59,7 @@ Route::prefix('tickets')->group(function () {
     Route::get('download/{type}/{id}', [TicketController::class, 'downloadAttachment'])->name('tickets.download');
     Route::get('archived', [TicketController::class, 'indexArchived'])->name('tickets.archived');
     Route::post('multipleForward', [TicketController::class, 'multipleForward'])->name('tickets.multipleForward');
+    Route::post('restoreLeads', [TicketController::class, 'restoreLeads'])->name('tickets.restore');
 //    Route::match(['get', 'post'], '/report', [TicketController::class, 'getReport'])->name('tickets.report');
 
 //    Route::get('vehicles/{userId}', 'UserController@getVehicles')->name('user.vehicles');
@@ -84,9 +87,17 @@ Route::prefix('settings')->group(function () {
 Route::get('devTest', [TicketController::class, 'devTest'])->name('devTest');
 
 
-Route::patch('/fcm-token', [WebNotificationController::class, 'updateToken'])->name('update.token');
+Route::post('/fcm/token', [FcmController::class, 'store'])->name('update.token')->middleware('auth');
 Route::post('/send-notification',[WebNotificationController::class,'notification'])->name('send.notification');
 Route::get('/notify',[WebNotificationController::class,'sendNotification'])->name('notify');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show'])
+        ->name('notifications.show');
+});
 
 Route::get('/test', function () {
     return view('test');

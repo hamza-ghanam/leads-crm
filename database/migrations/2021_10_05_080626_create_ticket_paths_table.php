@@ -48,6 +48,8 @@ class CreateTicketPathsTable extends Migration
 
             $table->text('comment');
 
+            $table->timestamp('notified_at')->nullable()->after('comment');
+
             $table->timestamps();
             $table->softDeletes();
         });
