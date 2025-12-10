@@ -233,8 +233,8 @@ class Kernel extends ConsoleKernel
             }
 
             /** Stopped at 9/11/022 */
-            //// 3.2. Status: Follow Up (7 days)
-            $followUpDays = 7;
+            //// 3.2. Status: Follow Up (15 days)
+            $followUpDays = 15;
             $followUpStatus = Status::where('slug', 'follow-up')->first()->id;
             //$tickets = Ticket::where('status_id', $followUpStatus)->get();
 
@@ -496,6 +496,9 @@ class Kernel extends ConsoleKernel
             $waitingDays = 7;
             $waitingStatus = Status::where('slug', 'waiting')->first()->id;
             $tickets = Ticket::where('status_id', $waitingStatus)->get();
+
+            // Stopped - 12/9/2025
+            $tickets = [];
 
             foreach ($tickets as $key => $ticket) {
                 $tPath = TicketPath::where('ticket_id', $ticket->id)

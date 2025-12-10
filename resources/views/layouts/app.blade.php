@@ -555,9 +555,7 @@
                             'info'
                         );
                     }
-
                 });
-
             }
         });
     }
@@ -579,12 +577,7 @@
         if (!badge) {
             return;
         }
-
-        var currentCount = parseInt(
-            badge.getAttribute('data-count') || badge.textContent || '0',
-            10
-        );
-
+        
         var currentCount = parseInt(
             badge.getAttribute('data-count') || badge.textContent || '0',
             10
@@ -647,7 +640,7 @@
         container.insertAdjacentHTML('afterbegin', html);
     }
 
-    function trimNotificationDropdown(limit = 10) {
+    function trimNotificationDropdown(limit = 5) {
         var container = document.getElementById('notif-dropdown-container');
         if (!container) return;
 
