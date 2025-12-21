@@ -7,7 +7,6 @@ use App\Helpers\LeadsHelper;
 use App\Imports\TicketsImport;
 use App\Mail\LeadNotifyMail;
 use App\Models\Booking;
-use App\Models\FcmToken;
 use App\Models\GeneralSettings;
 use App\Models\Meeting;
 use App\Models\Source;
@@ -16,11 +15,11 @@ use App\Models\TempLead;
 use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
-use App\Notifications\SendPushNotification;
-use App\Services\NotificationService;
+use App\Services\LeadAutoAssignService;
+use Barryvdh\DomPDF\PDF;
 use Carbon\Carbon;
-use Google\Exception;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -28,22 +27,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Kutia\Larafirebase\Facades\Larafirebase;
 use Maatwebsite\Excel\Facades\Excel;
-use Revolution\Google\Sheets\Facades\Sheets;
-use PDF;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\sendingEmail;
 use App\Models\ArchivedLead;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
-use Notification;
 
 //use Carbon\Carbon;
 
 class TicketController extends Controller
 {
     private $leadsHelper;
+    private $assignService;
 
     /**
      * Create a new OrderController instance.
@@ -53,6 +47,7 @@ class TicketController extends Controller
     public function __construct()
     {
         $this->leadsHelper = new LeadsHelper();
+        $this->assignService = new LeadAutoAssignService($this->leadsHelper);
         $this->middleware('auth')->except(['devTest', 'storeLead']);
     }
 
@@ -491,7 +486,7 @@ class TicketController extends Controller
 
         $paths = $ticket->paths;
 
-        $user  = auth()->user();
+        $user = auth()->user();
         if ($user->hasAnyRole($roles)) {
             $paths = $paths->where('next_user', $user->id);
         }
@@ -1092,7 +1087,7 @@ class TicketController extends Controller
         // Retrieve ticket early; return error if not found.
         $ticket = Ticket::find($id);
         if (!$ticket) {
-            return back()->withErrors(['msg' => 'Ticket does not exist!'])->withInput($request->all());
+            return back()->withErrors(['msg' => 'Lead does not exist!'])->withInput($request->all());
         }
 
         // Determine status id: use request value if provided, otherwise use ticket's next status.
@@ -1106,6 +1101,7 @@ class TicketController extends Controller
         $isBooking = stripos($slug, 'book') !== false;
         $isMeeting = stripos($slug, 'meet') !== false;
         $isFollowUp = ($slug === 'follow-up');
+        $isNotInterested = ($slug === 'not-interested');
 
         // Build base validation rules.
         $rules = [
@@ -1247,6 +1243,22 @@ class TicketController extends Controller
                 $mtng->save();
             }
 
+            ///// If Not Interested -> kill the lead immediately!
+            if ($isNotInterested) {
+                $tPath = TicketPath::create([
+                    'prev_user' => $ticket->user->id ?? null,
+                    'next_user' => $ticket->user->id ?? null,
+                    'prev_status' => $theStatus->id,
+                    'next_status' => $dead->id,
+                    'ticket_id' => $ticket->id,
+                    'comment' => 'Lead is now DEAD as the client is Not Interested.',
+                ]);
+
+                $ticket->update([
+                    'status_id' => $dead->id,
+                ]);
+            }
+
             // Update ticket user's status based on meeting.
             $ticketUser = User::find($ticket->user_id);
             if ($ticketUser) {
@@ -1290,7 +1302,6 @@ class TicketController extends Controller
                     'user_id' => auth()->user()->id,
                     'ticket_id' => $ticket->id,
                 ]);
-                $booking->save();
             }
 
             DB::commit();
@@ -1537,6 +1548,24 @@ class TicketController extends Controller
 
     public function devTest()
     {
+        $noAnswerStatusPeriod = '3d';
+        $statusMap = Status::pluck('id', 'name');   // ['new' => 1, 'follow-up' => 2]
+        $newStatusId = $statusMap->get(Status::NEW);
+        $noAnswerStatusId = $statusMap->get(Status::NO_ANSWER);
+        $superAdmins = User::role('super-admin')
+            ->where('status', 'permitted')
+            ->get();
+
+        $res = $this->assignService->autoReassignFromStatus(
+            $noAnswerStatusId,
+            $newStatusId,
+            $noAnswerStatusPeriod,
+            $superAdmins,
+            $statusMap
+        );
+
+        return response()->json($res, 200);
+
         Notifier::notifyUser(
             97,
             'Follow up reminder',
@@ -1546,8 +1575,6 @@ class TicketController extends Controller
             ['ticket_id' => 327925],
             null
         );
-
-        return response()->json('OK', 200);
 
 
         $now = now();
@@ -1780,7 +1807,7 @@ class TicketController extends Controller
         ];
 
         $tickets = [];
-        $newStatus = Status::where('slug', 'new')->first()->id;
+        $newStatusId = Status::where('slug', 'new')->first()->id;
         $duplicateStatus = Status::whereName('duplicated')->first()->id;
 
         foreach ($leads as $lead) {
@@ -1802,7 +1829,7 @@ class TicketController extends Controller
             if ($dupLead) {
                 $lead->status_id = $duplicateStatus;
             } else {
-                $lead->status_id = $newStatus;
+                $lead->status_id = $newStatusId;
             }
 
             $tickets[] = $lead;
@@ -1952,7 +1979,7 @@ class TicketController extends Controller
         }
     }
 
-    public function restoreLeads(Request $request)
+    public function restoreArchivedLeads(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'manual' => 'nullable|string',
@@ -1980,7 +2007,7 @@ class TicketController extends Controller
         if ($validSalesCount !== count($salesIds)) {
             return response()->json([
                 'sales_ids' => 'One or more selected sales users are not permitted.',
-            ], 422);
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $archivedLeads = ArchivedLead::whereIn('id', $leadIds)->get()->keyBy('id');
@@ -1988,7 +2015,7 @@ class TicketController extends Controller
         if ($archivedLeads->count() !== count($leadIds)) {
             return response()->json([
                 'lead_ids' => 'One or more archived leads were not found.',
-            ], 422);
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $restoredCount = 0;
