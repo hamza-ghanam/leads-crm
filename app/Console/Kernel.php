@@ -49,14 +49,16 @@ class Kernel extends ConsoleKernel
         $dateBegin = now()->copy()->setTime($startingHour, 0, 0);
         $dateEnd = now()->copy()->setTime($endingHour, 0, 0);
 
-        $pullDate = now();
-
         $leadsHelper = app()->make(LeadsHelper::class);
         $assignService = new LeadAutoAssignService(app(LeadsHelper::class));
 
         ////// 1. Notification for Follow-up Reminder
-        $schedule->call(function () use ($statusMap, $leadsHelper) {
+        $schedule->call(function () use ($dateEnd, $dateBegin, $statusMap, $leadsHelper) {
             $now = now();
+            if (!($now->between($dateBegin, $dateEnd))) {
+                return;
+            }
+
             $followUpStatusId = $statusMap->get(Status::FOLLOW_UP);
 
             if (!$followUpStatusId) {
@@ -109,7 +111,8 @@ class Kernel extends ConsoleKernel
         // Adding TikTok leads, on 13/11/2022
         // Adding Google Ads leads, on 06/04/2025
         $schedule->call(function () use ($leadsHelper, $dateEnd, $dateBegin, $pullDate) {
-            if (!($pullDate->between($dateBegin, $dateEnd))) {
+            $now = now();
+            if (!($now->between($dateBegin, $dateEnd))) {
                 return;
             }
 
@@ -136,8 +139,9 @@ class Kernel extends ConsoleKernel
         })->everyThirtyMinutes();
 
         ////// 3. Sales Leads - Statuses
-        $schedule->call(function () use ($assignService, $roles, $noAnswerPeriod, $statusMap, $deadId, $waitingPeriod, $meetingPeriod, $followUpPeriod, $newStatusPeriod, $leadsHelper, $dateBegin, $dateEnd, $pullDate) {
-            if (!($pullDate->between($dateBegin, $dateEnd))) {
+        $schedule->call(function () use ($assignService, $noAnswerPeriod, $statusMap, $waitingPeriod, $meetingPeriod, $followUpPeriod, $newStatusPeriod, $dateBegin, $dateEnd, $pullDate) {
+            $now = now();
+            if (!($now->between($dateBegin, $dateEnd))) {
                 return;
             }
 

@@ -214,7 +214,15 @@ class TicketController extends Controller
 
             $ticket->user = ($ticket->user) ? $ticket->user : [];
             if ($tPath) {
-                $ticket->lastFollowUp = strlen($tPath->comment) < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
+                if (auth()->user()->hasAnyRole('sale', 'tele-sale')) {
+                    if ($tPath->next_user === auth()->user()->id) {
+                        $ticket->lastFollowUp = strlen( ) < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
+                    } else {
+                        $ticket->lastFollowUp = '-';
+                    }
+                } else {
+                    $ticket->lastFollowUp = strlen($tPath->comment) < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
+                }
             } else {
                 $ticket->lastFollowUp = '-';
             }

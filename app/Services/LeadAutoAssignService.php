@@ -243,7 +243,7 @@ class LeadAutoAssignService
                             'next_user' => $assignedUserId,
                             'prev_status' => $prevStatusId,
                             'next_status' => $nextStatusId,
-                            'comment' => "Auto re-assigned (round-robin, skip history) from status: {$statusName}.",
+                            'comment' => "Auto re-assigned from status: {$statusName}.",
                         ]);
 
                         // Notify assigned user
