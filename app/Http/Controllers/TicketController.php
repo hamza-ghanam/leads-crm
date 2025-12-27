@@ -212,7 +212,7 @@ class TicketController extends Controller
                 ->orderBy('updated_at', 'DESC')
                 ->first();
 
-            $ticket->user = ($ticket->user) ? $ticket->user : [];
+            $ticket->user = ($ticket->user) ?: [];
             if ($tPath) {
                 if (auth()->user()->hasAnyRole('sale', 'tele-sale')) {
                     if ($tPath->next_user === auth()->user()->id) {

@@ -26,6 +26,28 @@ class Status extends Model
     public const NOT_INTERESTED = 'Not-Interested';
     public const SOLD = 'Sold';
 
+    protected $fillable = ['duration'];
+
+    public function getDurationValue(): ?int
+    {
+        if (! $this->duration) {
+            return null;
+        }
+
+        preg_match('/^(\d+)([hd])$/', $this->duration, $m);
+
+        return isset($m[1]) ? (int) $m[1] : null;
+    }
+
+    public function getDurationUnit(): ?string
+    {
+        if (! $this->duration) {
+            return null;
+        }
+
+        return str_ends_with($this->duration, 'h') ? 'hour' : 'day';
+    }
+
     /**
      * Get the tickets for the status.
      */

@@ -99,6 +99,21 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.show');
 });
 
+use App\Http\Controllers\StatusController;
+
+Route::middleware(['auth', 'role:super-admin'])->group(function () {
+
+    // Show status duration settings page
+    Route::get('/statuses/durations', [StatusController::class, 'index'])
+        ->name('statuses.durations');
+
+    // Save status duration settings
+    Route::post('/statuses/durations', [StatusController::class, 'saveDurations'])
+        ->name('statuses.save-durations');
+
+});
+
 Route::get('/test', function () {
     return view('test');
 });
+
