@@ -1,6 +1,5 @@
 <?php
 
-// app/Http/Controllers/FcmController.php
 namespace App\Http\Controllers;
 
 use App\Models\FcmToken;
