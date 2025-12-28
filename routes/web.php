@@ -59,7 +59,7 @@ Route::prefix('tickets')->group(function () {
     Route::get('download/{type}/{id}', [TicketController::class, 'downloadAttachment'])->name('tickets.download');
     Route::get('archived', [TicketController::class, 'indexArchived'])->name('tickets.archived');
     Route::post('multipleForward', [TicketController::class, 'multipleForward'])->name('tickets.multipleForward');
-    Route::post('restoreLeads', [TicketController::class, 'restoreLeads'])->name('tickets.restore');
+    Route::post('restoreLeads', [TicketController::class, 'restoreArchivedLeads'])->name('tickets.restore');
 //    Route::match(['get', 'post'], '/report', [TicketController::class, 'getReport'])->name('tickets.report');
 
 //    Route::get('vehicles/{userId}', 'UserController@getVehicles')->name('user.vehicles');
@@ -99,6 +99,21 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.show');
 });
 
+use App\Http\Controllers\StatusController;
+
+Route::middleware(['auth', 'role:super-admin'])->group(function () {
+
+    // Show status duration settings page
+    Route::get('/statuses/durations', [StatusController::class, 'index'])
+        ->name('statuses.durations');
+
+    // Save status duration settings
+    Route::post('/statuses/durations', [StatusController::class, 'saveDurations'])
+        ->name('statuses.save-durations');
+
+});
+
 Route::get('/test', function () {
     return view('test');
 });
+

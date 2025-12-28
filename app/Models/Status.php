@@ -13,6 +13,40 @@ class Status extends Model
     public const NEW = 'New';
     public const FOLLOW_UP = 'Follow-up';
     public const MEETING = 'Meeting';
+    public const WAITING = 'Waiting';
+    public const BOOKING = 'Booking';
+    public const DEAD = 'Dead';
+    public const REVIEWED = 'Reviewed';
+    public const PRE_APPROVED = 'Pre-Approved';
+    public const APPROVED = 'Approved';
+    public const REJECTED = 'Rejected';
+    public const DUPLICATED = 'Duplicated';
+    public const RE_SHUFFLED = 'Re-shuffled';
+    public const NO_ANSWER = 'No-Answer';
+    public const NOT_INTERESTED = 'Not-Interested';
+    public const SOLD = 'Sold';
+
+    protected $fillable = ['duration'];
+
+    public function getDurationValue(): ?int
+    {
+        if (! $this->duration) {
+            return null;
+        }
+
+        preg_match('/^(\d+)([hd])$/', $this->duration, $m);
+
+        return isset($m[1]) ? (int) $m[1] : null;
+    }
+
+    public function getDurationUnit(): ?string
+    {
+        if (! $this->duration) {
+            return null;
+        }
+
+        return str_ends_with($this->duration, 'h') ? 'hour' : 'day';
+    }
 
     /**
      * Get the tickets for the status.
