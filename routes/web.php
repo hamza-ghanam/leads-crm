@@ -68,10 +68,9 @@ Route::get('/ticket/pdf', [TicketController::class, 'createPDF']);
 Route::get('/ttt', function () {
     return view('ticketPDF');
 });
-Auth::routes();
 
 Route::get('/email', function (){
-    return new LeadNotifyMail();
+    return new LeadNotifyMail('test@gmail.com');
 })->name('tickets.email');
 
 Route::prefix('salesCamps')->group(function () {
@@ -116,8 +115,3 @@ Route::middleware(['auth', 'role:super-admin'])->group(function () {
 Route::get('/test', function () {
     return view('test');
 });
-
-
-Auth::routes();
-
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
