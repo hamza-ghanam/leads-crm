@@ -18,7 +18,7 @@ use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
-use Revolution\Google\Sheets\Facades\Sheets;
+//use Revolution\Google\Sheets\Facades\Sheets;
 use Illuminate\Support\Facades\Http;
 use App\Models\FcmToken;
 
@@ -279,10 +279,12 @@ class LeadsHelper
     public function fetchLeadsFromZapierOLD($source, $manual = null): array
     {
         [$spread, $sheet] = $this->getSpreadsheetDetails($source);
+        $sheets = [];
 
-        $sheets = Sheets::spreadsheet(config('sheets.' . $spread))
-            ->sheet(config('sheets.' . $sheet))
-            ->get();
+//        $sheets = Sheets::spreadsheet(config('sheets.' . $spread))
+//            ->sheet(config('sheets.' . $sheet))
+//            ->get();
+
         $header = $sheets->pull(0);
         $rawLeads = Sheets::collection($header, $sheets);
 
@@ -386,12 +388,12 @@ class LeadsHelper
     {
         [$spread, $sheet] = $this->getSpreadsheetDetails($source);
 
-        for ($i = 0; $i < $leadsLength; $i++) {
-            Sheets::spreadsheet(config('sheets.' . $spread))
-                ->sheet(config('sheets.' . $sheet))
-                ->range('A' . ($i + 2))
-                ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
-        }
+//        for ($i = 0; $i < $leadsLength; $i++) {
+//            Sheets::spreadsheet(config('sheets.' . $spread))
+//                ->sheet(config('sheets.' . $sheet))
+//                ->range('A' . ($i + 2))
+//                ->update([['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']]);
+//        }
     }
 
     public function initiateImport($leads)
