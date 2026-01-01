@@ -16,7 +16,7 @@ use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
 use App\Services\LeadAutoAssignService;
-use Barryvdh\DomPDF\PDF;
+use Mccarlosen\LaravelMpdf\Facades\LaravelMpdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -30,6 +30,7 @@ use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Mail;
 use App\Models\ArchivedLead;
+use Mpdf\MpdfException;
 use Spatie\Permission\Models\Role;
 
 //use Carbon\Carbon;
@@ -767,13 +768,19 @@ class TicketController extends Controller
             });
         }
 
+        $key = 'auto_import_' . $source;
+        $autoImportValue = optional(
+            GeneralSettings::whereName($key)->first()
+        )->value ?? '0';
+
         return view('tickets.showImports')->with([
             'tickets' => $leads,
             'sales' => $sales ? $sales->map(function ($group) {
                 return $group->toArray();
             })->toArray() : [],
             'source' => $source,
-            'auto_import' => boolval(GeneralSettings::whereName('auto_import_' . $source)->first()->value),
+            'auto_import_key' => $key,
+            'auto_import_value' => $autoImportValue, // 0 or 1
         ]);
     }
 
@@ -1404,6 +1411,10 @@ class TicketController extends Controller
     }
 
     // Generate PDF
+
+    /**
+     * @throws MpdfException
+     */
     public function createPDF()
     {
         // retrieve all records from db
@@ -1411,9 +1422,12 @@ class TicketController extends Controller
 
         // share data to view
         view()->share('ticket', $data);
-        $pdf = PDF::loadView('ticketPDF', $data);
-        $pdf->setOptions(['isRemoteEnabled' => true]);
-        $pdf->getDomPDF()->setProtocol($_SERVER['DOCUMENT_ROOT']);
+        $pdf = LaravelMpdf::loadView('ticketPDF', $data, [], [
+            'format' => 'A4',
+            'allow_url_fopen' => true,
+        ]);
+
+        // in blade put: <img src="{{ public_path('images/logo.png') }}" style="width:120px">
         // download PDF file with download method
         return $pdf->download('pdf_file.pdf');
     }
@@ -1572,7 +1586,7 @@ class TicketController extends Controller
             $statusMap
         );
 
-        return response()->json($res, 200);
+        return çjson($res, 200);
 
         Notifier::notifyUser(
             97,

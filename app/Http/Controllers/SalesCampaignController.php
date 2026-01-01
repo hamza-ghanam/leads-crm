@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\GeneralSettings;
 use App\Models\SalesCampaign;
 use App\Models\User;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class SalesCampaignController extends Controller
 {
@@ -23,15 +27,20 @@ class SalesCampaignController extends Controller
 
     /**
      * Display a listing of the resource.
-     * @param string $status
-     * @return \Illuminate\Http\Response
+     * @return Factory|\Illuminate\Contracts\View\View|View
      */
     public function index()
     {
+        $key = 'use_camps';
+        $campAssignValue = optional(
+            GeneralSettings::whereName($key)->first()
+        )->value ?? '0';
+
         return view('salesCamps.index')->with([
             'salesCamps' => SalesCampaign::all(),
             'sales' => User::role(['sale', 'tele-sale'])->get(),
-            'use_camps' => boolval(GeneralSettings::whereName('use_camps')->first()->value),
+            'camp_assign_key' => $key,
+            'camp_assign_value' => $campAssignValue, // 0 or 1
         ]);
     }
 
@@ -39,9 +48,9 @@ class SalesCampaignController extends Controller
      * Remove the specified resource from storage.
      *
      * @param int $id
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
-    public function destroy($id)
+    public function destroy(int $id)
     {
         $salesCamp = SalesCampaign::find($id);
 
@@ -60,8 +69,8 @@ class SalesCampaignController extends Controller
     /**
      * Store a newly created resource in storage.
      *
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @param Request $request
+     * @return RedirectResponse
      */
     public function store(Request $request)
     {

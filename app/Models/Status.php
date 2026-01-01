@@ -5,10 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * @method static Builder reassignable()
+ */
 class Status extends Model
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
     public const NEW = 'New';
     public const FOLLOW_UP = 'Follow-up';
@@ -46,6 +50,24 @@ class Status extends Model
         }
 
         return str_ends_with($this->duration, 'h') ? 'hour' : 'day';
+    }
+
+    // App\Models\Status.php
+    public function scopeReassignable($query)
+    {
+        return $query
+            ->whereNotIn('name', [
+                self::DEAD,
+                self::REVIEWED,
+                self::BOOKING,
+                self::APPROVED,
+                self::SOLD,
+                self::PRE_APPROVED,
+                self::REJECTED,
+                self::DUPLICATED,
+                self::RE_SHUFFLED,
+            ])
+            ->where('name', 'not like', '%(Tele)%');
     }
 
     /**

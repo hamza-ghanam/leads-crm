@@ -6,6 +6,7 @@ use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class StatusController extends Controller
 {
@@ -16,51 +17,50 @@ class StatusController extends Controller
 
     public function index(Request $request)
     {
-        $statuses = Status::query()
-            ->where('slug', 'not like', '%-tele')
-            ->orderBy('id')
-            ->get();
-
+        $statuses = Status::reassignable()->orderBy('id')->get();
         return view('statuses.durations', compact('statuses'));
     }
 
+    /**
+     * @throws Throwable
+     */
     public function saveDurations(Request $request)
     {
         $validated = $request->validate([
             'statuses' => ['required', 'array'],
             'statuses.*.id' => ['required', 'integer', 'exists:statuses,id'],
             'statuses.*.duration' => ['nullable', 'integer', 'min:1'],
-            'statuses.*.unit' => ['required', 'in:hour,day'],
+            'statuses.*.unit' => ['required', 'in:hour,day', 'required_with:statuses.*.duration'],
         ]);
 
         $payload = $validated['statuses'];
 
         $ids = collect($payload)->pluck('id')->unique()->values();
 
-        $allowedIds = Status::query()
+        $allowedIds = Status::reassignable()
             ->whereIn('id', $ids)
-            ->where('slug', 'not like', '%-tele')
             ->pluck('id')
             ->all();
+
 
         DB::transaction(function () use ($payload, $allowedIds) {
             $allowedIds = array_flip($allowedIds);
 
             foreach ($payload as $row) {
-                $id = (int) $row['id'];
+                $id = (int)$row['id'];
 
-                if (! isset($allowedIds[$id])) {
+                if (!isset($allowedIds[$id])) {
                     continue;
                 }
 
-                if (empty($row['duration']) || empty($row['unit'])) {
+                if (!filled($row['duration'] ?? null) || !filled($row['unit'] ?? null)) {
                     Status::where('id', $id)->update([
                         'duration' => null,
                     ]);
                     continue;
                 }
 
-                $value = (int) $row['duration']
+                $value = (int)$row['duration']
                     . ($row['unit'] === 'hour' ? 'h' : 'd');
 
                 Status::where('id', $id)->update([
@@ -71,7 +71,7 @@ class StatusController extends Controller
         });
 
         return redirect()
-            ->route('statuses.durations')
+            ->route('settings.status')
             ->with('success', 'Status durations updated successfully.');
     }
 }

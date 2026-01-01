@@ -9,6 +9,7 @@ use App\Mail\LeadNotifyMail;
 use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\FcmController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\StatusController;
 
 /*
 |--------------------------------------------------------------------------
@@ -80,7 +81,9 @@ Route::prefix('salesCamps')->group(function () {
 });
 
 Route::prefix('settings')->group(function () {
+    Route::get('/', [GeneralSettingsController::class, 'index'])->name('settings.index');
     Route::put('update', [GeneralSettingsController::class, 'update'])->name('settings.update');
+    Route::get('/statuses', [StatusController::class, 'index'])->name('settings.status');
 });
 
 Route::get('devTest', [TicketController::class, 'devTest'])->name('devTest');
@@ -98,13 +101,7 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.show');
 });
 
-use App\Http\Controllers\StatusController;
-
 Route::middleware(['auth', 'role:super-admin'])->group(function () {
-
-    // Show status duration settings page
-    Route::get('/statuses/durations', [StatusController::class, 'index'])
-        ->name('statuses.durations');
 
     // Save status duration settings
     Route::post('/statuses/durations', [StatusController::class, 'saveDurations'])

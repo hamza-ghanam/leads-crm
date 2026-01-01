@@ -350,6 +350,32 @@
                         </ul>
                     </li>
 
+                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'settings') !== false)  ? 'menu-open' : '' }}">
+                        <a href=""
+                           class="nav-link {{ strpos(Route::currentRouteName(), 'settings') !== false  ? 'active' : ''}}">
+                            <i class="nav-icon fas fa-cog"></i>
+                            <p>
+                                System Settings
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('settings.index') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'settings.index') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>General</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('settings.status') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'settings.status') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Status</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
 
                     @endhasrole
                 </ul>
@@ -577,7 +603,7 @@
         if (!badge) {
             return;
         }
-        
+
         var currentCount = parseInt(
             badge.getAttribute('data-count') || badge.textContent || '0',
             10

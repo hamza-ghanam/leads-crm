@@ -27,11 +27,18 @@
                         @method('PUT')
                         <div class="form-group">
                             <div class="custom-control custom-switch">
+                                <input type="hidden"
+                                       name="settings_values[{{ $camp_assign_key }}]"
+                                       value="0">
+
                                 <input type="checkbox" class="custom-control-input" id="customSwitch1"
-                                       name="settings_values[]" {{ $use_camps ? 'checked' : '' }}
-                                       value="{{ $use_camps ? 'on' : 'off' }}" />
+                                       name="settings_values[{{ $camp_assign_key }}]"
+                                       value="1"
+                                    @checked(
+                                        old('settings_values.'.$camp_assign_key, $camp_assign_value) == '1'
+                                    )
+                                />
                                 <label class="custom-control-label" for="customSwitch1">Enable shuffle based on campaigns</label>
-                                <input type="hidden" name="settings_names[]" value="use_camps">
                             </div>
                         </div>
                     </form>
@@ -150,11 +157,29 @@
     <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
 
     <script>
-        document.getElementById('customSwitch1').addEventListener('click', async() => {
-            document.getElementById('customSwitch1').checked;
-            document.getElementById('customSwitch1').value = 'on';
-            document.forms['settings-form'].submit();
-        }, false);
+        document.getElementById('customSwitch1').addEventListener('change', async (e) => {
+            const form = document.forms['settings-form'];
+            const formData = new FormData(form);
+
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+
+                const jsonRes = await res.json();
+
+                // show success notification
+                Toast.fire({
+                    icon: 'success',
+                    title: jsonRes.message
+                });
+            } catch (err) {
+                console.error(err);
+                alert('Failed to save setting.');
+            }
+        });
 
         $(function () {
             $('#example2').DataTable({

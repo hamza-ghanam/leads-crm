@@ -4,17 +4,15 @@ namespace App\Console;
 
 use App\Facades\Notifier;
 use App\Helpers\LeadsHelper;
-use App\Models\ArchivedLead;
 use App\Models\GeneralSettings;
 use App\Models\Status;
 use App\Models\Ticket;
-use App\Models\TicketPath;
 use App\Models\User;
 use App\Services\LeadAutoAssignService;
-use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
-use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class Kernel extends ConsoleKernel
 {
@@ -35,40 +33,35 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $startingHour = 9;
-        $endingHour = 19;
-
-        $newStatusPeriod = '3h';
-        $followUpPeriod = '15d';
-        $meetingPeriod = '7d';
-        $waitingPeriod = '30d';
-        $noAnswerPeriod = '3d';
-
-        $statusMap = Status::pluck('id', 'name');   // ['new' => 1, 'follow-up' => 2]
-
-        $dateBegin = now()->copy()->setTime($startingHour, 0, 0);
-        $dateEnd = now()->copy()->setTime($endingHour, 0, 0);
+        $statusesByName = Status::all()->keyBy('name');
 
         $leadsHelper = app()->make(LeadsHelper::class);
         $assignService = new LeadAutoAssignService(app(LeadsHelper::class));
 
         ////// 1. Notification for Follow-up Reminder
-        $schedule->call(function () use ($dateEnd, $dateBegin, $statusMap, $leadsHelper) {
-            $now = now();
-            if (!($now->between($dateBegin, $dateEnd))) {
+        $schedule->call(function () use ($leadsHelper) {
+            if (!$this->withinWorkingWindow()) {
                 return;
             }
 
-            $followUpStatusId = $statusMap->get(Status::FOLLOW_UP);
+            $statusesByName = Cache::remember('statuses_by_name', 300, function () {
+                return Status::query()
+                    ->select(['id', 'name', 'duration']) // زِد الحقول اللي تحتاجها
+                    ->get()
+                    ->keyBy('name');
+            });
 
-            if (!$followUpStatusId) {
+            $followUp = $statusesByName->get(Status::FOLLOW_UP);
+            if (!$followUp) {
                 return;
             }
+
+            $followUpStatusId = $followUp->id;
 
             Ticket::where('status_id', $followUpStatusId)
-                ->whereHas('latestPath', function ($q) use ($now) {
+                ->whereHas('latestPath', function ($q) {
                     $q->whereNotNull('reminder_at')
-                        ->where('reminder_at', '<=', $now)
+                        ->where('reminder_at', '<=', now())
                         ->whereNull('reminder_sent_at');
                 })
                 ->with(['user', 'latestPath'])
@@ -107,18 +100,10 @@ class Kernel extends ConsoleKernel
         })->everyMinute();
 
         ////// 2. Auto Import from Social Media
-        // every 30 minutes, Facebook leads (Updated on: 17/5/2022)
-        // Adding TikTok leads, on 13/11/2022
-        // Adding Google Ads leads, on 06/04/2025
-        $schedule->call(function () use ($leadsHelper, $dateEnd, $dateBegin, $pullDate) {
-            $now = now();
-            if (!($now->between($dateBegin, $dateEnd))) {
+        $schedule->call(function () use ($leadsHelper) {
+            if (!$this->withinWorkingWindow()) {
                 return;
             }
-
-            ////// New Method (15/05/2022) //////
-            ////// Call helper function (03/09/2022)
-            ////// 28/11/2024 New Zapier Webhook //////
 
             $sources = GeneralSettings::where('name', 'like', 'auto_import_%')
                 ->where('value', 1)
@@ -139,31 +124,127 @@ class Kernel extends ConsoleKernel
         })->everyThirtyMinutes();
 
         ////// 3. Sales Leads - Statuses
-        $schedule->call(function () use ($assignService, $noAnswerPeriod, $statusMap, $waitingPeriod, $meetingPeriod, $followUpPeriod, $newStatusPeriod, $dateBegin, $dateEnd, $pullDate) {
-            $now = now();
-            if (!($now->between($dateBegin, $dateEnd))) {
+        $schedule->call(function () use ($assignService) {
+            if (!$this->withinWorkingWindow()) {
                 return;
             }
 
             $superAdmins = User::role('super-admin')
                 ->where('status', 'permitted')
-                ->get();
+                ->get(['id', 'email']);
 
-            $sAdminsEmails = $superAdmins->pluck('email')->toArray();
+            $statusesByName = Cache::remember('statuses_by_name', 300, function () {
+                return Status::query()
+                    ->select(['id', 'name', 'duration']) // زِد الحقول اللي تحتاجها
+                    ->get()
+                    ->keyBy('name');
+            });
 
+            $statusesToProcess = $statusesByName->filter(function ($s) {
+                if ($s->name === Status::DEAD) {
+                    return false;
+                }
+
+                $d = strtolower(trim((string)$s->duration));
+
+                if ($d === '') {
+                    return false;
+                }
+
+                if (preg_match('/^0+\s*[mhdw]$/', $d)) {
+                    return false;
+                }
+
+                if ($d === '0') return false;
+
+                if (!preg_match('/^\d+\s*[mhdw]$/', $d)) return false;
+
+                return true;
+            });
+
+            foreach ($statusesToProcess as $status) {
+                $assignService->autoReassignFromStatus(
+                    $status->name,
+                    Status::NEW,
+                    $status->duration,
+                    $superAdmins,
+                    $statusesByName
+                );
+            }
+
+
+            /*
             //// 3.1. Status: NEW
-            $newStatusId = $statusMap->get(Status::NEW);
-            if (!$newStatusId) {
+            $newStatus = $statusesByName->get(Status::NEW);
+            if (!$newStatus) {
                 return;
             }
 
             $assignService->autoReassignFromStatus(
-                $newStatusId,
-                $newStatusId,
-                $newStatusPeriod,
+                Status::NEW,
+                Status::NEW,
+                $newStatus->duration,
                 $superAdmins,
-                $statusMap
+                $statusesByName
             );
+
+            //// 3.2. Status: Follow Up
+            $followUpStatus = $statusesByName->get(Status::FOLLOW_UP);
+            if (!$followUpStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::FOLLOW_UP,
+                Status::NEW,
+                $followUpStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+
+            //// 3.3. Status: Meeting
+            $meetingStatus = $statusesByName->get(Status::MEETING);
+            if (!$meetingStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::MEETING,
+                Status::NEW,
+                $meetingStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+
+            //// 3.4. Status: Waiting
+            $waitingStatus = $statusesByName->get(Status::WAITING);
+            if (!$waitingStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::WAITING,
+                Status::NEW,
+                $waitingStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+
+
+            //// 3.5. Status: No-Answer
+            $noAnswerStatus = $statusesByName->get(Status::NO_ANSWER);
+            if (!$noAnswerStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::NO_ANSWER,
+                Status::NEW,
+                $noAnswerStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+            */
 
 
             /*
@@ -248,52 +329,62 @@ class Kernel extends ConsoleKernel
                 $ticket->delete();
             }
             */
+        })->everyTenMinutes()
+            ->withoutOverlapping()
+            ->name('tickets:auto-reassign');
+    }
 
-            //// 3.2. Status: Follow Up
-            $followUpStatusId = $statusMap->get(Status::FOLLOW_UP);
+    protected function withinWorkingWindow(): bool
+    {
+        $settings = Cache::remember('general_settings_window', 60, function () {
+            return GeneralSettings::whereIn('name', ['start_time', 'end_time', 'working_days'])
+                ->pluck('value', 'name')
+                ->toArray();
+        });
 
-            $assignService->autoReassignFromStatus(
-                $followUpStatusId,
-                $newStatusId,
-                $followUpPeriod,
-                $superAdmins,
-                $statusMap
-            );
+        $start = $settings['start_time'] ?? '09:00';
+        $end = $settings['end_time'] ?? '19:00';
 
-            //// 3.3. Status: Meeting
-            $meetingStatusId = $statusMap->get(Status::MEETING);
+        if ($start === $end) {
+            return false; // أو true إذا بدك 24/7
+        }
 
-            $assignService->autoReassignFromStatus(
-                $meetingStatusId,
-                $newStatusId,
-                $meetingPeriod,
-                $superAdmins,
-                $statusMap
-            );
+        $workingDays = json_decode($settings['working_days'] ?? '[]', true) ?: [];
+        if (empty($workingDays)) {
+            $workingDays = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'];
+        }
 
-            //// 3.4. Status: Waiting
-            $waitingStatusId = $statusMap->get(Status::WAITING);
+        $now = now();
+        $map = ['Mon' => 'mon', 'Tue' => 'tue', 'Wed' => 'wed', 'Thu' => 'thu', 'Fri' => 'fri', 'Sat' => 'sat', 'Sun' => 'sun'];
 
-            $assignService->autoReassignFromStatus(
-                $waitingStatusId,
-                $newStatusId,
-                $waitingPeriod,
-                $superAdmins,
-                $statusMap
-            );
+        $today = Carbon::today();
+        $begin = $today->copy()->setTimeFromTimeString($start);
+        $finish = $today->copy()->setTimeFromTimeString($end);
 
+        // نفس اليوم
+        if ($finish->greaterThan($begin)) {
+            $todayKey = $map[$now->format('D')] ?? null;
+            if (!$todayKey || !in_array($todayKey, $workingDays, true)) return false;
 
-            //// 3.5. Status: No-Answer
-            $noAnswerStatusId = $statusMap->get(Status::NO_ANSWER);
+            // استبعاد النهاية
+            return $now->greaterThanOrEqualTo($begin) && $now->lessThan($finish);
+        }
 
-            $assignService->autoReassignFromStatus(
-                $noAnswerStatusId,
-                $newStatusId,
-                $noAnswerPeriod,
-                $superAdmins,
-                $statusMap
-            );
-        })->everyTenMinutes();
+        // يقطع منتصف الليل
+        $finish->addDay();
+
+        $endToday = $today->copy()->setTimeFromTimeString($end);
+
+        if ($now->lessThan($endToday)) {
+            $begin->subDay();
+            $effectiveDayKey = $map[$now->copy()->subDay()->format('D')] ?? null;
+        } else {
+            $effectiveDayKey = $map[$now->format('D')] ?? null;
+        }
+
+        if (!$effectiveDayKey || !in_array($effectiveDayKey, $workingDays, true)) return false;
+
+        return $now->greaterThanOrEqualTo($begin) && $now->lessThan($finish);
     }
 
     /**

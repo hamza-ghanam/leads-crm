@@ -35,6 +35,7 @@
         <div class="col-12 col-sm-12">
             <div class="card card-primary card-outline card-tabs">
                 <div class="card-body">
+
                     <form method="POST" action="{{ route('statuses.save-durations') }}">
                         @csrf
 

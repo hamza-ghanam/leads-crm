@@ -49,11 +49,19 @@
                             @method('PUT')
                             <div class="form-group">
                                 <div class="custom-control custom-switch">
+                                    <input type="hidden"
+                                           name="settings_values[{{ $auto_import_key }}]"
+                                           value="0">
+
                                     <input type="checkbox" class="custom-control-input" id="customSwitch1"
-                                           name="settings_values[]" {{ $auto_import ? 'checked' : '' }}
-                                           value="{{ $auto_import ? 'on' : 'off' }}"/>
-                                    <label class="custom-control-label" for="customSwitch1">Auto <span class="sourceName"></span> import</label>
-                                    <input type="hidden" name="settings_names[]" value="auto_import_{{ $source }}">
+                                           name="settings_values[{{ $auto_import_key }}]"
+                                           value="1"
+                                        @checked(
+                                            old('settings_values.'.$auto_import_key, $auto_import_value) == '1'
+                                        )
+                                    />
+                                    <label class="custom-control-label" for="customSwitch1">Auto <span
+                                            class="sourceName"></span> import</label>
                                 </div>
                             </div>
                         </form>
@@ -272,7 +280,7 @@
                 const res = await fetch(form.action, {
                     method: 'POST',
                     body: formData,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
                 });
 
                 const jsonRes = await res.json();

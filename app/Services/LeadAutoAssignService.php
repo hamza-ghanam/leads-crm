@@ -8,6 +8,7 @@ use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\Status;
 use App\Models\User;
+use Carbon\CarbonInterval;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
@@ -27,12 +28,12 @@ class LeadAutoAssignService
      * skips users who were previously assigned to the ticket (based on TicketPath history),
      * and moves the ticket to DEAD if no eligible users remain.
      *
-     * @param int $statusId
-     *     The status ID to filter tickets by, based on latestPath.next_status
+     * @param string $currentStatusName
+     *     The status name to filter tickets by, based on latestPath.next_status
      *     (e.g. Status::NO_ANSWER, Status::WAITING).
      *
-     * @param int $nextStatusId
-     *     The status ID to apply when a ticket is successfully re-assigned
+     * @param string $nextStatusName
+     *     The status name to apply when a ticket is successfully re-assigned
      *     (e.g. Status::NEW, Status::FOLLOW_UP).
      *
      * @param int|string|\DateInterval $statusPeriod
@@ -47,7 +48,7 @@ class LeadAutoAssignService
      *     A collection or array of User models that should receive administrative
      *     notifications and emails when tickets are re-assigned or moved to DEAD.
      *
-     * @param \Illuminate\Support\Collection $statusMap
+     * @param \Illuminate\Support\Collection $statusesByName
      *     A collection mapping status names to IDs, typically:
      *     Status::pluck('id', 'name')
      *     Example:
@@ -62,35 +63,33 @@ class LeadAutoAssignService
      *     moved to DEAD, or skipped during execution.
      */
     public function autoReassignFromStatus(
-        int $statusId,
-        int $nextStatusId,
-            $statusPeriod,
-            $superAdmins,
-            $statusMap
-    )
+        string                   $currentStatusName,
+        string                   $nextStatusName,
+        int|string|\DateInterval $statusPeriod,
+        Collection|array         $superAdmins,
+        Collection               $statusesByName
+    ): array
     {
         $roles = ['sale', 'tele-sale'];
 
         $superAdmins = $superAdmins instanceof Collection ? $superAdmins : collect($superAdmins);
         $superAdminsEmails = $superAdmins->pluck('email')->filter()->unique()->values()->all();
 
-        $deadId = $statusMap->get(Status::DEAD);
-        if (!$deadId) {
-            throw new \RuntimeException('Status DEAD not found in DB.');
-        }
-
         $cutoff = now()->sub($this->parsePeriodToInterval($statusPeriod));
 
-        $statusName = $statusMap->search($statusId);
-        $statusName = $statusName !== false ? $statusName : null;
+        $currentStatus = $statusesByName->get($currentStatusName);
+        $nextStatus = $statusesByName->get($nextStatusName);
+        $deadStatus = $statusesByName->get(Status::DEAD);
 
-        $nextStatusName = $statusMap->search($nextStatusId);
-        $nextStatusName = $nextStatusName !== false ? $nextStatusName : null;
+        if (!$currentStatus || !$nextStatus || !$deadStatus) {
+            // Log...
+            return ['reassigned' => 0, 'dead' => 0, 'skipped' => 0];
+        }
 
-        $nfStatusIds = $statusMap->only([
-            Status::NEW,
-            Status::FOLLOW_UP
-        ])->values()->all();
+        $nfStatusIds = $statusesByName
+            ->only([Status::NEW, Status::FOLLOW_UP])
+            ->pluck('id')
+            ->all();
 
         $users = User::role($roles)
             ->withCount([
@@ -113,19 +112,19 @@ class LeadAutoAssignService
 
         $index = 0;
 
-        // Tickets whose latestPath is in $statusId and older than cutoff
+        // Tickets whose latestPath is in $currentStatus->id and older than cutoff
         Ticket::query()
-            ->where('status_id', $statusId)
-            ->whereHas('latestPath', function ($q) use ($statusId, $cutoff) {
-                $q->where('next_status', $statusId)
+            ->where('status_id', $currentStatus->id)
+            ->whereHas('latestPath', function ($q) use ($currentStatus, $cutoff) {
+                $q->where('next_status', $currentStatus->id)
                     ->where('created_at', '<=', $cutoff);
             })
             ->with(['latestPath', 'user', 'paths'])
             ->chunkById(200, function ($tickets) use (
                 $nextStatusName,
-                $statusName,
+                $currentStatusName,
                 &$stats, &$index, $userIds, $userCount,
-                $statusId, $nextStatusId, $deadId,
+                $currentStatus, $nextStatus, $deadStatus,
                 $users, $superAdmins, $superAdminsEmails
             ) {
                 foreach ($tickets as $ticket) {
@@ -161,34 +160,34 @@ class LeadAutoAssignService
                     // If all are used -> DEAD
                     if (!$assignedUserId) {
                         DB::transaction(function () use (
-                            $statusName,
-                            $ticket, $deadId, $statusId,
+                            $currentStatusName,
+                            $ticket, $deadStatus, $currentStatus,
                             $superAdmins, $superAdminsEmails
                         ) {
                             $prevUserId = $ticket->user_id;
                             $prevStatusId = $ticket->status_id;
 
-                            $ticket->update(['status_id' => $deadId]);
+                            $ticket->update(['status_id' => $deadStatus->id]);
 
                             TicketPath::create([
                                 'ticket_id' => $ticket->id,
                                 'prev_user' => $prevUserId,
                                 'next_user' => $prevUserId,
                                 'prev_status' => $prevStatusId,
-                                'next_status' => $deadId,
-                                'comment' => "Auto moved to DEAD: exhausted assignment pool for this lead (status: {$statusName}).",
+                                'next_status' => $deadStatus->id,
+                                'comment' => "Auto moved to DEAD: exhausted assignment pool for this lead (status: {$currentStatusName}).",
                             ]);
 
                             $data = [
                                 'title' => 'Dead Lead',
-                                'message' => "Lead moved to DEAD automatically because all eligible assignees were previously assigned (from status: {$statusName}).",
+                                'message' => "Lead moved to DEAD automatically because all eligible assignees were previously assigned (from status: {$currentStatusName}).",
                                 'user' => 'System',
                                 'ticket' => $ticket->id,
                             ];
 
                             // Super admins: mail + notify
                             if (!empty($superAdminsEmails)) {
-                               // $this->leadsHelper->sendLeadMail($superAdminsEmails, $data);
+                                // $this->leadsHelper->sendLeadMail($superAdminsEmails, $data);
                             }
 
                             Notifier::notifyMany(
@@ -204,7 +203,7 @@ class LeadAutoAssignService
                             // Ticket owner (withTrashed)
                             if ($ticket->user) {
                                 $data['user'] = '';
-                               // $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
+                                // $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
 
                                 Notifier::notifyUser(
                                     $ticket->user,
@@ -225,8 +224,8 @@ class LeadAutoAssignService
                     // Re-assign + move status to nextStatusId (as you requested)
                     DB::transaction(function () use (
                         $nextStatusName,
-                        $statusName,
-                        $ticket, $assignedUserId, $nextStatusId, $statusId,
+                        $currentStatusName,
+                        $ticket, $assignedUserId, $nextStatus, $currentStatus,
                         $users, $superAdmins, $superAdminsEmails
                     ) {
                         $prevUserId = $ticket->user_id;
@@ -234,7 +233,7 @@ class LeadAutoAssignService
 
                         $ticket->update([
                             'user_id' => $assignedUserId,
-                            'status_id' => $nextStatusId,
+                            'status_id' => $nextStatus->id,
                         ]);
 
                         $tp = TicketPath::create([
@@ -242,12 +241,12 @@ class LeadAutoAssignService
                             'prev_user' => $prevUserId,
                             'next_user' => $assignedUserId,
                             'prev_status' => $prevStatusId,
-                            'next_status' => $nextStatusId,
-                            'comment' => "Auto re-assigned from status: {$statusName}.",
+                            'next_status' => $nextStatus->id,
+                            'comment' => "Auto re-assigned from status: {$currentStatusName}.",
                         ]);
 
                         // Notify assigned user
-                        $assignedUser = $users->firstWhere('id', $assignedUserId) ?? User::find($assignedUserId);
+                        $assignedUser = $users->firstWhere('id', $assignedUserId);
                         if ($assignedUser) {
                             $data = [
                                 'title' => 'New Lead!',
@@ -271,13 +270,13 @@ class LeadAutoAssignService
 
                         $adminData = [
                             'title' => 'Lead Re-assigned',
-                            'message' => "Lead #{$ticket->id} was auto re-assigned (from status: {$statusName} to status: {$nextStatusName}).",
+                            'message' => "Lead #{$ticket->id} was auto re-assigned (from status: {$currentStatusName} to status: {$nextStatusName}).",
                             'user' => 'System',
                             'ticket' => $ticket->id,
                         ];
 
                         if (!empty($superAdminsEmails)) {
-                           // $this->leadsHelper->sendLeadMail($superAdminsEmails, $adminData);
+                            // $this->leadsHelper->sendLeadMail($superAdminsEmails, $adminData);
                         }
 
                         Notifier::notifyMany(
@@ -304,7 +303,7 @@ class LeadAutoAssignService
     {
         // int => days (default)
         if (is_int($period)) {
-            return \Carbon\CarbonInterval::days($period);
+            return CarbonInterval::days($period);
         }
 
         if (is_string($period)) {
@@ -312,21 +311,21 @@ class LeadAutoAssignService
 
             // "12h", "12hr", "12 hours"
             if (preg_match('/^(\d+)\s*(h|hr|hrs|hour|hours)$/', $p, $m)) {
-                return \Carbon\CarbonInterval::hours((int)$m[1]);
+                return CarbonInterval::hours((int)$m[1]);
             }
 
             // "7d", "7 day", "7 days"
             if (preg_match('/^(\d+)\s*(d|day|days)$/', $p, $m)) {
-                return \Carbon\CarbonInterval::days((int)$m[1]);
+                return CarbonInterval::days((int)$m[1]);
             }
 
             // "36" (string number) => days default
             if (ctype_digit($p)) {
-                return \Carbon\CarbonInterval::days((int)$p);
+                return CarbonInterval::days((int)$p);
             }
         }
 
         // fallback
-        return \Carbon\CarbonInterval::days(7);
+        return CarbonInterval::days(7);
     }
 }
