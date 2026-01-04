@@ -217,7 +217,7 @@ class TicketController extends Controller
             if ($tPath) {
                 if (auth()->user()->hasAnyRole('sale', 'tele-sale')) {
                     if ($tPath->next_user === auth()->user()->id) {
-                        $ticket->lastFollowUp = strlen( ) < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
+                        $ticket->lastFollowUp = strlen() < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
                     } else {
                         $ticket->lastFollowUp = '-';
                     }
@@ -968,50 +968,47 @@ class TicketController extends Controller
             $leads = TempLead::whereIn('id', $leadIds)->get();
 
             // return response()->json(['OK' => $request->details], 200);
-            $newStatus = Status::where('slug', 'new')->first()->id;
-            // $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+            $newStatus = Status::where('name', Status::NEW)->first()->id;
+            $duplicatedStatus = Status::where('name', Status::DUPLICATED)->first()->id;
 
             foreach ($leads as $rawLead) {
                 if (!User::find($request->details[$rawLead->id])) {
                     return response()->json(['msg' => 'Please check all users.'], 400);
                 }
 
-                $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$rawLead->phone_number}%")
+                $phoneNumber = $this->leadsHelper->rectifyPhone($rawLead->phone_number);
+
+                $dupLead = Ticket::query()
+                    ->where('phone_number', $phoneNumber)
+                    ->whereNotNull('phone_number')
                     ->where('phone_number', '!=', '')
                     ->first();
 
-                $dupTempLead = TempLead::where('phone_number', 'LIKE', "%{$rawLead->phone_number}%")
-                    ->where('phone_number', '!=', '')
-                    ->where('id', '!=', $rawLead->id)
-                    ->first();
+                $lead = Ticket::create([
+                    'number' => $rawLead->number,
+                    'user_id' => $request->details[$rawLead->id],
+                    'ad_id' => $rawLead->ad_id,
+                    'ad_name' => $rawLead->ad_name,
+                    'adset_id' => $rawLead->ad_name,
+                    'adset_name' => $rawLead->adset_id,
+                    'campaign_id' => $rawLead->campaign_id,
+                    'campaign_name' => $rawLead->campaign_name,
+                    'form_id' => $rawLead->form_id,
+                    'form_name' => $rawLead->form_name ?? '',
+                    'is_organic' => $rawLead->is_organic ?? '',
+                    'platform' => $rawLead->platform,
+                    'full_name' => $rawLead->full_name,
+                    'phone_number' => $rawLead->phone_number,
+                    'email' => $rawLead->email,
+                    'job_title' => $rawLead->job_title ?? '',
+                    'status_id' => ($dupLead !== null) ? $duplicatedStatus : $newStatus,
+                    'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
+                    'assigner_id' => $request->manual ? auth()->user()->id : null,
+                    'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
+                    'extra_data' => $rawLead->extra_data,
+                ]);
 
-                if (!$dupLead && !$dupTempLead) {
-                    $lead = Ticket::create([
-                        'number' => $rawLead->number,
-                        'user_id' => $request->details[$rawLead->id],
-                        'ad_id' => $rawLead->ad_id,
-                        'ad_name' => $rawLead->ad_name,
-                        'adset_id' => $rawLead->ad_name,
-                        'adset_name' => $rawLead->adset_id,
-                        'campaign_id' => $rawLead->campaign_id,
-                        'campaign_name' => $rawLead->campaign_name,
-                        'form_id' => $rawLead->form_id,
-                        'form_name' => $rawLead->form_name ?? '',
-                        'is_organic' => $rawLead->is_organic ?? '',
-                        'platform' => $rawLead->platform,
-                        'full_name' => $rawLead->full_name,
-                        'phone_number' => $rawLead->phone_number,
-                        'email' => $rawLead->email,
-                        'job_title' => $rawLead->job_title ?? '',
-                        'status_id' => $newStatus,
-                        'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
-                        'assigner_id' => $request->manual ? auth()->user()->id : null,
-                        'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
-                        'extra_data' => $rawLead->extra_data,
-                    ]);
-
-                    $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
-                }
+                $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
 
                 TempLead::destroy($rawLead->id);
             }
@@ -1914,15 +1911,18 @@ class TicketController extends Controller
             DB::beginTransaction();
 
             //$this->validateLead($request);
+            $phoneNumber = $this->leadsHelper->rectifyPhone($request->phone_number);
 
-            $newStatus = Status::where('slug', 'new')->first()->id;
-            $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+            $newStatus = Status::where('name', Status::NEW)->first()->id;
+            $duplicatedStatus = Status::where('name', Status::DUPLICATED)->first()->id;
 
-            $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$request->phone_number}%")
+            $dupLead = Ticket::where('phone_number', $phoneNumber)
+                ->whereNotNull('phone_number')
                 ->where('phone_number', '!=', '')
                 ->first();
 
-            $dupTempLead = TempLead::where('phone_number', 'LIKE', "%{$request->phone_number}%")
+            $dupTempLead = TempLead::where('phone_number', $phoneNumber)
+                ->whereNotNull('phone_number')
                 ->where('phone_number', '!=', '')
                 ->first();
 
@@ -1960,7 +1960,7 @@ class TicketController extends Controller
                 $payload = json_encode($filteredData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             }
 
-            // If it's an array, encode it:
+            $isDuplicate = $dupLead !== null || $dupTempLead !== null;
 
             $lead = TempLead::create([
                 'number' => $request->id ?? $request->lead_id ?? 0,
@@ -1975,10 +1975,10 @@ class TicketController extends Controller
                 'is_organic' => $request->is_organic ?? '',
                 'platform' => $request->platform,
                 'full_name' => $request->full_name ?: $request->name ?: $request->first_name ?: 'N/A',
-                'phone_number' => $request->phone_number,
+                'phone_number' => $this->leadsHelper->rectifyPhone($request->phone_number),
                 'email' => $request->email,
                 'job_title' => $request->job_title ?? '',
-                'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
+                'status_id' => $isDuplicate ? $duplicatedStatus : $newStatus,
                 'source_id' => $this->leadsHelper->getSourceID($request->query('pf')),
                 'extra_data' => $payload,
                 'method' => 'Automatic ' . ucfirst($request->query('sc')) . ' - Webhook',

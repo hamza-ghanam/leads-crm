@@ -18,6 +18,7 @@ use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
+
 //use Revolution\Google\Sheets\Facades\Sheets;
 use Illuminate\Support\Facades\Http;
 use App\Models\FcmToken;
@@ -461,32 +462,30 @@ class LeadsHelper
 
     function rectifyPhone($phoneNumber): string
     {
-        $phoneNumber = str_replace(' ', '', $phoneNumber);
+        $phoneNumber = trim($phoneNumber);
 
         $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
         $arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        $latin = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-        $num = range(0, 9);
-        $phoneNumber = str_replace($persian, $num, $phoneNumber);
-        $phoneNumber = str_replace($arabic, $num, $phoneNumber);
+        $phoneNumber = str_replace($persian, $latin, $phoneNumber);
+        $phoneNumber = str_replace($arabic, $latin, $phoneNumber);
 
+        $phoneNumber = preg_replace('/[^\d+]/', '', $phoneNumber);
+
+        /*
         $uaePrefix = '+971';
 
         if (str_starts_with($phoneNumber, '00971')) {
-            $phoneNumber = substr($phoneNumber, 5);
-            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
-        } else if (str_starts_with($phoneNumber, '+971')) {
-            $phoneNumber = substr($phoneNumber, 4);
-            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
-        } else if (str_starts_with($phoneNumber, '971')) {
-            $phoneNumber = substr($phoneNumber, 3);
-            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
-        } else if (str_starts_with($phoneNumber, '05')) {
-            $phoneNumber = substr($phoneNumber, 1);
-            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
-        } else if (str_starts_with($phoneNumber, '5')) {
-            $phoneNumber = $uaePrefix . ' ' . $phoneNumber;
+            $phoneNumber = $uaePrefix . substr($phoneNumber, 5);
+        } elseif (str_starts_with($phoneNumber, '971')) {
+            $phoneNumber = $uaePrefix . substr($phoneNumber, 3);
+        } elseif (str_starts_with($phoneNumber, '05')) {
+            $phoneNumber = $uaePrefix . substr($phoneNumber, 1);
+        } elseif (str_starts_with($phoneNumber, '5')) {
+            $phoneNumber = $uaePrefix . $phoneNumber;
         }
+        */
 
         return $phoneNumber;
     }

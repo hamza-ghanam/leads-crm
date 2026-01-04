@@ -33,8 +33,6 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $statusesByName = Status::all()->keyBy('name');
-
         $leadsHelper = app()->make(LeadsHelper::class);
         $assignService = new LeadAutoAssignService(app(LeadsHelper::class));
 
@@ -332,6 +330,11 @@ class Kernel extends ConsoleKernel
         })->everyTenMinutes()
             ->withoutOverlapping()
             ->name('tickets:auto-reassign');
+
+        $schedule->command('idempotency:cleanup')
+            ->daily()
+            ->withoutOverlapping()
+            ->onOneServer();
     }
 
     protected function withinWorkingWindow(): bool
