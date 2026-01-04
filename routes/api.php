@@ -26,6 +26,11 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:login');
 });
 
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::get('leads', [\App\Http\Controllers\Api\V1\LeadController::class, 'index']);
+});
+
+
 
 Route::post('/webhook/leads', [TicketController::class, 'storeLead'])->name('webhook.leads');
 //Route::post('/webhook/leads-test', [TicketController::class, 'storeLeadTest'])->name('webhook.leadstest');

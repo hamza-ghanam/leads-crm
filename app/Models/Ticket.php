@@ -83,6 +83,14 @@ class Ticket extends Model
         return $this->hasOne(TicketPath::class)->latestOfMany();
     }
 
+    public function latestFollowUpPath()
+    {
+        // uses status slug 'follow-up'
+        return $this->hasOne(TicketPath::class, 'ticket_id')
+            ->where('next_status', Status::where('name', Status::FOLLOW_UP)->value('id'))
+            ->latestOfMany();
+    }
+
     /**
      * Get the assigner user that assign the ticket.
      */

@@ -131,6 +131,155 @@
                     }
                 }
             }
+        },
+        "/api/v1/leads": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "List leads",
+                "description": "Returns a paginated list of leads based on the user's role with filtering support.",
+                "operationId": "d660caaedd473f1082c49dca5634bb53",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by lead status (same values as web)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Follow-up"
+                        }
+                    },
+                    {
+                        "name": "assignee_id",
+                        "in": "query",
+                        "description": "Filter by assigned sales user ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 12
+                        }
+                    },
+                    {
+                        "name": "date_from",
+                        "in": "query",
+                        "description": "Filter leads created from this date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-01-01"
+                        }
+                    },
+                    {
+                        "name": "date_to",
+                        "in": "query",
+                        "description": "Filter leads created until this date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-01-31"
+                        }
+                    },
+                    {
+                        "name": "lead_id",
+                        "in": "query",
+                        "description": "Filter by exact lead ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of items per page (max 100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "example": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Lead"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -157,12 +306,42 @@
                 },
                 "type": "object"
             },
+            "PaginationLinks": {
+                "description": "Pagination navigation links",
+                "properties": {
+                    "first": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://api.example.com/api/v1/leads?page=1",
+                        "nullable": true
+                    },
+                    "prev": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://api.example.com/api/v1/leads?page=1",
+                        "nullable": true
+                    },
+                    "next": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://api.example.com/api/v1/leads?page=3",
+                        "nullable": true
+                    },
+                    "last": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://api.example.com/api/v1/leads?page=7",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "PaginationMeta": {
                 "description": "Pagination metadata",
                 "properties": {
                     "current_page": {
                         "type": "integer",
-                        "example": 1
+                        "example": 2
                     },
                     "per_page": {
                         "type": "integer",
@@ -175,6 +354,9 @@
                     "last_page": {
                         "type": "integer",
                         "example": 7
+                    },
+                    "links": {
+                        "$ref": "#/components/schemas/PaginationLinks"
                     }
                 },
                 "type": "object"
@@ -223,6 +405,55 @@
                     }
                 },
                 "type": "object"
+            },
+            "Lead": {
+                "description": "Lead summary object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "full_name": {
+                        "type": "string",
+                        "example": "John Doe"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "00971501234567"
+                    },
+                    "email": {
+                        "type": "string",
+                        "example": "john@example.com"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "follow-up"
+                    },
+                    "assignee": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "example": 12
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Sales User"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "last_follow_up": {
+                        "type": "string",
+                        "example": "Called the client and scheduled a meeting",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-01-10T09:30:00Z"
+                    }
+                },
+                "type": "object"
             }
         },
         "parameters": {
@@ -261,6 +492,10 @@
         {
             "name": "Authentication",
             "description": "Authentication"
+        },
+        {
+            "name": "Leads",
+            "description": "Leads"
         }
     ]
 }

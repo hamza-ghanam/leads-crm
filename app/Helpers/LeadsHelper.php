@@ -429,25 +429,37 @@ class LeadsHelper
 
     public function filterLeads($filterParams, $leads)
     {
+        // Normalize filter params (prevent undefined keys)
+        $filterParams = array_merge([
+            'sale'     => null,
+            'status'   => null,
+            'camp'     => null,
+            'from'     => null,
+            'to'       => null,
+            'fullName' => null,
+            'phone'    => null,
+            'linkable' => null,
+        ], $filterParams);
+
         // Campaign filter
-        if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
+        if (!empty($filterParams['camp'] ?? null)) {
             $leads = $leads->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
         }
 
-        // Created at from & to filters
+        // Creation date range filters
         if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
             $from = date($filterParams['from'] . ' 00:00:00');
             $to = date($filterParams['to'] . ' 23:59:59');
             $leads = $leads->whereBetween('created_at', [$from, $to]);
         } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
-            $from = date($filterParams['from'] . ' 00:00:00');
+            $from = $filterParams['from'] . ' 00:00:00';
             $leads = $leads->where('created_at', '>=', $from);
         } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $to = date($filterParams['to'] . ' 23:59:59');
+            $to = $filterParams['to'] . ' 23:59:59';
             $leads = $leads->where('created_at', '<=', $to);
         }
 
-        // Person Full_name filter
+        // Full_name filter
         if (($filterParams['fullName'] and $filterParams['fullName'] !== '')) {
             $leads = $leads->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
         }

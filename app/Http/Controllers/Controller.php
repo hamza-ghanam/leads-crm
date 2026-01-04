@@ -72,15 +72,54 @@ use OpenApi\Attributes as OA;
  *      )
  *  )
  *
+ *
  * @OA\Schema(
- *      schema="PaginationMeta",
- *      type="object",
- *      description="Pagination metadata",
- *      @OA\Property(property="current_page", type="integer", example=1),
- *      @OA\Property(property="per_page", type="integer", example=20),
- *      @OA\Property(property="total", type="integer", example=134),
- *      @OA\Property(property="last_page", type="integer", example=7)
+ *      schema = "PaginationLinks",
+ *      type = "object",
+ *      description = "Pagination navigation links",
+ *      @OA\Property(
+ *          property = "first",
+ *          type = "string",
+ *          format = "uri",
+ *          nullable = true,
+ *          example = "https://api.example.com/api/v1/leads?page=1"
+ *      ),
+ *      @OA\Property(
+ *          property = "prev",
+ *          type = "string",
+ *          format = "uri",
+ *          nullable = true,
+ *          example = "https://api.example.com/api/v1/leads?page=1"
+ *      ),
+ *      @OA\Property(
+ *          property = "next",
+ *          type = "string",
+ *          format = "uri",
+ *          nullable = true,
+ *          example = "https://api.example.com/api/v1/leads?page=3"
+ *      ),
+ *      @OA\Property(
+ *          property = "last",
+ *          type = "string",
+ *          format = "uri",
+ *          nullable = true,
+ *          example = "https://api.example.com/api/v1/leads?page=7"
+ *      )
  *  )
+ *
+ *  @OA\Schema(
+ *      schema = "PaginationMeta",
+ *      type = "object",
+ *      description = "Pagination metadata",
+ *      @OA\Property(property = "current_page", type = "integer", example = 2),
+ *      @OA\Property(property = "per_page", type = "integer", example = 20),
+ *      @OA\Property(property = "total", type = "integer", example = 134),
+ *      @OA\Property(property = "last_page", type = "integer", example = 7),
+ *      @OA\Property(
+ *          property = "links",
+ *          ref = "#/components/schemas/PaginationLinks"
+ *      )
+ *  ),
  *
  * @OA\Schema(
  *    schema="ValidationErrorsMap",
@@ -104,6 +143,44 @@ use OpenApi\Attributes as OA;
  *    @OA\Property(property="code", type="string", example="VALIDATION_ERROR"),
  *    @OA\Property(property="message", type="string", example="The given data was invalid."),
  *    @OA\Property(property="data", ref="#/components/schemas/ValidationErrorData")
+ * ),
+ *
+ * @OA\Schema(
+ *     schema="Lead",
+ *     type="object",
+ *     description="Lead summary object",
+ *
+ *     @OA\Property(property="id", type="integer", example=123),
+ *     @OA\Property(property="full_name", type="string", example="John Doe"),
+ *     @OA\Property(property="phone", type="string", example="00971501234567"),
+ *     @OA\Property(property="email", type="string", example="john@example.com"),
+ *
+ *     @OA\Property(
+ *         property="status",
+ *         type="string",
+ *         example="follow-up"
+ *     ),
+ *
+ *     @OA\Property(
+ *         property="assignee",
+ *         type="object",
+ *         @OA\Property(property="id", type="integer", example=12),
+ *         @OA\Property(property="name", type="string", example="Sales User")
+ *     ),
+ *
+ *     @OA\Property(
+ *         property="last_follow_up",
+ *         type="string",
+ *         nullable=true,
+ *         example="Called the client and scheduled a meeting"
+ *     ),
+ *
+ *     @OA\Property(
+ *         property="created_at",
+ *         type="string",
+ *         format="date-time",
+ *         example="2026-01-10T09:30:00Z"
+ *     )
  * )
  *
  */

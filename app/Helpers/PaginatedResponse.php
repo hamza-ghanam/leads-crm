@@ -20,6 +20,13 @@ class PaginatedResponse
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
                 'last_page' => $paginator->lastPage(),
+
+                'links' => [
+                    'first' => $paginator->url(1),
+                    'prev' => $paginator->previousPageUrl(),
+                    'next' => $paginator->nextPageUrl(),
+                    'last' => $paginator->url($paginator->lastPage()),
+                ],
             ],
         ], $status);
     }
