@@ -18,6 +18,7 @@ use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
+use Carbon\Carbon;
 
 //use Revolution\Google\Sheets\Facades\Sheets;
 use Illuminate\Support\Facades\Http;
@@ -431,43 +432,51 @@ class LeadsHelper
     {
         // Normalize filter params (prevent undefined keys)
         $filterParams = array_merge([
-            'sale'     => null,
-            'status'   => null,
-            'camp'     => null,
-            'from'     => null,
-            'to'       => null,
-            'fullName' => null,
-            'phone'    => null,
-            'linkable' => null,
+            'sale'      => null,
+            'status'    => 'all',
+            'camp'      => null,
+            'from'      => null,
+            'to'        => null,
+            'fullName'  => null,
+            'phone'     => null,
+            'linkable'  => null,
         ], $filterParams);
 
-        // Campaign filter
-        if (!empty($filterParams['camp'] ?? null)) {
-            $leads = $leads->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
-        }
+        $leads
+            // Campaign filter
+            ->when(!empty($filterParams['camp']), function ($q) use ($filterParams) {
+                $q->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
+            })
 
-        // Creation date range filters
-        if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $from = date($filterParams['from'] . ' 00:00:00');
-            $to = date($filterParams['to'] . ' 23:59:59');
-            $leads = $leads->whereBetween('created_at', [$from, $to]);
-        } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
-            $from = $filterParams['from'] . ' 00:00:00';
-            $leads = $leads->where('created_at', '>=', $from);
-        } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $to = $filterParams['to'] . ' 23:59:59';
-            $leads = $leads->where('created_at', '<=', $to);
-        }
+            // Date range filter
+            ->when(!empty($filterParams['from']) || !empty($filterParams['to']), function ($q) use ($filterParams) {
 
-        // Full_name filter
-        if (($filterParams['fullName'] and $filterParams['fullName'] !== '')) {
-            $leads = $leads->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
-        }
+                $from = !empty($filterParams['from'])
+                    ? Carbon::parse($filterParams['from'])->startOfDay()
+                    : null;
 
-        // Person phone filter
-        if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
-            $leads = $leads->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
-        }
+                $to = !empty($filterParams['to'])
+                    ? Carbon::parse($filterParams['to'])->endOfDay()
+                    : null;
+
+                if ($from && $to) {
+                    $q->whereBetween('created_at', [$from, $to]);
+                } elseif ($from) {
+                    $q->where('created_at', '>=', $from);
+                } elseif ($to) {
+                    $q->where('created_at', '<=', $to);
+                }
+            })
+
+            // Full name filter
+            ->when(!empty($filterParams['fullName']), function ($q) use ($filterParams) {
+                $q->where('full_name', 'LIKE', "%{$filterParams['fullName']}%");
+            })
+
+            // Phone filter
+            ->when(!empty($filterParams['phone']), function ($q) use ($filterParams) {
+                $q->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
+            });
 
         return $leads;
     }
@@ -504,20 +513,17 @@ class LeadsHelper
 
     public function getSourceID($platform)
     {
-        switch ($platform) {
-            case 'fb':
-                return Source::where('name', 'Facebook')->first()->id;
-            case 'ig':
-                return Source::where('name', 'Instagram')->first()->id;
-            case 'tk':
-                return Source::where('name', 'TikTok')->first()->id;
-            case 'sc':
-                return Source::where('name', 'Snapchat')->first()->id;
-            case 'ga':  // 30/11/2024 - Google Ads
-                return Source::where('name', 'GoogleAds')->first()->id;
-            default:
-                return Source::where('name', 'Unspecified')->first()->id;
-        }
+        $map = [
+            'fb' => 'Facebook',
+            'ig' => 'Instagram',
+            'tk' => 'TikTok',
+            'sc' => 'Snapchat',
+            'ga' => 'GoogleAds',
+        ];
+
+        $sourceName = $map[$platform] ?? 'Unspecified';
+
+        return Source::where('name', $sourceName)->value('id');
     }
 
     public function notifyUser($usersIds, $title, $message, $link)

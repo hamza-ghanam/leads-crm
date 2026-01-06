@@ -162,7 +162,7 @@ use OpenApi\Attributes as OA;
  *     ),
  *
  *     @OA\Property(
- *         property="assignee",
+ *         property="assigned_to",
  *         type="object",
  *         @OA\Property(property="id", type="integer", example=12),
  *         @OA\Property(property="name", type="string", example="Sales User")
@@ -181,10 +181,58 @@ use OpenApi\Attributes as OA;
  *         format="date-time",
  *         example="2026-01-10T09:30:00Z"
  *     )
- * )
+ * ),
  *
+ * @OA\Schema(
+ *     schema="LeadPermissions",
+ *     type="object",
+ *     @OA\Property(property="can_view", type="boolean", example=true),
+ *     @OA\Property(property="can_view_paths", type="boolean", example=true),
+ *     @OA\Property(property="can_view_all_paths", type="boolean", example=false),
+ *     @OA\Property(property="can_update_status", type="boolean", example=true),
+ *     @OA\Property(property="can_add_follow_up", type="boolean", example=true)
+ * ),
+ *
+ * @OA\Schema(
+ *     schema="LastFollowUp",
+ *     type="object",
+ *     nullable=true,
+ *     @OA\Property(property="id", type="integer", example=555),
+ *     @OA\Property(property="comment", type="string", example="Call client tomorrow"),
+ *     @OA\Property(property="created_at", type="string", format="date-time"),
+ *     @OA\Property(
+ *         property="next_user",
+ *         type="object",
+ *         nullable=true,
+ *         @OA\Property(property="id", type="integer", example=13),
+ *         @OA\Property(property="name", type="string", example="Tony")
+ *     ),
+ *     @OA\Property(
+ *         property="next_status",
+ *         type="object",
+ *         nullable=true,
+ *         @OA\Property(property="id", type="integer", example=2),
+ *         @OA\Property(property="name", type="string", example="Follow-up"),
+ *         @OA\Property(property="slug", type="string", example="follow-up")
+ *     )
+ * ),
+ *
+ * @OA\Schema(
+ *     schema="LeadPath",
+ *     type="object",
+ *     @OA\Property(property="id", type="integer", example=999),
+ *     @OA\Property(property="comment", type="string", example="Client requested callback"),
+ *     @OA\Property(property="created_at", type="string", format="date-time"),
+ * ),
+ *
+ * @OA\Schema(
+ *   schema="Status",
+ *   type="object",
+ *   @OA\Property(property="id", type="integer", example=2),
+ *   @OA\Property(property="name", type="string", example="Follow-up"),
+ *   @OA\Property(property="slug", type="string", example="follow-up")
+ * )
  */
-
 class Controller extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;

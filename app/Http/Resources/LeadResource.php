@@ -15,11 +15,29 @@ class LeadResource extends JsonResource
             'full_name' => $this->full_name,
             'phone' => $this->phone_number,
             'email' => $this->email,
-            'status' => $this->status?->name,
 
-            'assignee' => [
+            'status' => $this->whenLoaded('status', fn () => [
+                'id' => $this->status->id,
+                'name' => $this->status->name,
+                'slug' => $this->status->slug,
+            ]),
+
+            'source' => $this->whenLoaded('source', fn () => [
+                'id' => $this->source->id,
+                'name' => $this->source->name,
+                'slug' => $this->source->slug,
+            ]),
+
+            'assigned_to' => [
                 'id' => $this->user?->id,
                 'name' => $this->user?->name,
+                'role' => $this->user?->getRoleNames()->first(),
+            ],
+
+            'assigner' => [
+                'id' => $this->assigner?->id,
+                'name' => $this->assigner?->name,
+                'role' => $this->assigner?->getRoleNames()->first(),
             ],
 
             'last_follow_up' => $this->lastFollowUpPreview($user),

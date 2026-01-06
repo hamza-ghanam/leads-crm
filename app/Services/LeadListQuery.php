@@ -41,7 +41,7 @@ class LeadListQuery
         $this->excludeHiddenStatuses($query, $user);
 
         // 6) Eager loads + ordering (API/Web both need these)
-        return $query->with(['user', 'latestFollowUpPath'])
+        return $query->with(['user', 'latestFollowUpPath', 'status', 'source', 'assigner'])
             ->orderByDesc('created_at');
     }
 

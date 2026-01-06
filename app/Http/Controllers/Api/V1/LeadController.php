@@ -6,13 +6,20 @@ use App\Adapters\LeadsFilterAdapter;
 use App\Helpers\ApiResponse;
 use App\Helpers\PaginatedResponse;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\LastFollowUpResource;
 use App\Http\Resources\LeadResource;
+use App\Models\Status;
+use App\Models\TicketPath;
+use App\Services\LeadAccess;
 use App\Services\LeadListQuery;
 use Illuminate\Http\Request;
 
 class LeadController extends Controller
 {
-    public function __construct(private readonly LeadListQuery $leadListQuery)
+    public function __construct(
+        private readonly LeadListQuery $leadListQuery,
+        private readonly LeadAccess    $leadAccess,
+    )
     {
     }
 
@@ -33,7 +40,7 @@ class LeadController extends Controller
      *     ),
      *
      *     @OA\Parameter(
-     *         name="assignee_id",
+     *         name="assigned_to",
      *         in="query",
      *         description="Filter by assigned sales user ID",
      *         required=false,
@@ -122,6 +129,7 @@ class LeadController extends Controller
 
         $filterParams = LeadsFilterAdapter::fromApi($request);
 
+
         $leadId = $request->query('lead_id')
             ? (int)$request->query('lead_id')
             : null;
@@ -141,8 +149,110 @@ class LeadController extends Controller
 
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
+        $paginator->setCollection(
+            LeadResource::collection($paginator->getCollection())->collection
+        );
+
         return PaginatedResponse::fromPaginator($paginator);
     }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/leads/{id}",
+     *     operationId="getLeadDetails",
+     *     tags={"Leads"},
+     *     summary="Get lead details",
+     *     description="Returns lead details with last follow-up and permissions",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Lead ID",
+     *         @OA\Schema(type="integer", example=123)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Lead details",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="lead",
+     *                     ref="#/components/schemas/Lead"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="last_follow_up",
+     *                     ref="#/components/schemas/LastFollowUp"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="permissions",
+     *                     ref="#/components/schemas/LeadPermissions"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="Lead not found or not visible",
+     *         @OA\JsonContent(ref="#/components/schemas/ApiError")
+     *     )
+     * )
+     */
+    public function show(Request $request, int $id)
+    {
+        $user = $request->user();
+
+        // Access control (404 if not visible)
+        $lead = $this->leadAccess->findVisibleLeadOrFail($user, $id);
+
+        $lead->load([
+            'user',
+            'status',
+            'source',
+            'assigner',
+        ]);
+
+        // Follow-up status
+        $followUpStatusId = Status::where('slug', 'follow-up')->value('id');
+
+        $lastFollowUpQuery = TicketPath::query()
+            ->where('ticket_id', $lead->id)
+            ->when($followUpStatusId, fn($q) => $q->where('next_status', $followUpStatusId))
+            ->orderByDesc('created_at');
+
+        // sales / tele-sales: only their own paths
+        if (!$this->leadAccess->canSeeAllPaths($user)) {
+            $lastFollowUpQuery->where('next_user', $user->id);
+        }
+
+        $lastFollowUp = $lastFollowUpQuery
+            ->with(['nextUser', 'nextStatus'])
+            ->first();
+
+        return ApiResponse::success([
+            'lead' => new LeadResource($lead),
+            'last_follow_up' => $lastFollowUp
+                ? new LastFollowUpResource(
+                    $lastFollowUp->load(['nextUser', 'nextStatus'])
+                )
+                : null,
+            'permissions' => [
+                'can_view' => true,
+                'can_view_paths' => true,
+                'can_view_all_paths' => $this->leadAccess->canSeeAllPaths($user),
+                'can_update_status' => $user->hasPermissionTo('change status'),
+                'can_add_follow_up' => $user->hasPermissionTo('change status'),
+            ],
+        ]);
+    }
+
 
     private function lastFollowUpPreview($ticket, $user): string
     {

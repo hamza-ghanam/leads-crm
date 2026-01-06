@@ -152,7 +152,7 @@
                         }
                     },
                     {
-                        "name": "assignee_id",
+                        "name": "assigned_to",
                         "in": "query",
                         "description": "Filter by assigned sales user ID",
                         "required": false,
@@ -277,6 +277,165 @@
                 "security": [
                     {
                         "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/leads/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Get lead details",
+                "description": "Returns lead details with last follow-up and permissions",
+                "operationId": "getLeadDetails",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Lead ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lead details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "lead": {
+                                                    "$ref": "#/components/schemas/Lead"
+                                                },
+                                                "last_follow_up": {
+                                                    "$ref": "#/components/schemas/LastFollowUp"
+                                                },
+                                                "permissions": {
+                                                    "$ref": "#/components/schemas/LeadPermissions"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Lead not found or not visible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/leads/{id}/paths": {
+            "get": {
+                "tags": [
+                    "Lead Paths"
+                ],
+                "summary": "Get lead history (paths)",
+                "description": "Returns paginated lead history. Sales/Tele-sales see only their own paths.",
+                "operationId": "getLeadPaths",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Lead ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of items per page (max 100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "example": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated lead paths",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/LeadPath"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Lead not found or not visible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
                     }
                 ]
             }
@@ -429,7 +588,7 @@
                         "type": "string",
                         "example": "follow-up"
                     },
-                    "assignee": {
+                    "assigned_to": {
                         "properties": {
                             "id": {
                                 "type": "integer",
@@ -451,6 +610,115 @@
                         "type": "string",
                         "format": "date-time",
                         "example": "2026-01-10T09:30:00Z"
+                    }
+                },
+                "type": "object"
+            },
+            "LeadPermissions": {
+                "properties": {
+                    "can_view": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "can_view_paths": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "can_view_all_paths": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "can_update_status": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "can_add_follow_up": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "LastFollowUp": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 555
+                    },
+                    "comment": {
+                        "type": "string",
+                        "example": "Call client tomorrow"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "next_user": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "example": 13
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Tony"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "next_status": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "example": 2
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Follow-up"
+                            },
+                            "slug": {
+                                "type": "string",
+                                "example": "follow-up"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    }
+                },
+                "type": "object",
+                "nullable": true
+            },
+            "LeadPath": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 999
+                    },
+                    "comment": {
+                        "type": "string",
+                        "example": "Client requested callback"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Status": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Follow-up"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "follow-up"
                     }
                 },
                 "type": "object"
@@ -496,6 +764,10 @@
         {
             "name": "Leads",
             "description": "Leads"
+        },
+        {
+            "name": "Lead Paths",
+            "description": "Lead Paths"
         }
     ]
 }

@@ -1,6 +1,8 @@
 <?php
 
 use App\Helpers\ApiResponse;
+use App\Http\Controllers\Api\V1\LeadController;
+use App\Http\Controllers\Api\V1\LeadPathController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TicketController;
@@ -27,7 +29,9 @@ Route::prefix('v1')->group(function () {
 });
 
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
-    Route::get('leads', [\App\Http\Controllers\Api\V1\LeadController::class, 'index']);
+    Route::get('leads', [LeadController::class, 'index']);
+    Route::get('leads/{id}', [LeadController::class, 'show']);
+    Route::get('leads/{id}/paths', [LeadPathController::class, 'index']);
 });
 
 

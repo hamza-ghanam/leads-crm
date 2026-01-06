@@ -13,7 +13,7 @@ class LeadsFilterAdapter
             'status' => $request->query('status', 'all'),
 
             // web uses 'sale' as user_id
-            'sale' => $request->query('assignee_id', 'all'),
+            'sale' => $request->query('assigned_to', 'all'),
 
             // date range
             'from' => $request->query('date_from'),
