@@ -15,6 +15,8 @@ class LeadAccess
 {
     /**
      * Returns a query builder scoped to leads visible to this user.
+     *
+     * @return Builder<Ticket>
      */
     public function visibleLeadsQuery(User $user): Builder
     {
@@ -45,7 +47,7 @@ class LeadAccess
     /**
      * Throws 404 if lead is not visible.
      */
-    public function findVisibleLeadOrFail(User $user, int $leadId): \Illuminate\Database\Eloquent\Model
+    public function findVisibleLeadOrFail(User $user, int $leadId): Ticket
     {
         return $this->visibleLeadsQuery($user)->whereKey($leadId)->firstOrFail();
     }
