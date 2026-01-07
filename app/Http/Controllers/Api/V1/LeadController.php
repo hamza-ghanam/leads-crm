@@ -325,15 +325,15 @@ class LeadController extends Controller
         // 404 if not visible (prevents ID discovery for sales/tele-sales)
         $lead = $this->leadAccess->findVisibleLeadOrFail($user, $id);
 
-        [$updatedLead, $latestPath] = $this->moveFwdService->moveForward(
+        $result = $this->moveFwdService->moveForward(
             actor: $user,
             lead: $lead,
             payload: $request->validated()
         );
 
         return ApiResponse::success([
-            'lead' => new LeadResource($updatedLead),
-            'latest_path' => new TicketPathResource($latestPath),
+            'lead' => new LeadResource($result['lead']),
+            'latest_path' => new TicketPathResource($result['path']),
         ]);
     }
 
