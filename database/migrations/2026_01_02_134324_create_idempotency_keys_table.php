@@ -13,12 +13,16 @@ return new class extends Migration
     {
         Schema::create('idempotency_keys', function (Blueprint $table) {
             $table->id();
-            $table->string('key')->unique();
-            $table->string('method');
-            $table->string('uri');
-            $table->json('response');
+            $table->string('key', 255);
+            $table->unsignedSmallInteger('user_id')->nullable();
+            $table->string('method', 10);
+            $table->string('uri', 512);
+            $table->string('request_hash', 64);
+            $table->longText('response');
             $table->unsignedSmallInteger('status_code');
             $table->timestamps();
+            $table->unique(['key', 'method', 'uri']);
+            $table->index('user_id');
         });
     }
 

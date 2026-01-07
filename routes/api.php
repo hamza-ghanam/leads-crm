@@ -3,6 +3,8 @@
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Api\V1\LeadController;
 use App\Http\Controllers\Api\V1\LeadPathController;
+use App\Http\Middleware\IdempotencyKey;
+use App\Http\Middleware\RequireIdempotencyKey;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TicketController;
@@ -32,6 +34,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('leads', [LeadController::class, 'index']);
     Route::get('leads/{id}', [LeadController::class, 'show']);
     Route::get('leads/{id}/paths', [LeadPathController::class, 'index']);
+
+    Route::post('leads/{id}/move-forward', [LeadController::class, 'moveForward'])
+        ->middleware([
+            RequireIdempotencyKey::class,
+            IdempotencyKey::class,
+        ]);
 });
 
 

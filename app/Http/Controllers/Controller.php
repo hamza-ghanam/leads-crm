@@ -231,6 +231,48 @@ use OpenApi\Attributes as OA;
  *   @OA\Property(property="id", type="integer", example=2),
  *   @OA\Property(property="name", type="string", example="Follow-up"),
  *   @OA\Property(property="slug", type="string", example="follow-up")
+ * ),
+ *
+ * @OA\Schema(
+ *   schema="TicketPath",
+ *   type="object",
+ *   @OA\Property(property="id", type="integer", example=1001),
+ *   @OA\Property(property="ticket_id", type="integer", example=123),
+ *   @OA\Property(property="comment", type="string", example="Follow up note"),
+ *   @OA\Property(property="reminder_at", type="string", format="date-time", nullable=true, example="2026-01-05T10:00:00Z"),
+ *   @OA\Property(property="created_at", type="string", format="date-time", example="2026-01-04T21:10:41Z"),
+ *
+ *   @OA\Property(
+ *     property="prev_user",
+ *     type="object",
+ *     nullable=true,
+ *     @OA\Property(property="id", type="integer", example=10),
+ *     @OA\Property(property="name", type="string", example="John")
+ *   ),
+ *   @OA\Property(
+ *     property="next_user",
+ *     type="object",
+ *     nullable=true,
+ *     @OA\Property(property="id", type="integer", example=11),
+ *     @OA\Property(property="name", type="string", example="Tony")
+ *   ),
+ *
+ *   @OA\Property(
+ *     property="prev_status",
+ *     type="object",
+ *     nullable=true,
+ *     @OA\Property(property="id", type="integer", example=1),
+ *     @OA\Property(property="name", type="string", example="New"),
+ *     @OA\Property(property="slug", type="string", example="new")
+ *   ),
+ *   @OA\Property(
+ *     property="next_status",
+ *     type="object",
+ *     nullable=true,
+ *     @OA\Property(property="id", type="integer", example=2),
+ *     @OA\Property(property="name", type="string", example="Follow-up"),
+ *     @OA\Property(property="slug", type="string", example="follow-up")
+ *   )
  * )
  */
 class Controller extends BaseController
