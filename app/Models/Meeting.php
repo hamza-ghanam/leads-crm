@@ -15,6 +15,7 @@ class Meeting extends Model
         'started_at',
         'ended_at',
         'method',
+        'reminder_at',
     ];
 
     /**

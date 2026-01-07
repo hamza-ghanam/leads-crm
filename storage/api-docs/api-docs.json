@@ -350,6 +350,171 @@
                 ]
             }
         },
+        "/api/v1/leads/{id}/move-forward": {
+            "post": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Move lead forward (change status)",
+                "operationId": "moveLeadForward",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Lead ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "Idempotency key to prevent duplicate execution",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "3f2c8c8e-1a34-4a0e-9c7b-0f2d2e7c4b91"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "status_id",
+                                    "comment"
+                                ],
+                                "properties": {
+                                    "status_id": {
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "assigned_to": {
+                                        "type": "integer",
+                                        "example": 13,
+                                        "nullable": true
+                                    },
+                                    "comment": {
+                                        "type": "string",
+                                        "example": "Client asked to follow up next week"
+                                    },
+                                    "reminder_datetime": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2026-01-10T10:30:00Z",
+                                        "nullable": true
+                                    },
+                                    "meeting_range": {
+                                        "type": "string",
+                                        "example": "2026-01-10 10:00 - 2026-01-10 10:30",
+                                        "nullable": true
+                                    },
+                                    "client_unit": {
+                                        "type": "string",
+                                        "example": "A-1203",
+                                        "nullable": true
+                                    },
+                                    "client_price": {
+                                        "type": "number",
+                                        "example": 1500000,
+                                        "nullable": true
+                                    },
+                                    "client_project": {
+                                        "type": "string",
+                                        "example": "Saray Towers",
+                                        "nullable": true
+                                    },
+                                    "client_developer": {
+                                        "type": "string",
+                                        "example": "WR",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Moved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "lead": {
+                                                    "$ref": "#/components/schemas/Lead"
+                                                },
+                                                "latest_path": {
+                                                    "$ref": "#/components/schemas/TicketPath"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found or not visible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/leads/{id}/paths": {
             "get": {
                 "tags": [
@@ -719,6 +884,98 @@
                     "slug": {
                         "type": "string",
                         "example": "follow-up"
+                    }
+                },
+                "type": "object"
+            },
+            "TicketPath": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1001
+                    },
+                    "ticket_id": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "comment": {
+                        "type": "string",
+                        "example": "Follow up note"
+                    },
+                    "reminder_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-01-05T10:00:00Z",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-01-04T21:10:41Z"
+                    },
+                    "prev_user": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "example": 10
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "John"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "next_user": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "example": 11
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Tony"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "prev_status": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "example": 1
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "New"
+                            },
+                            "slug": {
+                                "type": "string",
+                                "example": "new"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "next_status": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "example": 2
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Follow-up"
+                            },
+                            "slug": {
+                                "type": "string",
+                                "example": "follow-up"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
                     }
                 },
                 "type": "object"

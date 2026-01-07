@@ -48,15 +48,9 @@ class Handler extends ExceptionHandler
             if ($request->expectsJson()) {
                 return ApiResponse::error(
                     ApiErrorCode::VALIDATION_ERROR,
-                    status: Response::HTTP_UNPROCESSABLE_ENTITY
-                )->setData([
-                    'success' => false,
-                    'code' => ApiErrorCode::VALIDATION_ERROR->value,
-                    'message' => ApiErrorCode::VALIDATION_ERROR->message(),
-                    'data' => [
-                        $e->errors(),
-                    ]
-                ]);
+                    status: Response::HTTP_UNPROCESSABLE_ENTITY,
+                    data: ['errors' => $e->errors()],
+                );
             }
 
             return null;

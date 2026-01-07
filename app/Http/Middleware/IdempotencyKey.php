@@ -45,13 +45,16 @@ class IdempotencyKey
 
         // Process the request normally
         $response = $next($request);
+        $content = $response->getContent();
 
         // Store the response for future identical requests
         DB::table('idempotency_keys')->insert([
             'key' => $key,
+            'user_id' => $request->user()?->id,
             'method' => $request->method(),
             'uri' => $request->path(),
-            'response' => json_encode($response->getData(true)),
+            'request_hash' => hash('sha256', json_encode($request->all())),
+            'response' => $content,
             'status_code' => $response->getStatusCode(),
             'created_at' => now(),
             'updated_at' => now(),

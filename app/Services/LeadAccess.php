@@ -2,9 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\ApiErrorCode;
+use App\Helpers\ApiResponse;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class LeadAccess
 {
@@ -64,7 +69,7 @@ class LeadAccess
      * - sales-manager: can filter only within team/self
      * - admin/accountant/super-admin: no restriction
      */
-    public function sanitiseAssigneeFilter(User $user, array &$filterParams): void
+    public function sanitiseAssignedToFilter(User $user, array &$filterParams): void
     {
         // Normalise
         $sale = $filterParams['sale'] ?? null;
@@ -99,5 +104,17 @@ class LeadAccess
 
         // Default: deny
         $filterParams['sale'] = null;
+    }
+
+    public function assertCanActOnLeadOrFail(User $user, Ticket $lead): void
+    {
+        // sales & tele-sales must act only on their current leads
+        if ($user->hasAnyRole(['sale', 'tele-sale'])) {
+            if ((int)$lead->user_id !== (int)$user->id) {
+                // return NOT_FOUND (same visibility logic)
+                throw new ModelNotFoundException();
+            }
+        }
+
     }
 }

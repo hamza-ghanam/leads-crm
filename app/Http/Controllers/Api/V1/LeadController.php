@@ -6,12 +6,15 @@ use App\Adapters\LeadsFilterAdapter;
 use App\Helpers\ApiResponse;
 use App\Helpers\PaginatedResponse;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\LeadMoveForwardRequest;
 use App\Http\Resources\LastFollowUpResource;
 use App\Http\Resources\LeadResource;
+use App\Http\Resources\TicketPathResource;
 use App\Models\Status;
 use App\Models\TicketPath;
 use App\Services\LeadAccess;
 use App\Services\LeadListQuery;
+use App\Services\LeadMoveForwardService;
 use Illuminate\Http\Request;
 
 class LeadController extends Controller
@@ -19,6 +22,7 @@ class LeadController extends Controller
     public function __construct(
         private readonly LeadListQuery $leadListQuery,
         private readonly LeadAccess    $leadAccess,
+        private readonly LeadMoveForwardService $moveFwdService
     )
     {
     }
@@ -253,6 +257,85 @@ class LeadController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/v1/leads/{id}/move-forward",
+     *     operationId="moveLeadForward",
+     *     tags={"Leads"},
+     *     summary="Move lead forward (change status)",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Lead ID",
+     *         @OA\Schema(type="integer", example=123)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="Idempotency-Key",
+     *         in="header",
+     *         required=true,
+     *         description="Idempotency key to prevent duplicate execution",
+     *         @OA\Schema(type="string", example="3f2c8c8e-1a34-4a0e-9c7b-0f2d2e7c4b91")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"status_id","comment"},
+     *             @OA\Property(property="status_id", type="integer", example=2),
+     *             @OA\Property(property="assigned_to", type="integer", nullable=true, example=13),
+     *             @OA\Property(property="comment", type="string", example="Client asked to follow up next week"),
+     *             @OA\Property(property="reminder_datetime", type="string", format="date-time", nullable=true, example="2026-01-10T10:30:00Z"),
+     *             @OA\Property(property="meeting_range", type="string", nullable=true, example="2026-01-10 10:00 - 2026-01-10 10:30"),
+     *             @OA\Property(property="client_unit", type="string", nullable=true, example="A-1203"),
+     *             @OA\Property(property="client_price", type="number", nullable=true, example=1500000),
+     *             @OA\Property(property="client_project", type="string", nullable=true, example="Saray Towers"),
+     *             @OA\Property(property="client_developer", type="string", nullable=true, example="WR")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Moved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="lead", ref="#/components/schemas/Lead"),
+     *                 @OA\Property(property="latest_path", ref="#/components/schemas/TicketPath")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=404, description="Not found or not visible", @OA\JsonContent(ref="#/components/schemas/ApiError")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ApiError")),
+     *     @OA\Response(response=400, description="Bad request", @OA\JsonContent(ref="#/components/schemas/ApiError")),
+     *     @OA\Response(response=500, description="Server error", @OA\JsonContent(ref="#/components/schemas/ApiError"))
+     * )
+     */
+    public function moveForward(LeadMoveForwardRequest $request, int $id)
+    {
+        $user = $request->user();
+
+        // 404 if not visible (prevents ID discovery for sales/tele-sales)
+        $lead = $this->leadAccess->findVisibleLeadOrFail($user, $id);
+
+        [$updatedLead, $latestPath] = $this->moveFwdService->moveForward(
+            actor: $user,
+            lead: $lead,
+            payload: $request->validated()
+        );
+
+        return ApiResponse::success([
+            'lead' => new LeadResource($updatedLead),
+            'latest_path' => new TicketPathResource($latestPath),
+        ]);
+    }
 
     private function lastFollowUpPreview($ticket, $user): string
     {
