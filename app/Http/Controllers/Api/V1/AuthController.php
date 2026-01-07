@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 use App\Enums\ApiErrorCode;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -25,7 +26,7 @@ class AuthController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"email","password"},
-     *             @OA\Property(property="email", type="string", format="email", example="crm-sadmin@wrsae.ae"),
+     *             @OA\Property(property="email", type="string", format="email", example="crm-sadmin@gocodi.ae"),
      *             @OA\Property(property="password", type="string", format="password", example="password")
      *         )
      *     ),
@@ -43,7 +44,11 @@ class AuthController extends Controller
      *                     type="object",
      *                     @OA\Property(property="id", type="integer"),
      *                     @OA\Property(property="name", type="string"),
-     *                     @OA\Property(property="email", type="string")
+     *                     @OA\Property(property="email", type="string"),
+     *                     @OA\Property(property="phone", type="string"),
+     *                     @OA\Property(property="status", type="string"),
+     *                     @OA\Property(property="role", type="string"),
+     *                     @OA\Property(property="created_at", type="datetime"),
      *                 )
      *             )
      *         )
@@ -70,6 +75,7 @@ class AuthController extends Controller
      *         @OA\JsonContent(ref="#/components/schemas/ApiValidationError")
      *     )
      * )
+     * @throws Throwable
      */
     public function login(Request $request)
     {
@@ -103,10 +109,18 @@ class AuthController extends Controller
 
             return ApiResponse::success([
                 'token' => $token,
-                'user' => $user,
+                'user' => [
+                    'id'    => $user->id,
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'status' => $user->status,
+                    'created_at' => $user->created_at,
+                    'role' => $user->getRoleNames()->first(),
+                ],
             ]);
 
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
 
             // ✅ ADD IT HERE (temporary debug)
             Log::error('Login exception', [

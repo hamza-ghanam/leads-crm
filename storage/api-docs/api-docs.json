@@ -37,7 +37,7 @@
                                     "email": {
                                         "type": "string",
                                         "format": "email",
-                                        "example": "crm-sadmin@wrsae.ae"
+                                        "example": "crm-sadmin@gocodi.ae"
                                     },
                                     "password": {
                                         "type": "string",
@@ -76,6 +76,19 @@
                                                         },
                                                         "email": {
                                                             "type": "string"
+                                                        },
+                                                        "phone": {
+                                                            "type": "string"
+                                                        },
+                                                        "status": {
+                                                            "type": "string"
+                                                        },
+                                                        "role": {
+                                                            "type": "string"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
                                                         }
                                                     },
                                                     "type": "object"
