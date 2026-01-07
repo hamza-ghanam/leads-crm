@@ -67,6 +67,6 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'require.idempotency' => \App\Http\Middleware\RequireIdempotencyKey::class,
-        'idempotency' => \App\Http\Middleware\IdempotencyKey::class,
+        'idempotency.key' => \App\Http\Middleware\IdempotencyKey::class,
     ];
 }

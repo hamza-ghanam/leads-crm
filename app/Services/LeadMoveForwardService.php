@@ -15,6 +15,8 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Mpdf\Container\NotFoundException;
+use Symfony\Component\CssSelector\Exception\InternalErrorException;
 use Symfony\Component\HttpFoundation\Response;
 
 readonly class LeadMoveForwardService
@@ -24,9 +26,10 @@ readonly class LeadMoveForwardService
     ) {}
 
     /**
-     * @return JsonResponse
+     * @return array
+     * @throws InternalErrorException
      */
-    public function moveForward(User $actor, Ticket $lead, array $payload): JsonResponse
+    public function moveForward(User $actor, Ticket $lead, array $payload): array
     {
         // LeadAccess (extra safety: controller already checked visibility)
         // For sales/tele-sales, lead must still belong to them at the moment of action
@@ -36,10 +39,7 @@ readonly class LeadMoveForwardService
         $toStatus = Status::find($statusId);
 
         if (!$toStatus) {
-            return ApiResponse::error(
-                ApiErrorCode::NOT_FOUND,
-                status: Response::HTTP_NOT_FOUND
-            );
+            throw new NotFoundException();
         }
 
         // Role-specific restrictions (same as web)
@@ -60,10 +60,7 @@ readonly class LeadMoveForwardService
         $assignedTo = $assignedToId > 0 ? User::find($assignedToId) : null;
         if (!$assignedTo && !$this->isMgmtOrDeadTarget($toStatus)) {
             // For normal statuses, assignee is required
-            return ApiResponse::error(
-                ApiErrorCode::VALIDATION_ERROR,
-                'Validation error',
-                Response::HTTP_UNPROCESSABLE_ENTITY,
+            throw ValidationException::withMessages(
                 ['errors' => ['assigned_to' => ['Assigned to ID is required.']]]
             );
         }
@@ -181,16 +178,13 @@ readonly class LeadMoveForwardService
                 return [$lead, $path];
             });
 
-            return ApiResponse::success([
+            return [
                 'lead' => $freshLead,
                 'path' => $freshPath
-            ]);
+            ];
         } catch (\Throwable $e) {
             //// Log
-            return ApiResponse::error(
-                ApiErrorCode::SERVER_ERROR,
-                status: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            throw new InternalErrorException();
         }
     }
 

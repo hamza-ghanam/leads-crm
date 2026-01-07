@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -47,18 +48,29 @@ class IdempotencyKey
         $response = $next($request);
         $content = $response->getContent();
 
-        // Store the response for future identical requests
-        DB::table('idempotency_keys')->insert([
-            'key' => $key,
-            'user_id' => $request->user()?->id,
-            'method' => $request->method(),
-            'uri' => $request->path(),
-            'request_hash' => hash('sha256', json_encode($request->all())),
-            'response' => $content,
-            'status_code' => $response->getStatusCode(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $status = $response->getStatusCode();
+
+        // Store the response for future identical requests, only for sccess
+        if ($status >= 200 && $status < 300) {
+
+            if ($response instanceof JsonResponse) {
+                $content = $response->getData(true);
+            } else {
+                $content = json_decode($response->getContent(), true);
+            }
+
+            DB::table('idempotency_keys')->insert([
+                'key' => $key,
+                'user_id' => $request->user()?->id,
+                'method' => $request->method(),
+                'uri' => $request->path(),
+                'request_hash' => hash('sha256', json_encode($request->all())),
+                'response' => json_encode($content),
+                'status_code' => $status,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         return $response;
     }
