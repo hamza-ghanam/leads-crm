@@ -26,8 +26,12 @@ readonly class LeadMoveForwardService
     ) {}
 
     /**
+     * @param User $actor
+     * @param Ticket $lead
+     * @param array $payload
      * @return array
      * @throws InternalErrorException
+     * @throws NotFoundException
      */
     public function moveForward(User $actor, Ticket $lead, array $payload): array
     {
