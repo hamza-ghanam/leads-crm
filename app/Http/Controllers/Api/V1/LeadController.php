@@ -7,22 +7,26 @@ use App\Helpers\ApiResponse;
 use App\Helpers\PaginatedResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LeadMoveForwardRequest;
+use App\Http\Requests\LeadStoreRequest;
 use App\Http\Resources\LastFollowUpResource;
 use App\Http\Resources\LeadResource;
 use App\Http\Resources\TicketPathResource;
 use App\Models\Status;
 use App\Models\TicketPath;
 use App\Services\LeadAccess;
+use App\Services\LeadCreateService;
 use App\Services\LeadListQuery;
 use App\Services\LeadMoveForwardService;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class LeadController extends Controller
 {
     public function __construct(
-        private readonly LeadListQuery $leadListQuery,
-        private readonly LeadAccess    $leadAccess,
-        private readonly LeadMoveForwardService $moveFwdService
+        private readonly LeadListQuery          $leadListQuery,
+        private readonly LeadAccess             $leadAccess,
+        private readonly LeadMoveForwardService $moveFwdService,
+        private readonly LeadCreateService      $leadCreateService,
     )
     {
     }
@@ -167,7 +171,7 @@ class LeadController extends Controller
      *     tags={"Leads"},
      *     summary="Get lead details",
      *     description="Returns lead details with last follow-up and permissions",
-     *     security={{"bearerAuth":{}}},
+     *     security={{"sanctum":{}}},
      *
      *     @OA\Parameter(
      *         name="id",
@@ -263,7 +267,7 @@ class LeadController extends Controller
      *     operationId="moveLeadForward",
      *     tags={"Leads"},
      *     summary="Move lead forward (change status)",
-     *     security={{"bearerAuth":{}}},
+     *     security={{"sanctum":{}}},
      *
      *     @OA\Parameter(
      *         name="id",
@@ -307,7 +311,7 @@ class LeadController extends Controller
      *                 property="data",
      *                 type="object",
      *                 @OA\Property(property="lead", ref="#/components/schemas/Lead"),
-     *                 @OA\Property(property="latest_path", ref="#/components/schemas/TicketPath")
+     *                 @OA\Property(property="latest_path", ref="#/components/schemas/LeadPath")
      *             )
      *         )
      *     ),
@@ -335,6 +339,71 @@ class LeadController extends Controller
             'lead' => new LeadResource($result['lead']),
             'latest_path' => new TicketPathResource($result['path']),
         ]);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/leads",
+     *     operationId="createLead",
+     *     tags={"Leads"},
+     *     summary="Create a new lead",
+     *     description="Creates a new lead (admin/super-admin only). assigned_to is required.",
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(
+     *          name="Idempotency-Key",
+     *          in="header",
+     *          required=true,
+     *          description="Idempotency key to prevent duplicate execution",
+     *          @OA\Schema(type="string", example="3f2c8c8e-1a34-4a0e-9c7b-0f2d2e7c4b91")
+     *      ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"full_name","phone_number","source_id","assigned_to"},
+     *             @OA\Property(property="campaign_name", type="string", nullable=true, example="Meta - Jan Campaign"),
+     *             @OA\Property(property="full_name", type="string", example="John Doe"),
+     *             @OA\Property(property="email", type="string", format="email", nullable=true, example="john@example.com"),
+     *             @OA\Property(property="phone_number", type="string", example="+971501234567"),
+     *             @OA\Property(property="source_id", type="integer", example=3),
+     *             @OA\Property(property="assigned_to", type="integer", example=25),
+     *             @OA\Property(property="preferred_time", type="string", nullable=true, example="18:00"),
+     *             @OA\Property(property="remarks", type="string", nullable=true, example="Call after 6pm")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Lead created",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="lead", ref="#/components/schemas/Lead")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ApiError")),
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ApiError")),
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ApiError"))
+     * )
+     */
+    public function store(LeadStoreRequest $request)
+    {
+        $actor = $request->user();
+
+        $result = $this->leadCreateService->create($actor, $request->validated());
+
+        $result->lead->load(['user', 'status', 'source', 'assigner']);
+
+        return ApiResponse::success([
+            'lead' => new LeadResource($result->lead),
+            'is_duplicated' => $result->isDuplicated,
+        ], Response::HTTP_CREATED);
     }
 
     private function lastFollowUpPreview($ticket, $user): string

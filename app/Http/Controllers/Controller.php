@@ -148,25 +148,18 @@ use OpenApi\Attributes as OA;
  * @OA\Schema(
  *     schema="Lead",
  *     type="object",
- *     description="Lead summary object",
+ *     title="Lead",
+ *     description="Lead object",
  *
  *     @OA\Property(property="id", type="integer", example=123),
  *     @OA\Property(property="full_name", type="string", example="John Doe"),
  *     @OA\Property(property="phone", type="string", example="00971501234567"),
  *     @OA\Property(property="email", type="string", example="john@example.com"),
  *
- *     @OA\Property(
- *         property="status",
- *         type="string",
- *         example="follow-up"
- *     ),
- *
- *     @OA\Property(
- *         property="assigned_to",
- *         type="object",
- *         @OA\Property(property="id", type="integer", example=12),
- *         @OA\Property(property="name", type="string", example="Sales User")
- *     ),
+ *     @OA\Property(property="status", ref="#/components/schemas/Status"),
+ *     @OA\Property(property="source", ref="#/components/schemas/Source"),
+ *     @OA\Property(property="assigned_to", ref="#/components/schemas/UserLite"),
+ *     @OA\Property(property="assigner", ref="#/components/schemas/UserLite"),
  *
  *     @OA\Property(
  *         property="last_follow_up",
@@ -182,6 +175,28 @@ use OpenApi\Attributes as OA;
  *         example="2026-01-10T09:30:00Z"
  *     )
  * ),
+ *
+ * @OA\Schema(
+ *    schema="UserLite",
+ *    type="object",
+ *    @OA\Property(property="id", type="integer", example=25),
+ *    @OA\Property(property="name", type="string", example="Tony Stark")
+ *  )
+ *
+ * @OA\Schema(
+ *    schema="Status",
+ *    type="object",
+ *    @OA\Property(property="id", type="integer", example=2),
+ *    @OA\Property(property="name", type="string", example="Follow Up"),
+ *    @OA\Property(property="slug", type="string", example="follow-up")
+ *  )
+ *
+ * @OA\Schema(
+ *    schema="Source",
+ *    type="object",
+ *    @OA\Property(property="id", type="integer", example=3),
+ *    @OA\Property(property="name", type="string", example="Facebook Lead Ads")
+ *  )
  *
  * @OA\Schema(
  *     schema="LeadPermissions",
@@ -218,26 +233,10 @@ use OpenApi\Attributes as OA;
  * ),
  *
  * @OA\Schema(
- *     schema="LeadPath",
- *     type="object",
- *     @OA\Property(property="id", type="integer", example=999),
- *     @OA\Property(property="comment", type="string", example="Client requested callback"),
- *     @OA\Property(property="created_at", type="string", format="date-time"),
- * ),
- *
- * @OA\Schema(
- *   schema="Status",
- *   type="object",
- *   @OA\Property(property="id", type="integer", example=2),
- *   @OA\Property(property="name", type="string", example="Follow-up"),
- *   @OA\Property(property="slug", type="string", example="follow-up")
- * ),
- *
- * @OA\Schema(
- *   schema="TicketPath",
+ *   schema="LeadPath",
  *   type="object",
  *   @OA\Property(property="id", type="integer", example=1001),
- *   @OA\Property(property="ticket_id", type="integer", example=123),
+ *   @OA\Property(property="lead_id", type="integer", example=123),
  *   @OA\Property(property="comment", type="string", example="Follow up note"),
  *   @OA\Property(property="reminder_at", type="string", format="date-time", nullable=true, example="2026-01-05T10:00:00Z"),
  *   @OA\Property(property="created_at", type="string", format="date-time", example="2026-01-04T21:10:41Z"),

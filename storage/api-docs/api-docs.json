@@ -292,6 +292,142 @@
                         "sanctum": []
                     }
                 ]
+            },
+            "post": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Create a new lead",
+                "description": "Creates a new lead (admin/super-admin only). assigned_to is required.",
+                "operationId": "createLead",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "Idempotency key to prevent duplicate execution",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "3f2c8c8e-1a34-4a0e-9c7b-0f2d2e7c4b91"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "full_name",
+                                    "phone_number",
+                                    "source_id",
+                                    "assigned_to"
+                                ],
+                                "properties": {
+                                    "campaign_name": {
+                                        "type": "string",
+                                        "example": "Meta - Jan Campaign",
+                                        "nullable": true
+                                    },
+                                    "full_name": {
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john@example.com",
+                                        "nullable": true
+                                    },
+                                    "phone_number": {
+                                        "type": "string",
+                                        "example": "+971501234567"
+                                    },
+                                    "source_id": {
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "assigned_to": {
+                                        "type": "integer",
+                                        "example": 25
+                                    },
+                                    "preferred_time": {
+                                        "type": "string",
+                                        "example": "18:00",
+                                        "nullable": true
+                                    },
+                                    "remarks": {
+                                        "type": "string",
+                                        "example": "Call after 6pm",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Lead created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "lead": {
+                                                    "$ref": "#/components/schemas/Lead"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
             }
         },
         "/api/v1/leads/{id}": {
@@ -358,7 +494,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "sanctum": []
                     }
                 ]
             }
@@ -469,7 +605,7 @@
                                                     "$ref": "#/components/schemas/Lead"
                                                 },
                                                 "latest_path": {
-                                                    "$ref": "#/components/schemas/TicketPath"
+                                                    "$ref": "#/components/schemas/LeadPath"
                                                 }
                                             },
                                             "type": "object"
@@ -523,7 +659,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "sanctum": []
                     }
                 ]
             }
@@ -744,7 +880,8 @@
                 "type": "object"
             },
             "Lead": {
-                "description": "Lead summary object",
+                "title": "Lead",
+                "description": "Lead object",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -763,21 +900,16 @@
                         "example": "john@example.com"
                     },
                     "status": {
-                        "type": "string",
-                        "example": "follow-up"
+                        "$ref": "#/components/schemas/Status"
+                    },
+                    "source": {
+                        "$ref": "#/components/schemas/Source"
                     },
                     "assigned_to": {
-                        "properties": {
-                            "id": {
-                                "type": "integer",
-                                "example": 12
-                            },
-                            "name": {
-                                "type": "string",
-                                "example": "Sales User"
-                            }
-                        },
-                        "type": "object"
+                        "$ref": "#/components/schemas/UserLite"
+                    },
+                    "assigner": {
+                        "$ref": "#/components/schemas/UserLite"
                     },
                     "last_follow_up": {
                         "type": "string",
@@ -788,6 +920,49 @@
                         "type": "string",
                         "format": "date-time",
                         "example": "2026-01-10T09:30:00Z"
+                    }
+                },
+                "type": "object"
+            },
+            "UserLite": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 25
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Tony Stark"
+                    }
+                },
+                "type": "object"
+            },
+            "Status": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Follow Up"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "follow-up"
+                    }
+                },
+                "type": "object"
+            },
+            "Source": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Facebook Lead Ads"
                     }
                 },
                 "type": "object"
@@ -871,43 +1046,9 @@
                 "properties": {
                     "id": {
                         "type": "integer",
-                        "example": 999
-                    },
-                    "comment": {
-                        "type": "string",
-                        "example": "Client requested callback"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                },
-                "type": "object"
-            },
-            "Status": {
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "example": 2
-                    },
-                    "name": {
-                        "type": "string",
-                        "example": "Follow-up"
-                    },
-                    "slug": {
-                        "type": "string",
-                        "example": "follow-up"
-                    }
-                },
-                "type": "object"
-            },
-            "TicketPath": {
-                "properties": {
-                    "id": {
-                        "type": "integer",
                         "example": 1001
                     },
-                    "ticket_id": {
+                    "lead_id": {
                         "type": "integer",
                         "example": 123
                     },

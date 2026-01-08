@@ -39,9 +39,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         ->middleware([
             RequireIdempotencyKey::class,
             IdempotencyKey::class,
+            ]);
+
+    Route::post('leads', [LeadController::class, 'store'])
+        ->middleware([
+            RequireIdempotencyKey::class,
+            IdempotencyKey::class,
         ]);
 });
-
 
 
 Route::post('/webhook/leads', [TicketController::class, 'storeLead'])->name('webhook.leads');
