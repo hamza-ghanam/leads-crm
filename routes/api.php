@@ -46,6 +46,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             RequireIdempotencyKey::class,
             IdempotencyKey::class,
         ]);
+
 });
 
 
