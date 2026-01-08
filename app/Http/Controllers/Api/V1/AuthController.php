@@ -110,8 +110,8 @@ class AuthController extends Controller
             return ApiResponse::success([
                 'token' => $token,
                 'user' => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
+                    'id' => $user->id,
+                    'name' => $user->name,
                     'email' => $user->email,
                     'phone' => $user->phone,
                     'status' => $user->status,
@@ -131,5 +131,44 @@ class AuthController extends Controller
             // Let the global handler return SERVER_ERROR
             throw $e;
         }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/logout",
+     *     operationId="logout",
+     *     tags={"Authentication"},
+     *     summary="Logout current user",
+     *     description="Invalidates the current access token and logs the user out.",
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Logged out successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Logged out")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(ref="#/components/schemas/ApiError")
+     *     )
+     * )
+     */
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        $token = $request->user()?->currentAccessToken();
+        if ($token) {
+            $token->delete();
+        }
+
+        return ApiResponse::success([
+            'message' => 'Logged out',
+        ]);
     }
 }

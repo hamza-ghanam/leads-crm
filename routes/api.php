@@ -31,6 +31,11 @@ Route::prefix('v1')->group(function () {
 });
 
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::get('/me', fn (Request $r) => $r->user());
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
+
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('leads', [LeadController::class, 'index']);
     Route::get('leads/{id}', [LeadController::class, 'show']);
     Route::get('leads/{id}/paths', [LeadPathController::class, 'index']);
@@ -46,7 +51,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             RequireIdempotencyKey::class,
             IdempotencyKey::class,
         ]);
-
 });
 
 
