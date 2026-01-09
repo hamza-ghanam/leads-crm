@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Adapters\LeadsFilterAdapter;
+use App\Enums\ApiErrorCode;
 use App\Helpers\ApiResponse;
 use App\Helpers\PaginatedResponse;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LeadMoveForwardRequest;
 use App\Http\Requests\LeadStoreRequest;
+use App\Http\Requests\LeadUpdateRequest;
 use App\Http\Resources\LastFollowUpResource;
 use App\Http\Resources\LeadResource;
 use App\Http\Resources\TicketPathResource;
@@ -17,6 +19,7 @@ use App\Services\LeadAccess;
 use App\Services\LeadCreateService;
 use App\Services\LeadListQuery;
 use App\Services\LeadMoveForwardService;
+use App\Services\LeadUpdateService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -27,6 +30,7 @@ class LeadController extends Controller
         private readonly LeadAccess             $leadAccess,
         private readonly LeadMoveForwardService $moveFwdService,
         private readonly LeadCreateService      $leadCreateService,
+        private readonly LeadUpdateService      $leadUpdateService,
     )
     {
     }
@@ -404,6 +408,70 @@ class LeadController extends Controller
             'lead' => new LeadResource($result->lead),
             'is_duplicated' => $result->isDuplicated,
         ], Response::HTTP_CREATED);
+    }
+
+    /**
+     * @OA\Patch(
+     *   path="/api/v1/leads/{id}",
+     *   summary="Update lead details",
+     *   tags={"Leads"},
+     *   security={{"sanctum":{}}},
+     *
+     *   @OA\Parameter(
+     *     name="id",
+     *     in="path",
+     *     required=true,
+     *     @OA\Schema(type="integer")
+     *   ),
+     *
+     *   @OA\RequestBody(
+     *     required=true,
+     *     @OA\JsonContent(
+     *       @OA\Property(property="full_name", type="string"),
+     *       @OA\Property(property="phone_number", type="string"),
+     *       @OA\Property(property="email", type="string"),
+     *       @OA\Property(property="campaign_name", type="string"),
+     *       @OA\Property(property="source_id", type="integer"),
+     *       @OA\Property(property="preferred_time", type="string"),
+     *       @OA\Property(property="remarks", type="string")
+     *     )
+     *   ),
+     *
+     *   @OA\Response(
+     *     response=200,
+     *     description="Updated",
+     *     @OA\JsonContent(ref="#/components/schemas/Lead")
+     *   ),
+     *
+     *   @OA\Response(response=403, description="Forbidden"),
+     *   @OA\Response(response=404, description="Not found")
+     * )
+     */
+    public function update(LeadUpdateRequest $request, int $id)
+    {
+        $user = $request->user();
+
+        // 404 if not visible (same LeadAccess logic)
+        $lead = $this->leadAccess->findVisibleLeadOrFail($user, $id);
+
+        // Extra safety: prevent assignment/status tampering
+        if ($request->hasAny(['assigned_to', 'user_id', 'status_id'])) {
+            return ApiResponse::error(
+                ApiErrorCode::FORBIDDEN,
+                'You cannot change lead assignment or status via update',
+                Response::HTTP_FORBIDDEN
+            );
+        }
+
+        $result = $this->leadUpdateService->update(
+            actor: $user,
+            lead: $lead,
+            payload: $request->validated()
+        );
+
+        return ApiResponse::success([
+            'lead' => new LeadResource($result->lead),
+        ]);
     }
 
     private function lastFollowUpPreview($ticket, $user): string
