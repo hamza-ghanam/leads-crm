@@ -334,6 +334,7 @@ class Kernel extends ConsoleKernel
             ->name('tickets:auto-reassign')
             ->withoutOverlapping();
 
+        /*
         $schedule->call(function () {
             if (!$this->withinWorkingWindow()) {
                 return;
@@ -346,6 +347,7 @@ class Kernel extends ConsoleKernel
         })->everyMinute()
             ->name('tickets:testassign')
             ->withoutOverlapping();
+        */
     }
 
     protected function withinWorkingWindow(): bool
