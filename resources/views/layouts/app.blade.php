@@ -248,13 +248,9 @@
                                         <p>Show All</p>
                                     </a>
                                 @endcan
-                                @can('list tickets')
-                                    <a href="/tickets/all?fstatus=re-shuffled"
-                                       class="nav-link {{ strpos(Route::currentRouteName(), 're-shuffled') !== false  ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Re-shuffled Leads</p>
-                                    </a>
-                                @endcan
+
+                                <!-- Re-shuffled has been removed! -->
+
                                 @can('create invoice')
                                     @if(auth()->user()->hasRole('accountant'))
                                         <a href="{{ route('tickets.all') }}"
