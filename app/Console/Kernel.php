@@ -13,6 +13,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class Kernel extends ConsoleKernel
 {
@@ -330,8 +331,21 @@ class Kernel extends ConsoleKernel
             }
             */
         })->everyTenMinutes()
-            ->withoutOverlapping()
-            ->name('tickets:auto-reassign');
+            ->name('tickets:auto-reassign')
+            ->withoutOverlapping();
+
+        $schedule->call(function () {
+            if (!$this->withinWorkingWindow()) {
+                return;
+            }
+
+            DB::table('logs')->insert([
+                'text' => 'Start time: ' . now()->toDateTimeString() . ' - ' . 'Test',
+                'level' => 'info',
+            ]);
+        })->everyMinute()
+            ->name('tickets:testassign')
+            ->withoutOverlapping();
     }
 
     protected function withinWorkingWindow(): bool
