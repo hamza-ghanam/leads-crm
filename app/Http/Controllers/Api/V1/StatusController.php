@@ -62,6 +62,7 @@ class StatusController extends Controller
         return ApiResponse::success($statuses);
     }
 
+    // To check user -> status accessibility
     private function isVisibleToUser(string $slug, $user): bool
     {
         // TELE: ignore all tele-related statuses
