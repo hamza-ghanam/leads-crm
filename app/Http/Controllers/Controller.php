@@ -308,6 +308,18 @@ use OpenApi\Attributes as OA;
  *    @OA\Property(property="success", type="boolean", example=true),
  *    @OA\Property(property="data", ref="#/components/schemas/GroupedUsersByRolesData")
  *  )
+ *
+ * @OA\Schema(
+ *    schema="StatusesListResponse",
+ *    type="object",
+ *    description="Standard success response for statuses dropdown",
+ *    @OA\Property(property="success", type="boolean", example=true),
+ *    @OA\Property(
+ *      property="data",
+ *      type="array",
+ *      @OA\Items(ref="#/components/schemas/Status")
+ *    )
+ *  )
  */
 class Controller extends BaseController
 {

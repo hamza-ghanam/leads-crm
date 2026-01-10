@@ -3,6 +3,7 @@
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Api\V1\LeadController;
 use App\Http\Controllers\Api\V1\LeadPathController;
+use App\Http\Controllers\Api\V1\StatusController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Middleware\IdempotencyKey;
 use App\Http\Middleware\RequireIdempotencyKey;
@@ -59,6 +60,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/users/by-roles', [UserController::class, 'groupedByRoles'])
     ->middleware(['role:super-admin']);
+});
+
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::get('/statuses', StatusController::class);
 });
 
 

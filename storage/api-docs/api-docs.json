@@ -870,6 +870,53 @@
                 ]
             }
         },
+        "/api/v1/statuses": {
+            "get": {
+                "tags": [
+                    "Statuses"
+                ],
+                "summary": "List statuses available to the authenticated user",
+                "description": "Returns role-filtered, DB-ordered statuses intended for dropdown usage. Tele statuses are excluded. Ordering is controlled by statuses.sort_order in DB.",
+                "operationId": "getStatuses",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StatusesListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/users/by-roles": {
             "get": {
                 "tags": [
@@ -1393,6 +1440,22 @@
                     }
                 },
                 "type": "object"
+            },
+            "StatusesListResponse": {
+                "description": "Standard success response for statuses dropdown",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Status"
+                        }
+                    }
+                },
+                "type": "object"
             }
         },
         "parameters": {
@@ -1439,6 +1502,10 @@
         {
             "name": "Lead Paths",
             "description": "Lead Paths"
+        },
+        {
+            "name": "Statuses",
+            "description": "Statuses"
         },
         {
             "name": "Users",

@@ -15,7 +15,7 @@ class UserController extends Controller
 {
     /**
      * @OA\Get(
-     *   path="/api/users/by-roles",
+     *   path="/api/v1/users/by-roles",
      *   operationId="getUsersGroupedByRoles",
      *   tags={"Users"},
      *   summary="Get users grouped by roles",
