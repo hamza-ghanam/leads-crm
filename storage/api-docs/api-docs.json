@@ -869,6 +869,73 @@
                     }
                 ]
             }
+        },
+        "/api/users/by-roles": {
+            "get": {
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get users grouped by roles",
+                "description": "Returns users belonging to the provided roles, grouped under each role name. Uses a single DB query and returns standard ApiResponse envelope.",
+                "operationId": "getUsersGroupedByRoles",
+                "parameters": [
+                    {
+                        "name": "roles[]",
+                        "in": "query",
+                        "description": "Roles to include. Repeat roles[] multiple times.",
+                        "required": true,
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "example": [
+                            "sale",
+                            "tele-sale"
+                        ]
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GroupedUsersByRolesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error (roles missing)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -1249,6 +1316,83 @@
                     }
                 },
                 "type": "object"
+            },
+            "UserListItem": {
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Ahmad Saleh"
+                    },
+                    "email": {
+                        "type": "string",
+                        "example": "ahmad@example.com"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "active"
+                    }
+                },
+                "type": "object"
+            },
+            "GroupedUsersByRolesData": {
+                "description": "Map of role => users[]",
+                "type": "object",
+                "example": {
+                    "sale": [
+                        {
+                            "id": 1,
+                            "name": "Sale One",
+                            "email": "s1@example.com",
+                            "status": "active",
+                            "role": "sale"
+                        },
+                        {
+                            "id": 2,
+                            "name": "Sale Two",
+                            "email": "s2@example.com",
+                            "status": "active",
+                            "role": "sale"
+                        }
+                    ],
+                    "tele-sale": [
+                        {
+                            "id": 3,
+                            "name": "Tele One",
+                            "email": "t1@example.com",
+                            "status": "active",
+                            "role": "tele-sale"
+                        }
+                    ]
+                },
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/components/schemas/UserListItem"
+                    }
+                }
+            },
+            "GroupedUsersByRolesResponse": {
+                "description": "Standard success response for grouped users by roles",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/GroupedUsersByRolesData"
+                    }
+                },
+                "type": "object"
             }
         },
         "parameters": {
@@ -1295,6 +1439,10 @@
         {
             "name": "Lead Paths",
             "description": "Lead Paths"
+        },
+        {
+            "name": "Users",
+            "description": "Users"
         }
     ]
 }

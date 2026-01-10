@@ -72,7 +72,6 @@ use OpenApi\Attributes as OA;
  *      )
  *  )
  *
- *
  * @OA\Schema(
  *      schema = "PaginationLinks",
  *      type = "object",
@@ -119,7 +118,7 @@ use OpenApi\Attributes as OA;
  *          property = "links",
  *          ref = "#/components/schemas/PaginationLinks"
  *      )
- *  ),
+ *  )
  *
  * @OA\Schema(
  *    schema="ValidationErrorsMap",
@@ -129,13 +128,14 @@ use OpenApi\Attributes as OA;
  *        type="array",
  *        @OA\Items(type="string")
  *    )
- * ),
+ * )
  *
  * @OA\Schema(
  *    schema="ValidationErrorData",
  *    type="object",
  *        @OA\Property(property="errors", ref="#/components/schemas/ValidationErrorsMap")
- * ),
+ * )
+ *
  * @OA\Schema(
  *    schema="ApiValidationError",
  *    type="object",
@@ -143,7 +143,7 @@ use OpenApi\Attributes as OA;
  *    @OA\Property(property="code", type="string", example="VALIDATION_ERROR"),
  *    @OA\Property(property="message", type="string", example="The given data was invalid."),
  *    @OA\Property(property="data", ref="#/components/schemas/ValidationErrorData")
- * ),
+ * )
  *
  * @OA\Schema(
  *     schema="Lead",
@@ -174,7 +174,7 @@ use OpenApi\Attributes as OA;
  *         format="date-time",
  *         example="2026-01-10T09:30:00Z"
  *     )
- * ),
+ * )
  *
  * @OA\Schema(
  *    schema="UserLite",
@@ -206,7 +206,7 @@ use OpenApi\Attributes as OA;
  *     @OA\Property(property="can_view_all_paths", type="boolean", example=false),
  *     @OA\Property(property="can_update_status", type="boolean", example=true),
  *     @OA\Property(property="can_add_follow_up", type="boolean", example=true)
- * ),
+ * )
  *
  * @OA\Schema(
  *     schema="LastFollowUp",
@@ -230,7 +230,7 @@ use OpenApi\Attributes as OA;
  *         @OA\Property(property="name", type="string", example="Follow-up"),
  *         @OA\Property(property="slug", type="string", example="follow-up")
  *     )
- * ),
+ * )
  *
  * @OA\Schema(
  *   schema="LeadPath",
@@ -255,7 +255,6 @@ use OpenApi\Attributes as OA;
  *     @OA\Property(property="id", type="integer", example=11),
  *     @OA\Property(property="name", type="string", example="Tony")
  *   ),
- *
  *   @OA\Property(
  *     property="prev_status",
  *     type="object",
@@ -273,6 +272,42 @@ use OpenApi\Attributes as OA;
  *     @OA\Property(property="slug", type="string", example="follow-up")
  *   )
  * )
+ *
+ * @OA\Schema(
+ *    schema="UserListItem",
+ *    type="object",
+ *    required={"id","name","email","status"},
+ *    @OA\Property(property="id", type="integer", example=10),
+ *    @OA\Property(property="name", type="string", example="Ahmad Saleh"),
+ *    @OA\Property(property="email", type="string", example="ahmad@example.com"),
+ *    @OA\Property(property="status", type="string", example="active")
+ *  )
+ * @OA\Schema(
+ *    schema="GroupedUsersByRolesData",
+ *    type="object",
+ *    description="Map of role => users[]",
+ *    @OA\AdditionalProperties(
+ *      type="array",
+ *      @OA\Items(ref="#/components/schemas/UserListItem")
+ *    ),
+ *    example={
+ *      "sale": {
+ *        {"id": 1, "name": "Sale One", "email": "s1@example.com", "status": "active", "role": "sale"},
+ *        {"id": 2, "name": "Sale Two", "email": "s2@example.com", "status": "active", "role": "sale"}
+ *      },
+ *      "tele-sale": {
+ *        {"id": 3, "name": "Tele One", "email": "t1@example.com", "status": "active", "role": "tele-sale"}
+ *      }
+ *    }
+ *  )
+ *
+ * @OA\Schema(
+ *    schema="GroupedUsersByRolesResponse",
+ *    type="object",
+ *    description="Standard success response for grouped users by roles",
+ *    @OA\Property(property="success", type="boolean", example=true),
+ *    @OA\Property(property="data", ref="#/components/schemas/GroupedUsersByRolesData")
+ *  )
  */
 class Controller extends BaseController
 {
