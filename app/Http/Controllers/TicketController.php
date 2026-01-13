@@ -207,26 +207,42 @@ class TicketController extends Controller
 
         $fUpStatus = Status::whereSlug('follow-up')->first();
 
-        foreach ($tickets as $key => $ticket) {
-            $tPath = TicketPath::whereTicketId($ticket->id)
-                ->whereNextStatus($fUpStatus->id)
-                ->orderBy('updated_at', 'DESC')
-                ->first();
+        // ---- last follow-up preview (no N+1) ---- //
 
-            $ticket->user = ($ticket->user) ?: [];
-            if ($tPath) {
-                if (auth()->user()->hasAnyRole('sale', 'tele-sale')) {
-                    if ($tPath->next_user === auth()->user()->id) {
-                        $ticket->lastFollowUp = strlen( ) < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
-                    } else {
-                        $ticket->lastFollowUp = '-';
-                    }
-                } else {
-                    $ticket->lastFollowUp = strlen($tPath->comment) < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
-                }
-            } else {
-                $ticket->lastFollowUp = '-';
+        $ticketIds = collect($tickets->items())->pluck('id')->values();
+
+        $latestFollowUps = $ticketIds->isEmpty()
+            ? collect()
+            : TicketPath::query()
+                ->select(['ticket_id', 'comment', 'next_user', 'updated_at'])
+                ->whereIn('ticket_id', $ticketIds)
+                ->where('next_status', $fUpStatus->id)
+                ->orderBy('updated_at', 'DESC')
+                ->get()
+                ->groupBy('ticket_id')
+                ->map(fn ($rows) => $rows->first());
+
+        $isSalesUser = auth()->user()->hasAnyRole(['sale', 'tele-sale']);
+        $authUserId  = (int) auth()->id();
+
+        foreach ($tickets as $ticket) {
+            $ticket->user = $ticket->user ?: [];
+            $ticket->lastFollowUp = '-';
+
+            $tPath = $latestFollowUps->get($ticket->id);
+            if (!$tPath) {
+                continue;
             }
+
+            // Sales & tele‑sale can only see their own follow‑ups
+            if ($isSalesUser && (int) $tPath->next_user !== $authUserId) {
+                continue;
+            }
+
+            $comment = (string) ($tPath->comment ?? '');
+            $ticket->lastFollowUp = mb_strlen($comment) <= 75
+                ? $comment
+                : mb_substr($comment, 0, 75) . '...';
         }
 
         $resultParams = [
