@@ -38,7 +38,6 @@
                     <div class="card-header">
                         <div class="row">
 
-                            @hasanyrole('super-admin|sales-manager')
                             {{-- Add New --}}
                             <div class="col-6 col-md-3 mb-2">
                                 <a href="{{ route('tickets.create') }}"
@@ -47,6 +46,7 @@
                                 </a>
                             </div>
 
+                            @hasanyrole('super-admin|sales-manager')
                             {{-- Enable multi forward --}}
                             <div class="col-6 col-md-3 mb-2">
                                 <button type="button" id="enable-fwd"
