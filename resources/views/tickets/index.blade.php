@@ -37,6 +37,8 @@
                 <div class="card">
                     <div class="card-header">
                         <div class="row">
+
+                            @hasanyrole('super-admin|sales-manager')
                             {{-- Add New --}}
                             <div class="col-6 col-md-3 mb-2">
                                 <a href="{{ route('tickets.create') }}"
@@ -53,7 +55,7 @@
                                 </button>
                             </div>
 
-                            @hasanyrole('super-admin|sales-manager')
+
                             {{-- Excel Import --}}
                             <div class="col-6 col-md-3 mb-2">
                                 <a href="{{ route('tickets.showImports', ['excel']) }}"
