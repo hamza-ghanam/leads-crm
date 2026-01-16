@@ -444,6 +444,12 @@ class TicketController extends Controller
             return abort(404);
         }
 
+        $ticket->loadMissing([
+            'paths.prevUser:id,name',
+            'paths.nextUser:id,name',
+            'paths.prevStatus:id,name,slug',
+        ]);
+
         if (auth()->user()->hasAnyRole(['sale', 'tele-sale']) and $ticket->user_id != auth()->user()->id) {
             return back()->withErrors(['msg' => 'Unauthorised Access.']);
         }
@@ -509,16 +515,34 @@ class TicketController extends Controller
         $passport = null;
         $sources = Source::all();
 
-        $paths = $ticket->paths;
-
         $user = auth()->user();
-        if ($user->hasAnyRole($roles)) {
-            $paths = $paths->where('next_user', $user->id);
+        $isSalesUser = $user->hasAnyRole($roles);
+
+        $pathsQuery = $ticket->paths()
+            ->with([
+                'prevUser:id,name',
+                'nextUser:id,name',
+                'prevStatus:id,name,slug',
+            ]);
+
+        if ($isSalesUser) {
+            $pathsQuery->where('next_user', $user->id);
         }
 
-        $ticketPaths = $paths->groupBy(function ($path) {
-            return $path->created_at->toDateString();
+        $paths = $pathsQuery->get();
+
+        $paths->transform(function ($path) use ($isSalesUser) {
+            $sameUser = $path->prevUser && $path->nextUser
+                && (int) $path->prevUser->id === (int) $path->nextUser->id;
+
+            // غير sales: دائماً true
+            // sales/tele-sale: true فقط إذا نفس المستخدم
+            $path->show_prev_status_block = $isSalesUser ? $sameUser : true;
+
+            return $path;
         });
+
+        $ticketPaths = $paths->groupBy(fn ($path) => $path->created_at->toDateString());
 
         $ticket->extra_data = json_decode($ticket->extra_data, true); // Decode JSON
 
@@ -530,9 +554,9 @@ class TicketController extends Controller
             'statuses' => $statuses,
             'booking' => $booking,
             'invoice' => $invoice,
-            'sources' => $sources
+            'sources' => $sources,
         ];
-//dd($booking);
+
         return view('tickets.show')->with($results);
     }
 
@@ -1134,11 +1158,14 @@ class TicketController extends Controller
         $isFollowUp = ($slug === 'follow-up');
         $isNotInterested = ($slug === 'not-interested');
 
+        $role = request()->user()->getRoleNames()->first();
+        $commentRule = $role !== 'super-admin' ? 'required' : 'nullable';
+
         // Build base validation rules.
         $rules = [
-            'comment' => ['required', 'string'],
+            'comment' => [$commentRule, 'string'],
             'user' => ['integer', 'gt:0', 'exists:users,id'],
-            'status' => ['required', 'nullable', 'integer', 'gt:0', 'exists:statuses,id'],
+            'status' => ['required', 'integer', 'gt:0', 'exists:statuses,id'],
         ];
 
         // If status name contains 'book', add additional booking validation rules.
@@ -1240,7 +1267,7 @@ class TicketController extends Controller
                 'prev_status' => $ticket->status->id,
                 'next_status' => $statusId,
                 'ticket_id' => $ticket->id,
-                'comment' => $request->comment,
+                'comment' => $request->comment ?? '-',
                 'reminder_at' => $isFollowUp
                     ? Carbon::parse($request->input('reminder_datetime'))
                     : null,

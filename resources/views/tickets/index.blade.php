@@ -229,8 +229,9 @@
                     <form name="fwd-form" action="{{ route('tickets.multipleForward') }}" method="post" id="fwd-form">
                         @csrf
                         @endhasanyrole
-                        <table id="example20" style="width: 100%;"
-                               class="table table-bordered table-hover table-responsive">
+                        <div class="table-responsive">
+                            <table id="example20" style="width: 100%;"
+                               class="table table-bordered table-hover">
                             <thead>
                             <tr>
                                 <th class="fwd-leads" style="display:none !important;">
@@ -249,7 +250,9 @@
                                 <th>Status</th>
                                 <th>Current User</th>
                                 <th>Latest Follow-up</th>
-                                <th>Created at</th>
+                                @unlessrole('sale|tele-sale')
+                                    <th>Created at</th>
+                                @endunlessrole
                                 <th></th>
                             </tr>
                             </thead>
@@ -285,7 +288,9 @@
                                     <td>
                                         {{ $ticket->lastFollowUp }}
                                     </td>
-                                    <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
+                                    @unlessrole('sale|tele-sale')
+                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
+                                    @endunlessrole
                                     <td>
                                         <ul class="nav nav-pills ml-auto p-2">
                                             <li class="nav-item dropdown" style="line-height: 1;">
@@ -326,6 +331,7 @@
                             </tr>
                             </tfoot>
                         </table>
+                        </div>
                         @hasanyrole('super-admin|sales-manager')
                         <div class="modal fade" id="modal-lg">
                             <div class="modal-dialog modal-lg">
@@ -611,7 +617,8 @@
                 searching: false,
                 ordering: true,
                 info: false,
-                autoWidth: false,
+                responsive: true,
+                autoWidth: false
             });
         }, false);
 

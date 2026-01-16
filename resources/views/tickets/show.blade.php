@@ -262,10 +262,12 @@
                                             </span>
                                         </td>
                                     </tr>
+                                    @hasrole('super-admin')
                                     <tr>
                                         <th>Creation date</th>
                                         <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
                                     </tr>
+                                    @endhasrole
                                     <tr>
                                         <th>Last update date</th>
                                         <td>{{ date('d/m/Y h:i A', strtotime($ticket['updated_at'])) }}</td>
@@ -441,18 +443,20 @@
 
                                                 <div class="timeline-body">
                                                     <ul>
-                                                        <li>
-                                                            <b>Previous Status:</b>
-                                                            @if(isset($pathDetails->prevStatus))
-                                                                <span
-                                                                    style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $pathDetails->prevStatus->slug) }}"
-                                                                    class="badge">
-                                                                {{ $pathDetails->prevStatus->name }}
-                                                                </span>
-                                                            @else
-                                                                -
-                                                            @endif
-                                                        </li>
+                                                        @if($pathDetails->show_prev_status_block)
+                                                            <li>
+                                                                <b>Previous Status:</b>
+                                                                @if(isset($pathDetails->prevStatus))
+                                                                    <span
+                                                                        style="color: #FFF; background-color: {{ Config::get('constants.status_colors.' . $pathDetails->prevStatus->slug) }}"
+                                                                        class="badge">
+                                                                    {{ $pathDetails->prevStatus->name }}
+                                                                    </span>
+                                                                @else
+                                                                    -
+                                                                @endif
+                                                            </li>
+                                                        @endif
                                                         <li>
                                                             <b>Current status:</b>
                                                             @if(isset($pathDetails->nextStatus))
@@ -603,12 +607,18 @@
                                                style="display:none; font-size: 1em;"></p>
 
                                             <div class="form-group">
-                                                <label for="comment">Comment</label><sup>*</sup>
+                                                <label for="comment">Comment</label>
+
+                                                @unlessrole('super-admin')
+                                                <sup>*</sup>
+                                                @endunlessrole
+
                                                 <textarea cols="2" rows="3" class="form-control" id="comment"
                                                           name="comment"
                                                           placeholder="Enter Comment"
-                                                          required>{{ old('comment') }}</textarea>
+                                                          @unlessrole('super-admin') required @endunlessrole>{{ old('comment') }}</textarea>
                                             </div>
+
                                             @hasanyrole('super-admin')
                                             <div class="form-group">
                                                 <label for="user">Assign to</label><sup>*</sup>
