@@ -535,8 +535,6 @@ class TicketController extends Controller
             $sameUser = $path->prevUser && $path->nextUser
                 && (int) $path->prevUser->id === (int) $path->nextUser->id;
 
-            // غير sales: دائماً true
-            // sales/tele-sale: true فقط إذا نفس المستخدم
             $path->show_prev_status_block = $isSalesUser ? $sameUser : true;
 
             return $path;
