@@ -234,4 +234,5 @@ return [
         'Notifier' => App\Facades\Notifier::class,
     ],
 
+    'build_version' => env('BUILD_VERSION', '1'),
 ];

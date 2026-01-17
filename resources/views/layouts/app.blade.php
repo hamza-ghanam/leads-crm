@@ -8,7 +8,7 @@
     <title>Leads CRM - Management Dashboard</title>
     <meta property="og:title" content="Leads CRM">
     <meta property="og:description" content="Manage you Leads from different sources using our advanced CRM">
-    <meta property="og:image" content="{{ asset('dist/img/wrsae_thumb.png') }}">
+    <meta property="og:image" content="{{ asset('dist/img/app_thumb.png') }}">
     <meta property="og:url" content="{{ env('APP_URL') }}">
     <meta property="og:type" content="website">
 
@@ -166,7 +166,7 @@
         <!-- Brand Logo -->
         <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
            class="brand-link">
-            <img src="{{ asset('dist/img/wrsae_thumb.png') }}" alt="AdminLTE Logo"
+            <img src="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}" alt="{{ config('app.name') }} Logo"
                  class="brand-image img-circle elevation-3"
                  style="opacity: .8">
             <span class="brand-text font-weight-light"><strong

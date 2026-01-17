@@ -27,7 +27,8 @@
 <body class="hold-transition login-page">
 <div class="login-box">
     <div class="login-logo">
-	    <img src="{{ asset('dist/img/wrsae_logo.png') }}?v={{ now()->format('YmdHis') }}" alt="charity" width="300" class="mb-4" /><br/>
+        <img src="{{ asset('dist/img/app_logo.png') }}?v={{ config('app.build_version') }}"
+             alt="{{ config('app.name') }}" width="300" class="mb-4"/><br/>
         <strong style="font-weight: bold;">Leads CRM </strong><b>Dashboard</b>
     </div>
     <!-- /.login-logo -->
