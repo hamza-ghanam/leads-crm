@@ -118,9 +118,31 @@ class Kernel extends ConsoleKernel
 
             foreach ($sources as $source) {
                 $leads = $leadsHelper->fetchLeadsFromZapier($source);
-                $leadsHelper->initiateImport($leads);
-                $leadIds = array_column($leads, 'key');
-                $leadsHelper->removeZapierTempLeads($leadIds);
+
+                [$jrStats, $srStats, $processedLeadKeys] = $leadsHelper->initiateImport($leads);
+
+                DB::table('logs')->insert([
+                    'text'  => json_encode($jrStats, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                DB::table('logs')->insert([
+                    'text'  => json_encode($srStats, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                DB::table('logs')->insert([
+                    'text'  => json_encode($processedLeadKeys, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                $leadIds = array_column($leads, 'number');
+                DB::table('logs')->insert([
+                    'text'  => json_encode($leadIds, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                $leadsHelper->removeTempLeads($leadIds);
             }
         })->everyThirtyMinutes();
 

@@ -1611,6 +1611,31 @@ class TicketController extends Controller
 
     public function devTest()
     {
+        return response()->json('OFF!', 200);
+
+        $leadsHelper = app()->make(LeadsHelper::class);
+
+        $sources = GeneralSettings::where('name', 'like', 'auto_import_%')
+            ->where('value', 1)
+            ->pluck('value', 'name')
+            ->keys()
+            ->map(function ($key) {
+                return str_replace('auto_import_', '', $key);
+            })
+            ->values()
+            ->toArray();
+
+        foreach ($sources as $source) {
+            $leads = $leadsHelper->fetchLeadsFromZapier($source);
+            [$jrStats, $srStats, $processedLeadKeys] = $leadsHelper->initiateImport($leads);
+
+            $leadIds = array_column($leads, 'number');
+
+            $leadsHelper->removeTempLeads($leadIds);
+        }
+
+        return response()->json('DONE!', 200);
+
         $noAnswerStatusPeriod = '3d';
         $statusMap = Status::pluck('id', 'name');   // ['new' => 1, 'follow-up' => 2]
         $newStatusId = $statusMap->get(Status::NEW);
@@ -1627,7 +1652,7 @@ class TicketController extends Controller
             $statusMap
         );
 
-        return çjson($res, 200);
+        return response()->json($res, 200);
 
         Notifier::notifyUser(
             97,
@@ -1708,7 +1733,7 @@ class TicketController extends Controller
         [$assignmentsCountJR, $assignmentsCountSR, $tempLeads] = $this->leadsHelper->initiateImport($leads);
         //$res = $this->leadsHelper->initiateImport($leads);
 
-        $this->leadsHelper->removeZapierTempLeads($tempLeads);
+        $this->leadsHelper->removeTempLeads($tempLeads);
 
         return response()->json([$tempLeads], 200);
 

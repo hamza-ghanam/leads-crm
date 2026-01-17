@@ -13,6 +13,7 @@ use App\Models\TicketPath;
 use App\Models\User;
 use App\Notifications\SendPushNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
@@ -34,7 +35,7 @@ class LeadsHelper
         // Junior
         $jrUsers = User::role('sale')->where('status', 'permitted')->pluck('id');
         // Senior
-        $srUsers = User::role('sales-senior')->where('status', 'permitted')->pluck('id');
+        $srUsers = User::role('tele-sale')->where('status', 'permitted')->pluck('id');
 
         // Send IDs only
         [$jrUserCounts, $srUserCounts] = $this->prepareJrAndSrSalesLists($jrUsers, $srUsers, $statuses);
@@ -84,92 +85,97 @@ class LeadsHelper
         return [$assignmentsCountJR, $assignmentsCountSR];
     }
 
-    public function distributeLeads($leads, $jrUserCounts, $srUserCounts)
+    public function distributeLeads($leads, $jrUserIds, $srUserIds)
     {
-        $srUserCounts = array_keys($srUserCounts);
-        $jrCount = count($srUserCounts) > 0 ? floor(count($leads) / 3) : count($leads);
-        $duplicatedStatus = Status::whereName('duplicated')->first();
-        $newStatus = Status::where('slug', 'new')->first();
+        $jrUserIds = array_values(array_filter($jrUserIds, fn ($id) => (int)$id > 0));
+        $srUserIds = array_values(array_filter($srUserIds, fn ($id) => (int)$id > 0));
+
+        $newStatusId        = Status::where('name', Status::NEW)->value('id');
+        $duplicatedStatusId = Status::where('name', Status::DUPLICATED)->value('id');
+
         $tempLeads = [];
 
-        // Junior Distribution
-        $assignmentsCountJR = []; // To track assignments per user
+        // If there are seniors, you allocate 1/3 of leads to juniors, otherwise all to juniors.
+        // (Keeping your original business rule, but making it explicit and safe.)
+        $totalLeads = is_countable($leads) ? count($leads) : $leads->count();
+        $jrQuota    = count($srUserIds) > 0 ? (int) floor($totalLeads / 3) : $totalLeads;
 
-        $startPos = 0;
-        foreach ($leads as $key => $lead) {
-            if ($key === $jrCount) {
-                break;
-            }
+        $assignmentsCountJR = [];
+        $assignmentsCountSR = [];
 
-            if ($lead->status_id === $duplicatedStatus->id) {
-                $lead->user_id = null;
-                $tempLeads[] = $lead->key;
-                unset($lead->key);
-                $lead->save();
+        // Helper to assign a slice of leads to a rotating list of users
+        $assignSlice = function (array $userIds, iterable $slice, array &$assignmentsCount) use (
+            $duplicatedStatusId,
+            $newStatusId,
+            &$tempLeads
+        ) {
+            /*
+            if (count($userIds) === 0) {
+                // No users to assign to, just handle duplicates / temp keys collection if needed.
+                foreach ($slice as $lead) {
+                    if ((int) $lead->status_id === (int) $duplicatedStatusId) {
+                        $lead->user_id = null;
+                        $tempLeads[] = $lead->key ?? null;
 
-                continue;
-            }
+                        // If 'key' is not a DB column, avoid persisting it accidentally
+                        unset($lead->key);
 
-            // Assign a user
-            $currentUser = $jrUserCounts[$startPos]; // Get the current user ID
-            $lead->user_id = $currentUser;
-            $tempLeads[] = $lead->key;
-            unset($lead->key);  // Removes the 'key' attribute from the $lead instance
-            $lead->save();
-            $this->createAndAssignLead($lead, $newStatus->id);
-
-            // Track the assignment count
-            if (!isset($assignmentsCountJR[$currentUser])) {
-                $assignmentsCountJR[$currentUser] = 0; // Initialize if not set
-            }
-            $assignmentsCountJR[$currentUser]++; // Increment count
-
-            $startPos++;
-
-            if ($startPos === count($jrUserCounts)) {
-                $startPos = 0;
-            }
-        }
-
-        $assignmentsCountSR = []; // To track assignments per user
-
-        // Senior Distribution
-        if (count($srUserCounts) > 0) {
-            $startPos = 0;
-            foreach ($leads as $key => $lead) {
-                if ($key >= 0 and $key < $jrCount) {
-                    continue;
+                        $lead->save();
+                    }
                 }
-                if ($lead->status_id === $duplicatedStatus->id) {
+                return;
+            }
+            */
+
+            $pos = 0;
+            $userCount = count($userIds);
+
+            foreach ($slice as $lead) {
+                // Duplicated lead → unassign and skip create/assign
+                /*
+                if ((int) $lead->status_id === (int) $duplicatedStatusId) {
                     $lead->user_id = null;
-                    $tempLeads[] = $lead->key;
-                    unset($lead->key);
-                    $lead->save();
+                    $tempLeads[] = $lead->key ?? null;
 
+                    // unset($lead->key);
+
+                    $lead->save();
                     continue;
                 }
+                */
 
-                // Assign a user
-                $currentUser = $srUserCounts[$startPos];
-                $lead->user_id = $currentUser;
-                $tempLeads[] = $lead->key;
+                $currentUserId = $userIds[$pos];
+
+                $lead->user_id = $currentUserId;
+                $tempLeads[] = $lead->key ?? null;
+
                 unset($lead->key);
+
                 $lead->save();
 
-                $this->createAndAssignLead($lead, $newStatus->id);
+                $this->createAndAssignLead($lead, $newStatusId);
 
-                // Track the assignment count
-                if (!isset($assignmentsCountSR[$currentUser])) {
-                    $assignmentsCountSR[$currentUser] = 0; // Initialize if not set
-                }
-                $assignmentsCountSR[$currentUser]++; // Increment count
+                $assignmentsCount[$currentUserId] = ($assignmentsCount[$currentUserId] ?? 0) + 1;
 
-                $startPos++;
-                if ($startPos === count($srUserCounts)) {
-                    $startPos = 0;
-                }
+                $pos = ($pos + 1) % $userCount;
             }
+        };
+
+        // Split leads: first jrQuota to JR, remainder to SR (if any)
+        // Works for both arrays and collections
+        $jrLeads = is_array($leads) ? array_slice($leads, 0, $jrQuota) : $leads->take($jrQuota);
+        $srLeads = is_array($leads) ? array_slice($leads, $jrQuota) : $leads->slice($jrQuota);
+
+        // Junior distribution
+        $assignSlice($jrUserIds, $jrLeads, $assignmentsCountJR);
+
+        // Senior distribution (only if seniors exist)
+        if (count($srUserIds) > 0) {
+            $assignSlice($srUserIds, $srLeads, $assignmentsCountSR);
         }
+
+        // Clean nulls if key might be missing
+        $tempLeads = array_values(array_filter($tempLeads, fn ($v) => !is_null($v)));
 
         return [$assignmentsCountJR, $assignmentsCountSR, $tempLeads];
     }
@@ -539,7 +545,7 @@ class LeadsHelper
         }
     }
 
-    public function removeZapierTempLeads($leadIds)
+    public function removeTempLeads($leadIds)
     {
         return TempLead::whereIn('id', $leadIds)->delete();
     }
