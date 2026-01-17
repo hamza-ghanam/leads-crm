@@ -2212,6 +2212,30 @@ class TicketController extends Controller
         return response()->json(['OK' => $deletedRowsCount], 200);
     }
 
+    public function reshuffle(Request $request)
+    {
+        $data = $request->validate([
+            'lead_ids'   => ['required', 'array', 'min:1'],
+            'lead_ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $result = $this->leadsHelper->reshuffleAndAssign($data['lead_ids']);
+
+        if (!$result['ok']) {
+            return response()->json([
+                'message'     => $result['message'],
+                'missing_ids' => $result['missing_ids'] ?? [],
+            ], 422);
+        }
+
+        return response()->json([
+            'message'        => 'Reshuffled successfully',
+            'total_fetched'  => $result['total_fetched'],
+            'total_assigned' => $result['total_assigned'],
+            'assigned_stats' => $result['assigned_stats'],
+        ]);
+    }
+
     private function validateLead(Request $request)
     {
         $rules = [

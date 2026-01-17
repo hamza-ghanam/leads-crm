@@ -61,6 +61,7 @@ Route::prefix('tickets')->group(function () {
     Route::get('archived', [TicketController::class, 'indexArchived'])->name('tickets.archived');
     Route::post('multipleForward', [TicketController::class, 'multipleForward'])->name('tickets.multipleForward');
     Route::post('restoreLeads', [TicketController::class, 'restoreArchivedLeads'])->name('tickets.restore');
+    Route::post('reshuffle', [TicketController::class, 'reshuffle'])->name('tickets.reshuffle');
 //    Route::match(['get', 'post'], '/report', [TicketController::class, 'getReport'])->name('tickets.report');
 
 //    Route::get('vehicles/{userId}', 'UserController@getVehicles')->name('user.vehicles');

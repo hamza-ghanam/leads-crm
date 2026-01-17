@@ -51,26 +51,19 @@
                             <div class="col-6 col-md-3 mb-2">
                                 <button type="button" id="enable-fwd"
                                         class="btn btn-secondary btn-block">
-                                    Enable multi forward
+                                    Forward
                                 </button>
                             </div>
 
 
                             {{-- Excel Import --}}
                             <div class="col-6 col-md-3 mb-2">
-                                <a href="{{ route('tickets.showImports', ['excel']) }}"
+                                <a href="#" id="reshuffle-btn"
                                    class="btn btn-info btn-block">
-                                    Excel Import
+                                    Reshuffle
                                 </a>
                             </div>
 
-                            {{-- Facebook Import --}}
-                            <div class="col-6 col-md-3 mb-2">
-                                <a href="{{ route('tickets.showImports', ['facebook']) }}"
-                                   class="btn btn-primary btn-block">
-                                    Facebook Import
-                                </a>
-                            </div>
                             @endhasanyrole
                         </div>
                     </div>
@@ -264,7 +257,7 @@
                                     <td class="fwd-leads" style="display:none !important;">
                                         <div class="form-check">
                                             <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
-                                                   value="{{ $ticket->id }}" class="form-check-input"/>
+                                                   value="{{ $ticket->id }}" class="form-check-input lead-checkbox"/>
                                         </div>
                                     </td>
                                     <td><a href="{{ route('tickets.show', [$ticket->id]) }}">{{ $ticket->id }}</a>
@@ -595,6 +588,8 @@
 
 
         const fwdBtn = document.getElementById('enable-fwd');
+        const reshufBtn = document.getElementById('reshuffle-btn');
+
         const boxes = document.querySelectorAll('.fwd-leads');
 
         let enabledByBtn = false;
@@ -622,34 +617,48 @@
             });
         }, false);
 
-        function toggleFwdBtn(fwdBtn, boxes) {
-            if (fwdBtn.innerText === 'Enable multi forward') {
-                fwdBtn.innerText = 'Disable multi forward';
-                fwdBtn.classList.remove('btn-secondary');
-                fwdBtn.classList.add('btn-danger');
-            } else {
-                fwdBtn.innerText = 'Enable multi forward';
-                fwdBtn.classList.remove('btn-danger');
-                fwdBtn.classList.add('btn-secondary');
+        fwdBtn.addEventListener('click', () => {
+            const checked = document.querySelectorAll('.lead-checkbox:checked');
+
+            if (checked.length === 0) {
+                Toast.fire({
+                    icon: 'warning',
+                    title: 'No selected leads!'
+                });
+
+                return;
             }
 
-            boxes.forEach(box => {
-                if (box.style.display === '') {
-                    enabledByBtn = false;
-                    box.style.display = 'none';
-                } else {
-                    enabledByBtn = true;
-                    box.style.display = '';
-                }
-            });
-        }
-
-        fwdBtn.addEventListener('click', () => {
-            toggleFwdBtn(fwdBtn, boxes);
+            $('#modal-lg').modal('show');
         }, false);
 
-        document.getElementById('submit-fwd').addEventListener('click', () => {
-            $('#modal-lg').modal('show');
+        reshufBtn.addEventListener('click', () => {
+            const checked = document.querySelectorAll('.lead-checkbox:checked');
+
+            if (checked.length === 0) {
+                Toast.fire({
+                    icon: 'warning',
+                    title: 'No selected leads!'
+                });
+
+                return;
+            }
+
+            const leadIds = Array.from(checked).map(cb => parseInt(cb.value));
+
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, reshuffle!'
+            }).then(async (result) => {
+                if (result.value) {
+                    reshuffleLeads(leadIds);
+                }
+            });
         }, false);
 
         const selectAll = document.getElementById('select-all');
@@ -666,5 +675,48 @@
             document.getElementById('select-all-lbl').innerHTML = isSelectAllChecked ? 'Deselect all' : 'Select all';
         }, false);
 
+        function reshuffleLeads(leadIds) {
+            const token = '{{ csrf_token() }}';
+
+            axios.post('/tickets/reshuffle', {
+                lead_ids: leadIds
+            }, {
+                withCredentials: true,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-Token': token,
+                }
+            })
+                .then(response => {
+                    const data = response.data;
+
+                    console.log('Reshuffle result:', data);
+
+                    Toast.fire({
+                        icon: 'success',
+                        title: `Reshuffled successfully. Assigned: ${data.total_assigned}`,
+                    });
+
+                    setTimeout(function () {
+                        window.location.reload();
+                    }, 2000);
+                })
+                .catch(error => {
+                    console.error(error);
+
+                    if (error.response && error.response.data) {
+                        Toast.fire({
+                            icon: 'error',
+                            title: error.response.data.message || 'Reshuffle failed.'
+                        });
+                    } else {
+                        Toast.fire({
+                            icon: 'error',
+                            title: 'Network or server error.'
+                        });
+                    }
+                });
+        }
     </script>
 @endsection

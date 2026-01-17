@@ -13,6 +13,7 @@ use App\Models\TicketPath;
 use App\Models\User;
 use App\Notifications\SendPushNotification;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Kreait\Firebase\Exception\FirebaseException;
@@ -605,4 +606,364 @@ class LeadsHelper
     }
 
 
+    public function assignLeadsBalanced(array $leadIds): array
+    {
+        // 0) تنظيف المدخلات
+        $leadIds = array_values(array_unique(array_map('intval', $leadIds)));
+        $leadIds = array_values(array_filter($leadIds, fn($id) => $id > 0));
+
+        if (empty($leadIds)) {
+            return [
+                'ok' => false,
+                'message' => 'No valid lead IDs provided.',
+                'missing_ids' => [],
+                'assigned' => [],
+            ];
+        }
+
+        // 1) تحقق من وجود الـ IDs فعلاً
+        $existingIds = Ticket::query()
+            ->whereIn('id', $leadIds)
+            ->pluck('id')
+            ->all();
+
+        $missingIds = array_values(array_diff($leadIds, $existingIds));
+
+        if (!empty($missingIds)) {
+            // إذا بدك تتجاهل المفقود وتكمل، شيل هالـ return وخليها warning.
+            return [
+                'ok' => false,
+                'message' => 'Some lead IDs do not exist in tickets table.',
+                'missing_ids' => $missingIds,
+                'assigned' => [],
+            ];
+        }
+
+        // 2) جيب الـ leads (Tickets)
+        $leads = Ticket::query()
+            ->whereIn('id', $leadIds)
+            ->get(['id', 'user_id', 'status_id']); // زيد أعمدة إذا بدك
+
+        // 3) statuses اللي بنحسب عليها الحمل
+        $statusIds = Status::query()
+            ->whereIn('slug', ['new', 'follow-up'])
+            ->pluck('id')
+            ->all();
+
+        // 4) جيب المستخدمين (sale + tele-sale) permitted
+        // ملاحظة: role() من Spatie تقبل array
+        $users = User::query()
+            ->role(['sale', 'tele-sale'])
+            ->where('status', 'permitted')
+            ->get(['id', 'name']);
+
+        if ($users->isEmpty()) {
+            return [
+                'ok' => false,
+                'message' => 'No eligible users (sale/tele-sale) found.',
+                'missing_ids' => [],
+                'assigned' => [],
+            ];
+        }
+
+        $userIds = $users->pluck('id')->all();
+
+        // 5) احسب الحمل الحالي لكل user باستعلام واحد
+        $loads = Ticket::query()
+            ->select('user_id', DB::raw('COUNT(*) as cnt'))
+            ->whereIn('user_id', $userIds)
+            ->whereIn('status_id', $statusIds)
+            ->groupBy('user_id')
+            ->pluck('cnt', 'user_id')   // [user_id => cnt]
+            ->all();
+
+        // جهز عدادات تبدأ بالحمل الحالي (اللي مو موجود نخليه 0)
+        $current = [];
+        foreach ($userIds as $uid) {
+            $current[$uid] = (int)($loads[$uid] ?? 0);
+        }
+
+        // 6) التوزيع المتوازن (Greedy: دائماً اختار أقل user حمل)
+        // راح نطلع assignments: [ticket_id => user_id]
+        $assignments = [];
+        $assignedCounts = array_fill_keys($userIds, 0);
+
+        // لتحسين الأداء: رتّب users by current load مبدئياً
+        // وبكل مرة نختار min (لأعداد صغيرة، هذا كافي. لو آلاف users نعمل heap)
+        foreach ($leads as $lead) {
+            // find user with min current load
+            $minUserId = array_key_first($current);
+            $minLoad = $current[$minUserId];
+
+            foreach ($current as $uid => $load) {
+                if ($load < $minLoad) {
+                    $minLoad = $load;
+                    $minUserId = $uid;
+                }
+            }
+
+            $assignments[$lead->id] = $minUserId;
+            $assignedCounts[$minUserId]++;
+
+            // update load
+            $current[$minUserId]++;
+        }
+
+        // 7) طبّق التحديثات (Bulk update عبر CASE WHEN)
+        DB::transaction(function () use ($assignments) {
+            if (empty($assignments)) return;
+
+            $ids = array_keys($assignments);
+
+            $caseSql = "CASE id ";
+            $bindings = [];
+            foreach ($assignments as $ticketId => $userId) {
+                $caseSql .= "WHEN ? THEN ? ";
+                $bindings[] = $ticketId;
+                $bindings[] = $userId;
+            }
+            $caseSql .= "END";
+
+            // update tickets set user_id = CASE ... WHERE id IN (...)
+            DB::table('tickets')
+                ->whereIn('id', $ids)
+                ->update([
+                    'user_id' => DB::raw($caseSql),
+                    'updated_at' => now(),
+                ], $bindings); // ⚠️ لو ORM ما يقبل bindings هون، نعمل statement مباشرة (أعطيكها إذا لزم)
+        });
+
+        // 8) رجّع تقرير واضح
+        // (assignedCounts فيها فقط الجديد، current فيها (load بعد التوزيع))
+        $result = [
+            'ok' => true,
+            'missing_ids' => [],
+            'total_leads' => count($leadIds),
+            'eligible_users' => $users->count(),
+            'assigned_counts' => collect($assignedCounts)->filter(fn($v) => $v > 0)->all(),
+            'final_loads' => $current, // الحمل بعد التوزيع (اختياري)
+            'assignments' => $assignments, // ticket_id => user_id (اختياري)
+        ];
+
+        return $result;
+    }
+
+    public function reshuffleAndAssign(array $leadIds): array
+    {
+        // 0) Sanitize IDs
+        $leadIds = array_values(array_unique(array_map('intval', $leadIds)));
+        $leadIds = array_values(array_filter($leadIds, fn ($id) => $id > 0));
+
+        if (empty($leadIds)) {
+            return [
+                'ok' => false,
+                'message' => 'No valid lead IDs provided.',
+                'missing_ids' => [],
+            ];
+        }
+
+        // 1) Validate existence + fetch tickets (need phone_number for duplicate detection)
+        $tickets = Ticket::query()
+            ->whereIn('id', $leadIds)
+            ->get(['id', 'user_id', 'status_id', 'phone_number']);
+
+        $existingIds = $tickets->pluck('id')->all();
+        $missingIds  = array_values(array_diff($leadIds, $existingIds));
+
+        if (!empty($missingIds)) {
+            return [
+                'ok' => false,
+                'message' => 'Some lead IDs do not exist in tickets table.',
+                'missing_ids' => $missingIds,
+            ];
+        }
+
+        // 2) Status IDs
+        $newStatusId = Status::query()
+            ->where('name', Status::NEW)
+            ->value('id');
+
+        $duplicatedStatusId = Status::query()
+            ->where('name', Status::DUPLICATED)
+            ->value('id');
+
+        if (!$newStatusId || !$duplicatedStatusId) {
+            return [
+                'ok' => false,
+                'message' => 'Required statuses not found (new/duplicated).',
+                'missing_ids' => [],
+            ];
+        }
+
+        $loadStatusIds = Status::query()
+            ->whereIn('name', [Status::NEW, Status::FOLLOW_UP])
+            ->pluck('id')
+            ->all();
+
+        // 3) Eligible users: sale + tele-sale (permitted)
+        $eligibleUserIds = User::query()
+            ->role(['sale', 'tele-sale'])
+            ->where('status', 'permitted')
+            ->pluck('id')
+            ->map(fn ($v) => (int) $v)
+            ->filter(fn ($v) => $v > 0)
+            ->values()
+            ->all();
+
+        if (empty($eligibleUserIds)) {
+            return [
+                'ok' => false,
+                'message' => 'No eligible users found (sale/tele-sale, permitted).',
+                'missing_ids' => [],
+            ];
+        }
+
+        // 4) Current load per user (new/follow-up) - one query
+        $loads = Ticket::query()
+            ->select('user_id', DB::raw('COUNT(*) as cnt'))
+            ->whereIn('user_id', $eligibleUserIds)
+            ->whereIn('status_id', $loadStatusIds)
+            ->groupBy('user_id')
+            ->pluck('cnt', 'user_id')
+            ->all();
+
+        $currentLoad = [];
+        foreach ($eligibleUserIds as $uid) {
+            $currentLoad[$uid] = (int) ($loads[$uid] ?? 0);
+        }
+
+        // 5) Sort eligible users by load ASC (tie-breaking baseline)
+        uasort($currentLoad, fn ($a, $b) => $a <=> $b);
+        $eligibleUserIds = array_keys($currentLoad);
+
+        // 6) Detect which phone numbers are duplicated in DB (before updating)
+        $phones = $tickets->pluck('phone_number')
+            ->map(fn($p) => is_string($p) ? trim($p) : $p)
+            ->filter(fn($p) => !empty($p))
+            ->unique()
+            ->values()
+            ->all();
+
+        $dupPhones = [];
+        if (!empty($phones)) {
+            $dupPhones = Ticket::query()
+                ->whereIn('phone_number', $phones)
+                ->where('phone_number', '!=', '')
+                ->groupBy('phone_number')
+                ->havingRaw('COUNT(*) > 1')
+                ->pluck('phone_number')
+                ->all();
+        }
+
+        $dupPhonesSet = array_fill_keys($dupPhones, true);
+
+        // 7) Build next_status per ticket
+        $nextStatusByTicketId = [];
+        foreach ($tickets as $t) {
+            $phone = is_string($t->phone_number) ? trim($t->phone_number) : (string)($t->phone_number ?? '');
+            $nextStatusByTicketId[$t->id] = isset($dupPhonesSet[$phone]) ? $duplicatedStatusId : $newStatusId;
+        }
+
+        // 8) Balanced assignment (pick least-loaded, but skip if same as prev_user)
+        $assignments   = []; // [ticket_id => user_id]
+        $assignedStats = []; // [user_id => newly_assigned_count]
+
+        foreach ($tickets as $t) {
+            $prevUserId = (int) ($t->user_id ?? 0);
+
+            $selectedUserId = null;
+            $selectedLoad   = null;
+
+            foreach ($eligibleUserIds as $uid) {
+                $uid = (int) $uid;
+
+                if ($uid === $prevUserId) {
+                    continue; // must NOT assign to same previous user
+                }
+
+                $load = $currentLoad[$uid] ?? 0;
+
+                if ($selectedUserId === null || $load < $selectedLoad) {
+                    $selectedUserId = $uid;
+                    $selectedLoad   = $load;
+                }
+            }
+
+            if ($selectedUserId === null) {
+                return [
+                    'ok' => false,
+                    'message' => 'Reshuffle not possible: only one eligible user and it matches the current assigned user.',
+                    'missing_ids' => [],
+                ];
+            }
+
+            $assignments[$t->id] = $selectedUserId;
+            $assignedStats[$selectedUserId] = ($assignedStats[$selectedUserId] ?? 0) + 1;
+            $currentLoad[$selectedUserId]++; // update in-memory load
+        }
+
+        // 9) Apply changes atomically (tickets update + ticket_paths insert)
+        DB::transaction(function () use ($tickets, $assignments, $nextStatusByTicketId) {
+            $ids = array_keys($assignments);
+            if (empty($ids)) return;
+
+            $now = now();
+
+            // CASE for user_id
+            $caseUser = "CASE id ";
+            foreach ($assignments as $ticketId => $userId) {
+                $ticketId = (int) $ticketId;
+                $userId   = (int) $userId;
+                $caseUser .= "WHEN {$ticketId} THEN {$userId} ";
+            }
+            $caseUser .= "END";
+
+            // CASE for status_id
+            $caseStatus = "CASE id ";
+            foreach ($nextStatusByTicketId as $ticketId => $statusId) {
+                $ticketId = (int) $ticketId;
+                $statusId = (int) $statusId;
+                $caseStatus .= "WHEN {$ticketId} THEN {$statusId} ";
+            }
+            $caseStatus .= "END";
+
+            DB::table('tickets')
+                ->whereIn('id', $ids)
+                ->update([
+                    'user_id'    => DB::raw($caseUser),
+                    'status_id'  => DB::raw($caseStatus),
+                    'updated_at' => $now,
+                ]);
+
+            // Insert ticket_paths
+            $rows = [];
+            foreach ($tickets as $t) {
+                if (!isset($assignments[$t->id])) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'ticket_id'   => (int) $t->id,
+                    'prev_user'   => $t->user_id,
+                    'next_user'   => (int) $assignments[$t->id],
+                    'prev_status' => $t->status_id,
+                    'next_status' => (int) $nextStatusByTicketId[$t->id],
+                    'comment'     => 'Reshuffled',
+                    'created_at'  => $now,
+                    'updated_at'  => $now,
+                ];
+            }
+
+            DB::table('ticket_paths')->insert($rows);
+        });
+
+        return [
+            'ok' => true,
+            'message' => 'OK',
+            'missing_ids' => [],
+            'total_fetched' => count($leadIds),
+            'total_assigned' => array_sum($assignedStats),
+            'assigned_stats' => $assignedStats,
+        ];
+    }
 }
