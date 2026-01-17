@@ -8,7 +8,7 @@
     <title>Leads CRM - Management Dashboard</title>
     <meta property="og:title" content="Leads CRM">
     <meta property="og:description" content="Manage you Leads from different sources using our advanced CRM">
-    <meta property="og:image" content="{{ asset('dist/img/app_thumb.png') }}">
+    <meta property="og:image" content="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}">
     <meta property="og:url" content="{{ env('APP_URL') }}">
     <meta property="og:type" content="website">
 
@@ -73,9 +73,9 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{{ asset('dist/img/favicons/favicon.ico') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}?v={{ config('app.build_version') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}?v={{ config('app.build_version') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}?v={{ config('app.build_version') }}">
     <link rel="manifest" href="{{ asset('dist/img/favicons/site.webmanifest') }}">
 </head>
 <body class=" hold-transition sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed
