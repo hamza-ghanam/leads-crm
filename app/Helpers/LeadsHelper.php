@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use App\Facades\Notifier;
 use App\Mail\LeadNotifyMail;
 use App\Models\GeneralSettings;
 use App\Models\SalesCampaign;
@@ -730,8 +731,71 @@ class LeadsHelper
                 ->update([
                     'user_id' => DB::raw($caseSql),
                     'updated_at' => now(),
-                ], $bindings); // ⚠️ لو ORM ما يقبل bindings هون، نعمل statement مباشرة (أعطيكها إذا لزم)
+                ], $bindings);
         });
+
+        foreach ($assignments as $ticketId => $newUserId) {
+            $lead = $leads->firstWhere('id', $ticketId);
+            if (!$lead) {
+                continue;
+            }
+
+            // Safety: لا نرسل إذا ما تغير المستخدم
+            if ((int)$lead->user_id === (int)$newUserId) {
+                continue;
+            }
+
+            $nextUser = User::find($newUserId);
+            if (!$nextUser) {
+                continue;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 📧 Send Mail
+            |--------------------------------------------------------------------------
+            */
+            $mailData = [
+                'title'   => 'New Lead',
+                'message' => 'A new lead has been assigned by super-admin to you!',
+                'user'    => $nextUser->name ?? '',
+                'ticket'  => $lead->id,
+            ];
+
+            try {
+                $this->sendLeadMail($nextUser->email, $mailData);
+            } catch (\Throwable $e) {
+                // Log فقط – لا تكسر العملية
+                \Log::error('Lead mail failed', [
+                    'ticket_id' => $lead->id,
+                    'user_id'   => $nextUser->id,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 🔔 Send Notification
+            |--------------------------------------------------------------------------
+            */
+            try {
+                Notifier::notifyUser(
+                    $nextUser,
+                    'New ticket',
+                    "A new ticket has been assigned to you #{$lead->id}",
+                    route('tickets.show', $lead->id),
+                    'ticket_new',
+                    ['ticket_id' => $lead->id],
+                    null
+                );
+            } catch (\Throwable $e) {
+                \Log::error('Notification failed', [
+                    'ticket_id' => $lead->id,
+                    'user_id'   => $nextUser->id,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+        }
 
         // 8) رجّع تقرير واضح
         // (assignedCounts فيها فقط الجديد، current فيها (load بعد التوزيع))
