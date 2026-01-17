@@ -1936,7 +1936,7 @@ class TicketController extends Controller
 
     public function storeLead(Request $request)
     {
-        if (!$request->header('X-Make-Token') || $request->header('X-Make-Token') !== env('MAKE_SECRET')) {
+        if (!$request->header('X-Make-Token') || $request->header('X-Make-Token') !== config('app.auth_token')) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 

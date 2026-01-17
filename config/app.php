@@ -235,4 +235,5 @@ return [
     ],
 
     'build_version' => env('BUILD_VERSION', '1'),
+    'auth_token' => env('MAKE_SECRET', 'xyz'),
 ];
