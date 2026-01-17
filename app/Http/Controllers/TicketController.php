@@ -220,10 +220,10 @@ class TicketController extends Controller
                 ->orderBy('updated_at', 'DESC')
                 ->get()
                 ->groupBy('ticket_id')
-                ->map(fn ($rows) => $rows->first());
+                ->map(fn($rows) => $rows->first());
 
         $isSalesUser = auth()->user()->hasAnyRole(['sale', 'tele-sale']);
-        $authUserId  = (int) auth()->id();
+        $authUserId = (int)auth()->id();
 
         foreach ($tickets as $ticket) {
             $ticket->user = $ticket->user ?: [];
@@ -235,11 +235,11 @@ class TicketController extends Controller
             }
 
             // Sales & tele‑sale can only see their own follow‑ups
-            if ($isSalesUser && (int) $tPath->next_user !== $authUserId) {
+            if ($isSalesUser && (int)$tPath->next_user !== $authUserId) {
                 continue;
             }
 
-            $comment = (string) ($tPath->comment ?? '');
+            $comment = (string)($tPath->comment ?? '');
             $ticket->lastFollowUp = mb_strlen($comment) <= 75
                 ? $comment
                 : mb_substr($comment, 0, 75) . '...';
@@ -533,14 +533,14 @@ class TicketController extends Controller
 
         $paths->transform(function ($path) use ($isSalesUser) {
             $sameUser = $path->prevUser && $path->nextUser
-                && (int) $path->prevUser->id === (int) $path->nextUser->id;
+                && (int)$path->prevUser->id === (int)$path->nextUser->id;
 
             $path->show_prev_status_block = $isSalesUser ? $sameUser : true;
 
             return $path;
         });
 
-        $ticketPaths = $paths->groupBy(fn ($path) => $path->created_at->toDateString());
+        $ticketPaths = $paths->groupBy(fn($path) => $path->created_at->toDateString());
 
         $ticket->extra_data = json_decode($ticket->extra_data, true); // Decode JSON
 
@@ -973,7 +973,7 @@ class TicketController extends Controller
         parent::hasPermission('facebook import');
 
         if (!in_array($source, ['facebook', 'tiktok', 'googleAds'])) {
-            return response()->json(['ERROR' => 'Unkown Source'], 404);
+            return response()->json(['ERROR' => 'Unknown Source'], 404);
         }
 
         $rules = [
@@ -1006,8 +1006,8 @@ class TicketController extends Controller
             $leads = TempLead::whereIn('id', $leadIds)->get();
 
             // return response()->json(['OK' => $request->details], 200);
-            $newStatus = Status::where('slug', 'new')->first()->id;
-            // $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+            $newStatus = Status::where('name', Status::NEW)->first()->id;
+            $duplicatedStatus = Status::where('name', Status::DUPLICATED)->first()->id;
 
             foreach ($leads as $rawLead) {
                 if (!User::find($request->details[$rawLead->id])) {
@@ -1023,33 +1023,33 @@ class TicketController extends Controller
                     ->where('id', '!=', $rawLead->id)
                     ->first();
 
-                if (!$dupLead && !$dupTempLead) {
-                    $lead = Ticket::create([
-                        'number' => $rawLead->number,
-                        'user_id' => $request->details[$rawLead->id],
-                        'ad_id' => $rawLead->ad_id,
-                        'ad_name' => $rawLead->ad_name,
-                        'adset_id' => $rawLead->ad_name,
-                        'adset_name' => $rawLead->adset_id,
-                        'campaign_id' => $rawLead->campaign_id,
-                        'campaign_name' => $rawLead->campaign_name,
-                        'form_id' => $rawLead->form_id,
-                        'form_name' => $rawLead->form_name ?? '',
-                        'is_organic' => $rawLead->is_organic ?? '',
-                        'platform' => $rawLead->platform,
-                        'full_name' => $rawLead->full_name,
-                        'phone_number' => $rawLead->phone_number,
-                        'email' => $rawLead->email,
-                        'job_title' => $rawLead->job_title ?? '',
-                        'status_id' => $newStatus,
-                        'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
-                        'assigner_id' => $request->manual ? auth()->user()->id : null,
-                        'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
-                        'extra_data' => $rawLead->extra_data,
-                    ]);
+                //  if (!$dupLead && !$dupTempLead) {
+                $lead = Ticket::create([
+                    'number' => $rawLead->number,
+                    'user_id' => $request->details[$rawLead->id],
+                    'ad_id' => $rawLead->ad_id,
+                    'ad_name' => $rawLead->ad_name,
+                    'adset_id' => $rawLead->ad_name,
+                    'adset_name' => $rawLead->adset_id,
+                    'campaign_id' => $rawLead->campaign_id,
+                    'campaign_name' => $rawLead->campaign_name,
+                    'form_id' => $rawLead->form_id,
+                    'form_name' => $rawLead->form_name ?? '',
+                    'is_organic' => $rawLead->is_organic ?? '',
+                    'platform' => $rawLead->platform,
+                    'full_name' => $rawLead->full_name ?? 'N/A',
+                    'phone_number' => $rawLead->phone_number ?? '0',
+                    'email' => $rawLead->email,
+                    'job_title' => $rawLead->job_title ?? '',
+                    'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
+                    'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
+                    'assigner_id' => $request->manual ? auth()->user()->id : null,
+                    'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
+                    'extra_data' => $rawLead->extra_data,
+                ]);
 
-                    $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
-                }
+                $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
+                // }
 
                 TempLead::destroy($rawLead->id);
             }
