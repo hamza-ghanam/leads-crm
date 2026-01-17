@@ -1603,6 +1603,17 @@ class TicketController extends Controller
                 // Mail::to($lead->user->email)->send(new LeadNotifyMail($data));
                 $this->sendLeadMail($lead->user->email, $data);
 
+                // Notification
+                Notifier::notifyUser(
+                    $lead->user,
+                    'New ticket',
+                    "A new ticket has been assigned to you #{$lead->id}",
+                    route('tickets.show', $lead->id),
+                    'ticket_new',
+                    ['ticket_id' => $lead->id],
+                    null
+                );
+
             }
         }
 
