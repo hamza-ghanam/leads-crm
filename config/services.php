@@ -30,4 +30,9 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'facebook' => [
+        'leads_verify_token' => env('FB_LEADS_VERIFY_TOKEN'),
+        'app_secret' => env('FB_APP_SECRET'),
+    ],
+
 ];
