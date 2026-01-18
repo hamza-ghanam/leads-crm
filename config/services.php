@@ -31,6 +31,8 @@ return [
     ],
 
     'facebook' => [
+        'graph_version' => env('FB_GRAPH_VERSION', 'v24.0'),
+        'system_user_token' => env('FB_SYSTEM_USER_TOKEN'),
         'leads_verify_token' => env('FB_LEADS_VERIFY_TOKEN'),
         'app_secret' => env('FB_APP_SECRET'),
     ],

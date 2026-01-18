@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ProcessMetaLeadWebhookJob;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,8 @@ class MetaController extends Controller
             'level' => 'info',
         ]);
 
-        return response('EVENT_RECEIVED', SymfonyResponse::HTTP_OK)
-            ->header('Content-Type', 'text/plain');
+        ProcessMetaLeadWebhookJob::dispatch($request->all(), $request->headers->all());
+
+        return response('EVENT_RECEIVED', Response::HTTP_OK)->header('Content-Type', 'text/plain');
     }
 }
