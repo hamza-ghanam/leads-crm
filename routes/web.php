@@ -113,3 +113,5 @@ Route::middleware(['auth', 'role:super-admin'])->group(function () {
 Route::get('/test', function () {
     return view('test');
 });
+
+Route::view('/privacy-policy', 'privacy');
