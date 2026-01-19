@@ -40,7 +40,7 @@ class MetaController extends Controller
                 'headers' => $request->headers->all(),
                 'payload' => $request->all()
             ], JSON_THROW_ON_ERROR),
-            'level' => 'info',
+            'level' => 'meta_log',
         ]);
 
         ProcessMetaLeadWebhookJob::dispatch($request->all(), $request->headers->all());
