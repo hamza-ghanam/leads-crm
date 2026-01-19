@@ -35,11 +35,17 @@ class MetaController extends Controller
             'payload' => $request->all(),
         ]);
 
-        DB::table('logs')->insert([
-            'text' => json_encode([
+        try {
+            $text = json_encode([
                 'headers' => $request->headers->all(),
-                'payload' => $request->all()
-            ], JSON_THROW_ON_ERROR),
+                'payload' => $request->all(),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Throwable $e) {
+            $text = '{"error":"json_encode_failed"}';
+        }
+
+        DB::table('logs')->insert([
+            'text' => $text,
             'level' => 'meta_log',
         ]);
 
