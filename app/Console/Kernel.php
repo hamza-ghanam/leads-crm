@@ -87,7 +87,7 @@ class Kernel extends ConsoleKernel
                         Notifier::notifyUser(
                             $ticket->user,
                             'Follow up reminder',
-                      ى      "You have a follow up on ticket #{$ticket->id}",
+                            "You have a follow up on ticket #{$ticket->id}",
                             route('tickets.show', $ticket->id),
                             'ticket_follow_up',
                             ['ticket_id' => $ticket->id],
