@@ -82,7 +82,7 @@
 
 <footer>
     <main style="padding:0;max-width:900px">
-        <p class="mb-0">WRS AE © <span id="y"></span> All rights reserved.</p>
+        <p class="mb-0">{{ config('app.name') }} © <span id="y"></span> All rights reserved.</p>
     </main>
 </footer>
 
