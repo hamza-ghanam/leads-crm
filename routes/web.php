@@ -147,7 +147,7 @@ Route::middleware('auth')->prefix('brokers')->group(function () {
     Route::get('show/{id}', [BrokerController::class, 'show'])->name('brokers.show');
     Route::get('add', [BrokerController::class, 'create'])->name('brokers.add');
     Route::post('invite', [OneTimeLinkController::class, 'generateLink'])->name('brokers.invite');
-    Route::delete('delete/{id}', [OneTimeLinkController::class, 'destroy'])->name('brokers.delete');
+    Route::delete('delete/{id}', [BrokerController::class, 'destroy'])->name('brokers.delete');
 
     Route::get('docs/{doc}', [BrokerController::class, 'download'])
         ->name('brokers.docs.download');
