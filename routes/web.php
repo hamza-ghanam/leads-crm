@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\BrokerController;
+use App\Http\Controllers\OneTimeLinkController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\SalesCampaignController;
 use App\Http\Controllers\GeneralSettingsController;
@@ -50,7 +52,7 @@ Route::prefix('tickets')->group(function () {
     Route::post('importFromExcel', [TicketController::class, 'importFromExcelFile'])->name('tickets.excel');
     Route::get('showImports/{source}', [TicketController::class, 'showImportLeads'])->name('tickets.showImports');
     //Route::get('importLeads/{source}', [TicketController::class, 'importLeadsFromZapier'])->name('tickets.doImport');
-   // Route::post('importLeads/{source}', [TicketController::class, 'importLeadsFromZapierV2'])->name('tickets.doImport');
+    // Route::post('importLeads/{source}', [TicketController::class, 'importLeadsFromZapierV2'])->name('tickets.doImport');
     Route::post('importLeads/{source}', [TicketController::class, 'importLeadsFromZapierV3'])->name('tickets.doImport');
     Route::put('ignoreLeads/{type}', [TicketController::class, 'ignoreLeads'])->name('tickets.ignoreLeads');
     Route::post('moveForward/{id}', [TicketController::class, 'moveForward'])->name('tickets.moveForward');
@@ -71,7 +73,7 @@ Route::get('/ttt', function () {
     return view('ticketPDF');
 });
 
-Route::get('/email', function (){
+Route::get('/email', function () {
     return new LeadNotifyMail('test@gmail.com');
 })->name('tickets.email');
 
@@ -91,8 +93,8 @@ Route::get('devTest', [TicketController::class, 'devTest'])->name('devTest');
 
 
 Route::post('/fcm/token', [FcmController::class, 'store'])->name('update.token')->middleware('auth');
-Route::post('/send-notification',[WebNotificationController::class,'notification'])->name('send.notification');
-Route::get('/notify',[WebNotificationController::class,'sendNotification'])->name('notify');
+Route::post('/send-notification', [WebNotificationController::class, 'notification'])->name('send.notification');
+Route::get('/notify', [WebNotificationController::class, 'sendNotification'])->name('notify');
 
 Route::middleware('auth')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])
@@ -115,3 +117,38 @@ Route::get('/test', function () {
 });
 
 Route::view('/privacy-policy', 'privacy');
+
+//  Brokers
+Route::prefix('brokers')->group(function () {
+    Route::get('register/success', function () {
+        if (!session()->pull('registration_success')) {
+            abort(403, 'Registration failed');
+        }
+        return view('brokers.register-success');
+    })->name('brokers.register.success');
+
+    Route::get('agreement/success', function () {
+        if (!session()->pull('agreement_success')) {
+            abort(403, 'Upload failed');
+        }
+        return view('brokers.agreement-success');
+    })->name('brokers.agreement.success');
+
+    Route::get('register/{token}', [BrokerController::class, 'registerForm'])->name('brokers.register.form');
+    Route::post('register/{token}', [BrokerController::class, 'register'])->name('brokers.register');
+
+    Route::get('upload-signed-agreement', [BrokerController::class, 'uploadSignedAgreementForm'])->name('brokers.agreement.form');
+    Route::post('upload-signed-agreement', [BrokerController::class, 'uploadSignedAgreement'])->name('brokers.agreement.upload');
+
+});
+
+Route::middleware('auth')->prefix('brokers')->group(function () {
+    Route::get('/', [BrokerController::class, 'index'])->name('brokers.index');
+    Route::get('show/{id}', [BrokerController::class, 'show'])->name('brokers.show');
+    Route::get('add', [BrokerController::class, 'create'])->name('brokers.add');
+    Route::post('invite', [OneTimeLinkController::class, 'generateLink'])->name('brokers.invite');
+    Route::delete('delete/{id}', [OneTimeLinkController::class, 'destroy'])->name('brokers.delete');
+
+    Route::get('docs/{doc}', [BrokerController::class, 'download'])
+        ->name('brokers.docs.download');
+});

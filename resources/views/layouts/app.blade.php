@@ -346,6 +346,36 @@
                         </ul>
                     </li>
 
+                    <!-- The best route -->
+                    <li class="nav-item has-treeview {{ Route::is('brokers.*') ? 'menu-open' : '' }}">
+                        <a href="#"
+                           class="nav-link {{ Route::is('brokers.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-user-secret"></i>
+                            <p>
+                                Brokers
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('brokers.index') }}"
+                                   class="nav-link {{ Route::is('brokers.index') ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Show All</p>
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('brokers.add') }}"
+                                   class="nav-link {{ Route::is('brokers.add') ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Add New Broker</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
                     <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'settings') !== false)  ? 'menu-open' : '' }}">
                         <a href=""
                            class="nav-link {{ strpos(Route::currentRouteName(), 'settings') !== false  ? 'active' : ''}}">
