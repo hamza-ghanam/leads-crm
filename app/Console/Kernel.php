@@ -100,6 +100,14 @@ class Kernel extends ConsoleKernel
                 });
         })->everyMinute();
 
+        $schedule->call(function () {
+            DB::table('logs')->insert([
+                'text' => 'test cron: ' . now()->format('d/m/Y H:i:s') ,
+                'level' => 'info',
+            ]);
+
+        })->everyMinute();
+
         ////// 2. Auto Import from Social Media
         $schedule->call(function () use ($leadsHelper) {
             if (!$this->withinWorkingWindow()) {
