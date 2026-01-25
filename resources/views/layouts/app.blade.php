@@ -452,7 +452,7 @@
         <strong>Copyright &copy; 2021 - {{ date("Y") }} | <a href="#">Leads CRM</a>.</strong>
         All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
-            <b>Version</b> {{ env('APP_VERSION') }}
+            <b>Version</b> {{ config('app.build_version') }}
         </div>
     </footer>
 </div>
