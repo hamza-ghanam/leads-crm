@@ -86,10 +86,11 @@ class LeadAutoAssignService
             return ['reassigned' => 0, 'dead' => 0, 'skipped' => 0];
         }
 
-        $nfStatusIds = $statusesByName
-            ->only([Status::NEW, Status::FOLLOW_UP])
-            ->pluck('id')
-            ->all();
+        $nfStatusIds = collect([Status::NEW, Status::FOLLOW_UP])
+            ->map(fn ($name) => optional($statusesByName->get($name))->id)
+            ->filter()
+            ->values()
+            ->toArray();
 
         $users = User::role($roles)
             ->withCount([
@@ -187,7 +188,7 @@ class LeadAutoAssignService
 
                             // Super admins: mail + notify
                             if (!empty($superAdminsEmails)) {
-                                // $this->leadsHelper->sendLeadMail($superAdminsEmails, $data);
+                                $this->leadsHelper->sendLeadMail($superAdminsEmails, $data);
                             }
 
                             Notifier::notifyMany(
@@ -203,7 +204,7 @@ class LeadAutoAssignService
                             // Ticket owner (withTrashed)
                             if ($ticket->user) {
                                 $data['user'] = '';
-                                // $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
+                                $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
 
                                 Notifier::notifyUser(
                                     $ticket->user,
@@ -255,7 +256,7 @@ class LeadAutoAssignService
                                 'ticket' => $ticket->id,
                             ];
 
-                            //$this->leadsHelper->sendLeadMail($assignedUser->email, $data);
+                            $this->leadsHelper->sendLeadMail($assignedUser->email, $data);
 
                             Notifier::notifyUser(
                                 $assignedUser,
@@ -276,7 +277,7 @@ class LeadAutoAssignService
                         ];
 
                         if (!empty($superAdminsEmails)) {
-                            // $this->leadsHelper->sendLeadMail($superAdminsEmails, $adminData);
+                            $this->leadsHelper->sendLeadMail($superAdminsEmails, $adminData);
                         }
 
                         Notifier::notifyMany(

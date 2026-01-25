@@ -74,7 +74,7 @@ class User extends Authenticatable
         return $this->hasMany(SalesCampaign::class, 'user_id');
     }
 
-    public function fcmTokens()
+    public function deviceTokens()
     {
         return $this->hasMany(FcmToken::class);
     }

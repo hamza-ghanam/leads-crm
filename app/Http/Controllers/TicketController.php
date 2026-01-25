@@ -16,6 +16,8 @@ use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
 use App\Services\LeadAutoAssignService;
+use Carbon\CarbonInterval;
+use Illuminate\Support\Collection;
 use Mccarlosen\LaravelMpdf\Facades\LaravelMpdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -1664,7 +1666,7 @@ class TicketController extends Controller
         );
 
         return response()->json($res, 200);
-
+/*
         Notifier::notifyUser(
             97,
             'Follow up reminder',
@@ -1674,7 +1676,7 @@ class TicketController extends Controller
             ['ticket_id' => 327925],
             null
         );
-
+*/
 
         $now = now();
         $followUpStatusId = Status::where('name', Status::FOLLOW_UP)->value('id');
@@ -1708,7 +1710,7 @@ class TicketController extends Controller
                     ];
 
                     $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
-
+/*
                     Notifier::notifyUser(
                         $ticket->user,
                         'Follow up reminder',
@@ -1718,7 +1720,7 @@ class TicketController extends Controller
                         ['ticket_id' => $ticket->id],
                         null
                     );
-
+*/
                     $ticket->latestPath->reminder_sent_at = now();
                     $ticket->latestPath->save();
                 }
