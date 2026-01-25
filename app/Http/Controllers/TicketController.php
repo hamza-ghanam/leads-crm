@@ -254,7 +254,9 @@ class TicketController extends Controller
             'currentStatus' => $filterParams['status'],
             'currentSale' => $filterParams['sale'],
             'from' => $filterParams['from'],
-            'to' => $filterParams['to']
+            'to' => $filterParams['to'],
+            'updatedFrom' => $filterParams['updated_from'],
+            'updatedTo' => $filterParams['updated_to'],
         ];
 
         session()->flashInput($request->input());

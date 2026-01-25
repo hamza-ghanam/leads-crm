@@ -73,6 +73,19 @@
                             </div>
                         </div>
                         <div class="form-group row">
+                            <label for="filter" class="col-sm-2 col-form-label">Update date</label>
+                            <label for="from" class="col-sm-1 col-form-label-sm">From:</label>
+                            <div class="col-sm-3">
+                                <input type="date" class="form-control form-control-sm" name="updated_from" id="updated-from"
+                                       value="{{ $updatedFrom }}"/>
+                            </div>
+                            <label for="to" class="col-sm-1 col-form-label-sm">To:</label>
+                            <div class="col-sm-3">
+                                <input type="date" class="form-control form-control-sm" name="updated_to" id="updated-to"
+                                       value="{{ $updatedTo }}"/>
+                            </div>
+                        </div>
+                        <div class="form-group row">
                             <label for="person" class="col-sm-2 col-form-label">Personal info</label>
                             <label for="fullName" class="col-sm-1 col-form-label-sm">Full Name:</label>
                             <div class="col-sm-3">
@@ -129,16 +142,21 @@
 @section('script')
     <!-- PAGE SCRIPTS -->
     <script>
-        var fromElem = document.getElementById('from') || false;
-        var toElem = document.getElementById('to') || false;
+        const fromElem = document.getElementById('updated-from') || false;
+        const toElem = document.getElementById('updated-to') || false;
 
-        if (fromElem && !fromElem.value) {
+        if (fromElem && fromElem.value === '') {
             fromElem.value = formatDate(getFstDayOfMonFnc());
-
         }
 
-        if (toElem && !toElem.value) {
+        if (toElem && toElem.value === '') {
             toElem.value = formatDate(new Date());
+        }
+
+        if (fromElem && toElem && fromElem.value && toElem.value) {
+            if (new Date(fromElem.value) > new Date(toElem.value)) {
+                toElem.value = fromElem.value;
+            }
         }
 
         function getFstDayOfMonFnc() {

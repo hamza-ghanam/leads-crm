@@ -34,7 +34,7 @@ class HomeController extends Controller
     {
         if (auth()->user()->hasAnyRole('super-admin')) {
             $filterParams = $this->leadsHelper->getLeadsFilterParams($request);
-//dd($filterParams['status']);
+
             $stats = [];
 
             if ($filterParams['linkable'] && !auth()->user()->hasAnyRole('sales-manager', 'super-admin')) {
@@ -124,6 +124,8 @@ class HomeController extends Controller
                 'camp' => $filterParams['camp'],
                 'from' => $filterParams['from'],
                 'to' => $filterParams['to'],
+                'updatedFrom' => $filterParams['updated_from'],
+                'updatedTo' => $filterParams['updated_to'],
                 'fullName' => $filterParams['fullName'],
                 'phone' => $filterParams['phone'],
                 'statuses' => $allStatuses,
