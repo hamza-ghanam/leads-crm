@@ -440,30 +440,23 @@ class LeadsHelper
     public function filterLeads($filterParams, $leads)
     {
         // Campaign filter
-        if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
-            $leads = $leads->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
+        $camp = data_get($filterParams, 'camp');
+        if (!empty($camp)) {
+            $leads->where('campaign_name', 'LIKE', "%{$camp}%");
         }
 
         // Created at from & to filters
-        if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $from = date($filterParams['from'] . ' 00:00:00');
-            $to = date($filterParams['to'] . ' 23:59:59');
-            $leads = $leads->whereBetween('created_at', [$from, $to]);
-        }
-
         $from = data_get($filterParams, 'from');
         $to   = data_get($filterParams, 'to');
 
-        if ($from && $to) {
+        if (!empty($from) && !empty($to)) {
             $leads->whereBetween('created_at', [
                 Carbon::parse($from)->startOfDay(),
                 Carbon::parse($to)->endOfDay(),
             ]);
-
-        } elseif ($from) {
+        } elseif (!empty($from)) {
             $leads->where('created_at', '>=', Carbon::parse($from)->startOfDay());
-
-        } elseif ($to) {
+        } elseif (!empty($to)) {
             $leads->where('created_at', '<=', Carbon::parse($to)->endOfDay());
         }
 
@@ -497,6 +490,13 @@ class LeadsHelper
         if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
             $leads = $leads->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
         }
+
+        $leads->orderByDesc(
+            TicketPath::select('created_at')
+                ->whereColumn('ticket_paths.ticket_id', 'tickets.id')
+                ->latest()
+                ->limit(1)
+        )->orderByDesc('tickets.created_at');
 
         return $leads;
     }
