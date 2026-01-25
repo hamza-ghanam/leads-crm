@@ -234,6 +234,6 @@ return [
         'Notifier' => App\Facades\Notifier::class,
     ],
 
-    'build_version' => env('BUILD_VERSION', '1'),
+    'build_version' => env('BUILD_VERSION', '3.0'),
     'auth_token' => env('MAKE_SECRET', 'xyz'),
 ];
