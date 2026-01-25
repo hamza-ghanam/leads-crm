@@ -240,7 +240,7 @@
                                class="table table-bordered table-hover">
                             <thead>
                             <tr>
-                                <th class="fwd-leads" style="display:none !important;">
+                                <th class="fwd-leads">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" value="" id="select-all">
                                         <label id="select-all-lbl" class="form-check-label" for="select-all">
@@ -268,7 +268,7 @@
                                 <tr id="row_{{ $ticket->id }}"
                                     @if($ticket->status->slug === 'duplicated') class="table-danger"
                                     @elseif($ticket->status->slug === 'dead' || $ticket->status->slug === 'dead-tele') class="table-warning" @endif>
-                                    <td class="fwd-leads" style="display:none !important;">
+                                    <td class="fwd-leads">
                                         <div class="form-check">
                                             <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
                                                    value="{{ $ticket->id }}" class="form-check-input lead-checkbox"/>
@@ -325,7 +325,7 @@
                                 </tr>
                             @endforeach
                             </tbody>
-                            <tfoot style="display: none !important;" class="fwd-leads">
+                            <tfoot class="fwd-leads">
                             <tr>
                                 <td colspan="11">
                                     <div class="form-group row">
@@ -615,12 +615,14 @@
         let enabledByBtn = false;
 
         function initBoxes(boxes) {
+            /*
             if (!enabledByBtn) {
                 boxes.forEach(box => {
                     box.style.display = 'none';
                     box.classList.remove('sorting_desc');
                 });
             }
+             */
         }
 
         document.addEventListener('DOMContentLoaded', () => {
