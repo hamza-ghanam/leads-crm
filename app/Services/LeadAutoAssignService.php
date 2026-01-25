@@ -170,7 +170,7 @@ class LeadAutoAssignService
 
                             $ticket->update(['status_id' => $deadStatus->id]);
 
-                            TicketPath::create([
+                            $tp = TicketPath::create([
                                 'ticket_id' => $ticket->id,
                                 'prev_user' => $prevUserId,
                                 'next_user' => $prevUserId,
@@ -216,6 +216,18 @@ class LeadAutoAssignService
                                     null
                                 );
                             }
+
+                            DbLogger::log(
+                                level: 'info',
+                                message: 'lead_reassigned',
+                                context: [
+                                    'current_status' => $currentStatusName,
+                                    'next_status' => $deadStatus->name,
+                                    'ticket' => $ticket->id,
+                                    'tp_id' => $tp->id,
+                                    'assigned_user' => 'N/A',
+                                ]
+                            );
                         });
 
                         $stats['dead']++;
@@ -288,6 +300,18 @@ class LeadAutoAssignService
                             'ticket_reassigned',
                             ['ticket_id' => $ticket->id],
                             null
+                        );
+
+                        DbLogger::log(
+                            level: 'info',
+                            message: 'lead_reassigned',
+                            context: [
+                                'current_status' => $currentStatusName,
+                                'next_status' => $nextStatusName,
+                                'ticket' => $ticket->id,
+                                'tp_id' => $tp->id,
+                                'assigned_user' => $assignedUser->id,
+                            ]
                         );
                     });
 
