@@ -93,6 +93,7 @@ class LeadAutoAssignService
             ->toArray();
 
         $users = User::role($roles)
+            ->where('status', 'permitted')
             ->withCount([
                 'tickets as nf_tickets_count' => function ($q) use ($nfStatusIds) {
                     $q->whereIn('status_id', $nfStatusIds);
