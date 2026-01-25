@@ -155,6 +155,19 @@
                                         </div>
                                     </div>
                                     <div class="form-group row">
+                                        <label for="filter" class="col-sm-2 col-form-label">Update date</label>
+                                        <label for="from" class="col-sm-1 col-form-label-sm">From:</label>
+                                        <div class="col-sm-3">
+                                            <input type="date" class="form-control form-control-sm" name="updated_from" id="updated-from"
+                                                   value="{{ $updatedFrom }}"/>
+                                        </div>
+                                        <label for="to" class="col-sm-1 col-form-label-sm">To:</label>
+                                        <div class="col-sm-3">
+                                            <input type="date" class="form-control form-control-sm" name="updated_to" id="updated-to"
+                                                   value="{{ $updatedTo }}"/>
+                                        </div>
+                                    </div>
+                                    <div class="form-group row">
                                         <label for="person" class="col-sm-2 col-form-label">Personal info</label>
                                         <label for="fullName" class="col-sm-1 col-form-label-sm">Full Name:</label>
                                         <div class="col-sm-3">
@@ -227,7 +240,7 @@
                                class="table table-bordered table-hover">
                             <thead>
                             <tr>
-                                <th class="fwd-leads" style="display:none !important;">
+                                <th class="fwd-leads">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" value="" id="select-all">
                                         <label id="select-all-lbl" class="form-check-label" for="select-all">
@@ -245,6 +258,7 @@
                                 <th>Latest Follow-up</th>
                                 @unlessrole('sale|tele-sale')
                                     <th>Created at</th>
+                                    <th>Updated at</th>
                                 @endunlessrole
                                 <th></th>
                             </tr>
@@ -254,7 +268,7 @@
                                 <tr id="row_{{ $ticket->id }}"
                                     @if($ticket->status->slug === 'duplicated') class="table-danger"
                                     @elseif($ticket->status->slug === 'dead' || $ticket->status->slug === 'dead-tele') class="table-warning" @endif>
-                                    <td class="fwd-leads" style="display:none !important;">
+                                    <td class="fwd-leads">
                                         <div class="form-check">
                                             <input type="checkbox" name="lead_ids[]" id="lead-{{ $ticket->id }}"
                                                    value="{{ $ticket->id }}" class="form-check-input lead-checkbox"/>
@@ -282,7 +296,8 @@
                                         {{ $ticket->lastFollowUp }}
                                     </td>
                                     @unlessrole('sale|tele-sale')
-                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket['created_at'])) }}</td>
+                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket->created_at)) }}</td>
+                                        <td>{{ date('d/m/Y h:i A', strtotime($ticket->latestPath->created_at)) }}</td>
                                     @endunlessrole
                                     <td>
                                         <ul class="nav nav-pills ml-auto p-2">
@@ -310,7 +325,7 @@
                                 </tr>
                             @endforeach
                             </tbody>
-                            <tfoot style="display: none !important;" class="fwd-leads">
+                            <tfoot class="fwd-leads">
                             <tr>
                                 <td colspan="11">
                                     <div class="form-group row">
@@ -423,16 +438,21 @@
         });
         @endif
 
-        const fromElem = document.getElementById('from') || false;
-        const toElem = document.getElementById('to') || false;
+        const fromElem = document.getElementById('updated-from') || false;
+        const toElem = document.getElementById('updated-to') || false;
 
-        if (fromElem && !fromElem.value) {
+        if (fromElem && fromElem.value === '') {
             fromElem.value = formatDate(getFstDayOfMonFnc());
-
         }
 
-        if (toElem && !toElem.value) {
+        if (toElem && toElem.value === '') {
             toElem.value = formatDate(new Date());
+        }
+
+        if (fromElem && toElem && fromElem.value && toElem.value) {
+            if (new Date(fromElem.value) > new Date(toElem.value)) {
+                toElem.value = fromElem.value;
+            }
         }
 
         function getFstDayOfMonFnc() {
@@ -595,12 +615,14 @@
         let enabledByBtn = false;
 
         function initBoxes(boxes) {
+            /*
             if (!enabledByBtn) {
                 boxes.forEach(box => {
                     box.style.display = 'none';
                     box.classList.remove('sorting_desc');
                 });
             }
+             */
         }
 
         document.addEventListener('DOMContentLoaded', () => {

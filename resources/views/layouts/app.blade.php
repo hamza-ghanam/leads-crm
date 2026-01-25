@@ -89,7 +89,7 @@
                 <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
             </li>
             <li class="nav-item d-none d-sm-inline-block">
-                <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+                <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
                    class="nav-link"><i class="fas fa-chart-area"></i> Reports</a>
             </li>
             <li class="nav-item d-none d-sm-inline-block">
@@ -193,7 +193,7 @@
                     <!-- Add icons to the links using the .nav-icon class
                          with font-awesome or any other icon font library -->
                     <li class="nav-item">
-                        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+                        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
                            class="nav-link {{ Route::currentRouteName() == ''  ? 'active' : ''}}">
                             <i class="nav-icon fas fa-home"></i>
                             <p>
@@ -242,7 +242,7 @@
                         <ul class="nav nav-treeview">
                             <li class="nav-item">
                                 @can('list tickets')
-                                    <a href="{{ route('tickets.all', [ 'from' => date('Y-m-01'), 'to' => date("Y-m-d")]) }}"
+                                    <a href="{{ route('tickets.all', [ 'updated_from' => date('Y-m-01'), 'updated_to' => date("Y-m-d")]) }}"
                                        class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.all') !== false  ? 'active' : '' }}">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Show All</p>

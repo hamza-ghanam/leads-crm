@@ -8,6 +8,7 @@ use App\Models\GeneralSettings;
 use App\Models\Status;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\DbLogger;
 use App\Services\LeadAutoAssignService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -98,7 +99,9 @@ class Kernel extends ConsoleKernel
                         $ticket->latestPath->save();
                     }
                 });
-        })->everyMinute();
+        })->everyFiveMinutes()
+            ->name('tickets:follow_up-reminder')
+            ->withoutOverlapping(2);
 
         ////// 2. Auto Import from Social Media
         $schedule->call(function () use ($leadsHelper) {
@@ -144,11 +147,21 @@ class Kernel extends ConsoleKernel
 
                 $leadsHelper->removeTempLeads($leadIds);
             }
-        })->everyThirtyMinutes();
+        })->everyThirtyMinutes()
+            ->name('tickets:auto-import')
+            ->withoutOverlapping(5);
 
         ////// 3. Sales Leads - Statuses
         $schedule->call(function () use ($assignService) {
             if (!$this->withinWorkingWindow()) {
+                DbLogger::log(
+                    level: 'info',
+                    message: 'timeout',
+                    context: [
+                        'time' => 'not in the time slot',
+                    ]
+                );
+
                 return;
             }
 
@@ -352,9 +365,9 @@ class Kernel extends ConsoleKernel
                 $ticket->delete();
             }
             */
-        })->everyTenMinutes()
+        })->everyFifteenMinutes()
             ->name('tickets:auto-reassign')
-            ->withoutOverlapping();
+            ->withoutOverlapping(5);
 
         /*
         $schedule->call(function () {

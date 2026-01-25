@@ -13,6 +13,7 @@ use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
 use App\Notifications\SendPushNotification;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\DB;
@@ -428,6 +429,8 @@ class LeadsHelper
             'camp' => $request->query('camp'),
             'from' => $request->query('from'),
             'to' => $request->query('to'),
+            'updated_from' => $request->query('updated_from'),
+            'updated_to' => $request->query('updated_to'),
             'fullName' => $request->query('fullName'),
             'phone' => $request->query('phone'),
             'linkable' => $request->query('linkable')
@@ -437,21 +440,45 @@ class LeadsHelper
     public function filterLeads($filterParams, $leads)
     {
         // Campaign filter
-        if (($filterParams['camp'] and $filterParams['camp'] !== '')) {
-            $leads = $leads->where('campaign_name', 'LIKE', "%{$filterParams['camp']}%");
+        $camp = data_get($filterParams, 'camp');
+        if (!empty($camp)) {
+            $leads->where('campaign_name', 'LIKE', "%{$camp}%");
         }
 
         // Created at from & to filters
-        if (($filterParams['from'] and $filterParams['from'] !== '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $from = date($filterParams['from'] . ' 00:00:00');
-            $to = date($filterParams['to'] . ' 23:59:59');
-            $leads = $leads->whereBetween('created_at', [$from, $to]);
-        } else if (($filterParams['from'] and $filterParams['from'] !== '') and (!$filterParams['to'] or $filterParams['to'] == '')) {
-            $from = date($filterParams['from'] . ' 00:00:00');
-            $leads = $leads->where('created_at', '>=', $from);
-        } else if ((!$filterParams['from'] or $filterParams['from'] == '') and ($filterParams['to'] and $filterParams['to'] !== '')) {
-            $to = date($filterParams['to'] . ' 23:59:59');
-            $leads = $leads->where('created_at', '<=', $to);
+        $from = data_get($filterParams, 'from');
+        $to   = data_get($filterParams, 'to');
+
+        if (!empty($from) && !empty($to)) {
+            $leads->whereBetween('created_at', [
+                Carbon::parse($from)->startOfDay(),
+                Carbon::parse($to)->endOfDay(),
+            ]);
+        } elseif (!empty($from)) {
+            $leads->where('created_at', '>=', Carbon::parse($from)->startOfDay());
+        } elseif (!empty($to)) {
+            $leads->where('created_at', '<=', Carbon::parse($to)->endOfDay());
+        }
+
+        // Updated Dates
+        $updatedFrom = data_get($filterParams, 'updated_from');
+        $updatedTo   = data_get($filterParams, 'updated_to');
+
+
+        if ($updatedFrom || $updatedTo) {
+            $leads->whereHas('latestPath', function ($q) use ($updatedFrom, $updatedTo) {
+
+                if (!empty($updatedFrom) && !empty($updatedTo)) {
+                    $q->whereBetween('created_at', [
+                        Carbon::parse($updatedFrom)->startOfDay(),
+                        Carbon::parse($updatedTo)->endOfDay(),
+                    ]);
+                } elseif (!empty($updatedFrom)) {
+                    $q->where('created_at', '>=', Carbon::parse($updatedFrom)->startOfDay());
+                } elseif (!empty($updatedTo)) {
+                    $q->where('created_at', '<=', Carbon::parse($updatedTo)->endOfDay());
+                }
+            });
         }
 
         // Person Full_name filter
@@ -463,6 +490,13 @@ class LeadsHelper
         if (($filterParams['phone'] and $filterParams['phone'] !== '')) {
             $leads = $leads->where('phone_number', 'LIKE', "%{$filterParams['phone']}%");
         }
+
+        $leads->orderByDesc(
+            TicketPath::select('created_at')
+                ->whereColumn('ticket_paths.ticket_id', 'tickets.id')
+                ->latest()
+                ->limit(1)
+        )->orderByDesc('tickets.created_at');
 
         return $leads;
     }

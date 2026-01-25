@@ -86,12 +86,14 @@ class LeadAutoAssignService
             return ['reassigned' => 0, 'dead' => 0, 'skipped' => 0];
         }
 
-        $nfStatusIds = $statusesByName
-            ->only([Status::NEW, Status::FOLLOW_UP])
-            ->pluck('id')
-            ->all();
+        $nfStatusIds = collect([Status::NEW, Status::FOLLOW_UP])
+            ->map(fn ($name) => optional($statusesByName->get($name))->id)
+            ->filter()
+            ->values()
+            ->toArray();
 
         $users = User::role($roles)
+            ->where('status', 'permitted')
             ->withCount([
                 'tickets as nf_tickets_count' => function ($q) use ($nfStatusIds) {
                     $q->whereIn('status_id', $nfStatusIds);
@@ -169,7 +171,7 @@ class LeadAutoAssignService
 
                             $ticket->update(['status_id' => $deadStatus->id]);
 
-                            TicketPath::create([
+                            $tp = TicketPath::create([
                                 'ticket_id' => $ticket->id,
                                 'prev_user' => $prevUserId,
                                 'next_user' => $prevUserId,
@@ -187,7 +189,7 @@ class LeadAutoAssignService
 
                             // Super admins: mail + notify
                             if (!empty($superAdminsEmails)) {
-                                // $this->leadsHelper->sendLeadMail($superAdminsEmails, $data);
+                                $this->leadsHelper->sendLeadMail($superAdminsEmails, $data);
                             }
 
                             Notifier::notifyMany(
@@ -203,7 +205,7 @@ class LeadAutoAssignService
                             // Ticket owner (withTrashed)
                             if ($ticket->user) {
                                 $data['user'] = '';
-                                // $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
+                                $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
 
                                 Notifier::notifyUser(
                                     $ticket->user,
@@ -215,6 +217,18 @@ class LeadAutoAssignService
                                     null
                                 );
                             }
+
+                            DbLogger::log(
+                                level: 'info',
+                                message: 'lead_reassigned',
+                                context: [
+                                    'current_status' => $currentStatusName,
+                                    'next_status' => $deadStatus->name,
+                                    'ticket' => $ticket->id,
+                                    'tp_id' => $tp->id,
+                                    'assigned_user' => 'N/A',
+                                ]
+                            );
                         });
 
                         $stats['dead']++;
@@ -255,7 +269,7 @@ class LeadAutoAssignService
                                 'ticket' => $ticket->id,
                             ];
 
-                            //$this->leadsHelper->sendLeadMail($assignedUser->email, $data);
+                            $this->leadsHelper->sendLeadMail($assignedUser->email, $data);
 
                             Notifier::notifyUser(
                                 $assignedUser,
@@ -276,7 +290,7 @@ class LeadAutoAssignService
                         ];
 
                         if (!empty($superAdminsEmails)) {
-                            // $this->leadsHelper->sendLeadMail($superAdminsEmails, $adminData);
+                            $this->leadsHelper->sendLeadMail($superAdminsEmails, $adminData);
                         }
 
                         Notifier::notifyMany(
@@ -287,6 +301,18 @@ class LeadAutoAssignService
                             'ticket_reassigned',
                             ['ticket_id' => $ticket->id],
                             null
+                        );
+
+                        DbLogger::log(
+                            level: 'info',
+                            message: 'lead_reassigned',
+                            context: [
+                                'current_status' => $currentStatusName,
+                                'next_status' => $nextStatusName,
+                                'ticket' => $ticket->id,
+                                'tp_id' => $tp->id,
+                                'assigned_user' => $assignedUser->id,
+                            ]
                         );
                     });
 
