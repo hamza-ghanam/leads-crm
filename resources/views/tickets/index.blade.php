@@ -328,13 +328,7 @@
                             <tfoot class="fwd-leads">
                             <tr>
                                 <td colspan="11">
-                                    <div class="form-group row">
-                                        <div class="col-sm-12">
-                                            <button type="button" id="submit-fwd" class="btn btn-success float-right">
-                                                Submit forward
-                                            </button>
-                                        </div>
-                                    </div>
+
                                 </td>
                             </tr>
                             </tfoot>
