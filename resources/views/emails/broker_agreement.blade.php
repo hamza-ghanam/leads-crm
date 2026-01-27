@@ -81,8 +81,15 @@
             {{ $otp }}
         </blockquote>
 
-        <p>Once signed, please use the following link to upload the signed copy:</p>
+        <p>Once signed, please press on the following button to upload the signed copy:</p>
 
+        <p style="text-align:center; margin: 22px 0;">
+            <a class="btn" href="{{ route('brokers.agreement.form') }}">
+                Upload Signed Agreement
+            </a>
+        </p>
+
+        <p>If the button above doesn't work, copy and paste the following link into your browser:</p>
         <blockquote cite="{{ config('app.url') }}/brokers/upload-signed-agreement">
             {{ config('app.url') }}/brokers/upload-signed-agreement
         </blockquote>
