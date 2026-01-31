@@ -2056,11 +2056,11 @@ class TicketController extends Controller
                 'is_organic' => $request->is_organic ?? '',
                 'platform' => $request->platform,
                 'full_name' => $request->full_name ?: $request->name ?: $request->first_name ?: 'N/A',
-                'phone_number' => $request->phone_number,
+                'phone_number' => $request->phone_number ?? '0',
                 'email' => $request->email,
                 'job_title' => $request->job_title ?? '',
                 'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
-                'source_id' => $this->leadsHelper->getSourceID($request->query('pf')),
+                'source_id' => $this->leadsHelper->getSourceID($request->platform),
                 'extra_data' => $payload,
                 'method' => 'Automatic ' . ucfirst($request->query('sc')) . ' - Webhook',
             ]);
