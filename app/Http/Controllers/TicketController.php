@@ -2042,6 +2042,7 @@ class TicketController extends Controller
             }
 
             // If it's an array, encode it:
+            $sourceId = $this->leadsHelper->getSourceID($request->platform);
 
             $lead = TempLead::create([
                 'number' => $request->id ?? $request->lead_id ?? 0,
@@ -2060,9 +2061,9 @@ class TicketController extends Controller
                 'email' => $request->email,
                 'job_title' => $request->job_title ?? '',
                 'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
-                'source_id' => $this->leadsHelper->getSourceID($request->platform),
+                'source_id' => $sourceId,
                 'extra_data' => $payload,
-                'method' => 'Automatic ' . ucfirst($request->query('sc')) . ' - Webhook',
+                'method' => 'Automatic ' . Source::find($sourceId)->name . ' - Webhook',
             ]);
 
             DB::commit();
