@@ -18,6 +18,12 @@ use Throwable;
 
 class BrokerController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('role:super-admin|admin')
+            ->except(['registerForm', 'register', 'uploadSignedAgreementForm', 'uploadSignedAgreement']);
+    }
+
     public function index()
     {
         $brokers = Broker::latest()->paginate(50);
@@ -28,7 +34,7 @@ class BrokerController extends Controller
     public function show($id)
     {
         $broker = Broker::with('docs')->findOrFail($id);
-        // خريطة id => name لتفسير nationality لو كانت country_id
+
         $countriesById = DB::table('countries')->pluck('name', 'id');
 
         return view('brokers.show', compact('broker', 'countriesById'));
@@ -151,7 +157,7 @@ class BrokerController extends Controller
             ]);
 
             $pdfContent = $pdf->output();
-            $pdfName = "agreement_{$broker->id}.pdf";
+            $pdfName = "broker_agreement_{$broker->id}.pdf";
 
             Storage::disk('local')->put("agreements/{$pdfName}", $pdfContent);
 
@@ -209,8 +215,15 @@ class BrokerController extends Controller
             );
 
             // 3) Store signed agreement
-            $path = $request->file('signed_agreement')
-                ->store('agreements/signed', 'local');
+            $file = $request->file('signed_agreement');
+
+            $filename = 'signed_broker_agreement_' . $broker->id . '.' . $file->getClientOriginalExtension();
+
+            $path = $file->storeAs(
+                'agreements/signed',
+                $filename,
+                'local'
+            );;
 
             $broker->docs()->create([
                 'doc_type' => 'signed_agreement',
@@ -253,7 +266,7 @@ class BrokerController extends Controller
      */
     public function destroy($id)
     {
-        if (!auth()->user()->hasAnyRole(['super-admin'])) {
+        if (!auth()->user()->hasAnyRole(['super-admin', 'admin'])) {
             abort(Response::HTTP_FORBIDDEN);
         }
 
@@ -283,13 +296,7 @@ class BrokerController extends Controller
     {
         $doc = BrokerDoc::findOrFail($docId);
 
-        // 🔐 Authorization (عدّل حسب سيستمك)
-        // مثال: فقط admin / super-admin
-        if (!auth()->user()->hasAnyRole(['super-admin'])) {
-            abort(Response::HTTP_FORBIDDEN);
-        }
-
-        $path = $doc->file_path; // مثال: docs/passports/abc.pdf
+        $path = $doc->file_path;
 
         if (!Storage::disk('local')->exists($path)) {
             abort(404, 'File not found.');

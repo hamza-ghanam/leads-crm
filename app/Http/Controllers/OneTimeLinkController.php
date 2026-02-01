@@ -21,14 +21,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class OneTimeLinkController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('role:super-admin|admin');
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
         Log::info("User {$user->id} requested OTL listing.");
-
-        if ($user->getRoleNames()[0] !== 'super-admin') {
-            abort(Response::HTTP_FORBIDDEN, 'Unauthorized');
-        }
 
         $limit = min((int)$request->get('limit', 10), 100);
 
@@ -46,11 +47,6 @@ class OneTimeLinkController extends Controller
     {
         $user = $request->user();
         Log::info("User {$user->id} is generating a one-time link.");
-
-        // If you have permission logic:
-        if ($user->getRoleNames()[0] !== 'super-admin') {
-            abort(Response::HTTP_FORBIDDEN, 'Unauthorized');
-        }
 
         $validator = Validator::make($request->all(), [
             // 'user_type' => 'required|string|in:Broker,Contractor',

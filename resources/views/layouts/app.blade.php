@@ -345,9 +345,11 @@
                             </li>
                         </ul>
                     </li>
+                    @endhasrole
 
-                    <!-- The best route -->
-                    <li class="nav-item has-treeview {{ Route::is('brokers.*') ? 'menu-open' : '' }}">
+                    @hasanyrole('super-admin|admin')
+                        <!-- The best route -->
+                        <li class="nav-item has-treeview {{ Route::is('brokers.*') ? 'menu-open' : '' }}">
                         <a href="#"
                            class="nav-link {{ Route::is('brokers.*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-user-secret"></i>
@@ -375,7 +377,9 @@
                             </li>
                         </ul>
                     </li>
+                    @endhasanyrole
 
+                    @hasrole('super-admin')
                     <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'settings') !== false)  ? 'menu-open' : '' }}">
                         <a href=""
                            class="nav-link {{ strpos(Route::currentRouteName(), 'settings') !== false  ? 'active' : ''}}">
@@ -402,7 +406,6 @@
                             </li>
                         </ul>
                     </li>
-
                     @endhasrole
                 </ul>
             </nav>

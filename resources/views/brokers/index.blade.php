@@ -37,8 +37,6 @@
                 <div class="card">
                     <div class="card-header">
                         <div class="row">
-
-                            @hasanyrole('super-admin|sales-manager')
                             {{-- Add New --}}
                             <div class="col-6 col-md-3 mb-2">
                                 <a href="{{ route('brokers.add') }}"
@@ -46,8 +44,6 @@
                                     Add New
                                 </a>
                             </div>
-
-                            @endhasanyrole
                         </div>
                     </div>
                     <!-- /.card-header -->
@@ -87,9 +83,9 @@
                                     <th>Name</th>
                                     <th>Phone Number</th>
                                     <th>Email</th>
-                                    <th>Company</th>
-                                    <th>Latest Follow-up</th>
-                                    <th>Created at</th>
+                                    <th>Type</th>
+                                    <th>Company (if exist)</th>
+                                    <th>Registration Date</th>
                                     <th></th>
                                 </tr>
                                 </thead>
