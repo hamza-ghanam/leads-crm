@@ -422,10 +422,9 @@
                         if (result.value) {
                             const token = '{{ csrf_token() }}';
 
-                            let resp = await axios.put('/tickets/ignoreLeads/temp', {leadIds}, {
+                            let resp = await axios.put('/tickets/ignoreLeads/temp', {lead_ids: leadIds}, {
                                 withCredentials: true,
                                 headers: {
-                                    'Content-Type': 'application/json',
                                     'Accept': 'application/json',
                                     'X-CSRF-Token': token,
                                 }
@@ -463,9 +462,19 @@
                     errors += (e.response?.data[valInd] + '\n');
                 });
 
+                const data = e.response?.data;
+                let msgs = [];
+                if (data?.errors) {
+                    msgs = Object.values(data.errors).flat();
+                } else if (data?.message) {
+                    msgs = [data.message];
+                } else {
+                    msgs = ['Request failed. Please try again.'];
+                }
                 Toast.fire({
                     icon: 'warning',
                     title: errors,
+                    text: msgs.join('\n'),
                 });
             }
         }
