@@ -457,10 +457,14 @@
                 }
             } catch (e) {
                 //  console.log(e.response);
+                let errors = '';
+                Object.keys(e.response?.data).forEach(valInd => {
+                    errors += (e.response?.data[valInd] + '\n');
+                });
+
                 const data = e.response?.data;
                 let msgs = [];
                 if (data?.errors) {
-                    // اجمع كل الرسائل من errors
                     msgs = Object.values(data.errors).flat();
                 } else if (data?.message) {
                     msgs = [data.message];
@@ -469,7 +473,8 @@
                 }
                 Toast.fire({
                     icon: 'warning',
-                    title: msgs.join('\n'),
+                    title: errors,
+                    text: msgs.join('\n'),
                 });
             }
         }
