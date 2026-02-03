@@ -19,7 +19,7 @@ class LoginController extends Controller
     {
         return array_merge(
             $request->only($this->username(), 'password'),
-            ['status' => 'permitted']
+            //['status' => 'permitted']
         );
     }
 

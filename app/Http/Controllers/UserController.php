@@ -175,7 +175,7 @@ class UserController extends Controller
      *
      * @param \Illuminate\Http\Request $request
      * @param int $id
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function update(Request $request, $id)
     {
@@ -218,7 +218,7 @@ class UserController extends Controller
         $role = Role::find($request->role);
 
         if (!$role) {
-            return back()->withErrors(['msg' => 'Role is not exists'])->withInput($request->all());
+            return back()->withErrors(['msg' => 'Role does not exist!'])->withInput($request->all());
         }
 
         $user->roles()->detach();
