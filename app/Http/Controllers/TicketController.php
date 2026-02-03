@@ -335,10 +335,16 @@ class TicketController extends Controller
         }
 
         if (auth()->user()->hasAnyRole(['sale', 'tele-sale'])) {
+            $user = auth()->user();
+            if ($user->status === 'banned') {
+                return back()->withErrors(['msg' => "You cannot create a lead while you're banned!"])
+                    ->withInput($request->all());
+            }
+
             if (isset($request->user))
-                return back()->withErrors(['msg' => 'You cannot assign a lead to others!'])->withInput($request->all());
+                return back()->withErrors(['msg' => 'You cannot assign a lead to others!'])
+                    ->withInput($request->all());
             else {
-                $user = auth()->user();
                 $sender = 'you';
             }
         } else {
@@ -1668,17 +1674,17 @@ class TicketController extends Controller
         );
 
         return response()->json($res, 200);
-/*
-        Notifier::notifyUser(
-            97,
-            'Follow up reminder',
-            "You have a follow up on ticket #3333333",
-            route('tickets.show', 327925),
-            'ticket_follow_up',
-            ['ticket_id' => 327925],
-            null
-        );
-*/
+        /*
+                Notifier::notifyUser(
+                    97,
+                    'Follow up reminder',
+                    "You have a follow up on ticket #3333333",
+                    route('tickets.show', 327925),
+                    'ticket_follow_up',
+                    ['ticket_id' => 327925],
+                    null
+                );
+        */
 
         $now = now();
         $followUpStatusId = Status::where('name', Status::FOLLOW_UP)->value('id');
@@ -1712,17 +1718,17 @@ class TicketController extends Controller
                     ];
 
                     $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
-/*
-                    Notifier::notifyUser(
-                        $ticket->user,
-                        'Follow up reminder',
-                        "You have a follow up on ticket #{$ticket->id}",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-*/
+                    /*
+                                        Notifier::notifyUser(
+                                            $ticket->user,
+                                            'Follow up reminder',
+                                            "You have a follow up on ticket #{$ticket->id}",
+                                            route('tickets.show', $ticket->id),
+                                            'ticket_follow_up',
+                                            ['ticket_id' => $ticket->id],
+                                            null
+                                        );
+                    */
                     $ticket->latestPath->reminder_sent_at = now();
                     $ticket->latestPath->save();
                 }
@@ -2231,7 +2237,7 @@ class TicketController extends Controller
     public function reshuffle(Request $request)
     {
         $data = $request->validate([
-            'lead_ids'   => ['required', 'array', 'min:1'],
+            'lead_ids' => ['required', 'array', 'min:1'],
             'lead_ids.*' => ['integer', 'min:1'],
         ]);
 
@@ -2239,14 +2245,14 @@ class TicketController extends Controller
 
         if (!$result['ok']) {
             return response()->json([
-                'message'     => $result['message'],
+                'message' => $result['message'],
                 'missing_ids' => $result['missing_ids'] ?? [],
             ], 422);
         }
 
         return response()->json([
-            'message'        => 'Reshuffled successfully',
-            'total_fetched'  => $result['total_fetched'],
+            'message' => 'Reshuffled successfully',
+            'total_fetched' => $result['total_fetched'],
             'total_assigned' => $result['total_assigned'],
             'assigned_stats' => $result['assigned_stats'],
         ]);
