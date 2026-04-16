@@ -16,8 +16,6 @@ use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
 use App\Services\LeadAutoAssignService;
-use Carbon\CarbonInterval;
-use Illuminate\Support\Collection;
 use Mccarlosen\LaravelMpdf\Facades\LaravelMpdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -39,8 +37,8 @@ use Spatie\Permission\Models\Role;
 
 class TicketController extends Controller
 {
-    private $leadsHelper;
-    private $assignService;
+    private LeadsHelper $leadsHelper;
+    private LeadAutoAssignService $assignService;
 
     /**
      * Create a new OrderController instance.
@@ -248,15 +246,18 @@ class TicketController extends Controller
         }
 
         $resultParams = [
-            'sales' => $sales,
-            'tickets' => $tickets,
-            'statuses' => $statuses,
+            'sales'         => $sales,
+            'tickets'       => $tickets,
+            'statuses'      => $statuses,
             'currentStatus' => $filterParams['status'],
-            'currentSale' => $filterParams['sale'],
-            'from' => $filterParams['from'],
-            'to' => $filterParams['to'],
-            'updatedFrom' => $filterParams['updated_from'],
-            'updatedTo' => $filterParams['updated_to'],
+            'currentSale'   => $filterParams['sale'],
+            'from'          => $filterParams['from'],
+            'to'            => $filterParams['to'],
+            'updatedFrom'   => $filterParams['updated_from'],
+            'updatedTo'     => $filterParams['updated_to'],
+            'camp'          => $filterParams['camp'],
+            'fullName'      => $filterParams['fullName'],
+            'phone'         => $filterParams['phone'],
         ];
 
         session()->flashInput($request->input());
