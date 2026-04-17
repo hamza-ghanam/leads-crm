@@ -322,7 +322,7 @@
                                             <div class="dropdown">
                                                 <button class="btn btn-sm btn-light border dropdown-toggle"
                                                         type="button" data-toggle="dropdown">
-                                                    <i class="fas fa-ellipsis-h"></i>
+                                                    <i class="fas fa-cogs"></i>
                                                 </button>
                                                 <div class="dropdown-menu dropdown-menu-right">
                                                     @can('show ticket')
@@ -408,6 +408,16 @@
 @endsection
 
 @section('script')
+    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js') }}"></script>
+    <script>
+        const Toast = Swal.mixin({
+            toast: true,
+            background: '#E3E5E8',
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+        });
+    </script>
     <script>
         /**
          * Build a GET URL from a form's fields, skipping empty values and the CSRF token.
@@ -484,6 +494,9 @@
 
             updateActiveFiltersCount();
             $('#filter-form').on('change input', 'input, select', updateActiveFiltersCount);
+            $('#filter-form').on('keydown', 'input', function (e) {
+                if (e.key === 'Enter') $('#ok-filter').trigger('click');
+            });
 
             // Quick date presets, applied to the "Created" range
             $('.date-preset').on('click', function () {
@@ -529,36 +542,53 @@
             });
         });
 
-        /**
-         * Delete a ticket after confirmation.
-         */
         async function deleteTicket(id) {
-            if (!confirm('Are you sure you want to delete this lead?')) return;
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!'
+            }).then(async (result) => {
+                if (!result.value) return;
 
-            const token = '{{ csrf_token() }}';
-            try {
-                const response = await fetch('/tickets/delete/' + id, {
-                    method: 'DELETE',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-Token': token,
-                    },
-                });
+                const token = '{{ csrf_token() }}';
 
-                const data = await response.json();
+                try {
+                    Swal.fire({
+                        title: 'Please wait!',
+                        imageUrl: '{{ asset('dist/img/loading2.gif') }}',
+                        imageWidth: 128,
+                        imageHeight: 128,
+                        imageAlt: 'Deleting..',
+                        showConfirmButton: false,
+                    });
 
-                if (data.error) {
-                    alert(data.error);
-                    console.error(data);
-                } else if (data.OK) {
-                    location.reload();
+                    const resp = await axios.delete('/tickets/delete/' + id, {
+                        withCredentials: true,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-Token': token,
+                        }
+                    });
+
+                    Swal.close();
+
+                    if (resp.data.OK) {
+                        Toast.fire({ icon: 'success', title: 'Deleted successfully!' });
+                        setTimeout(() => location.reload(), 1500);
+                    } else if (resp.data.error) {
+                        Toast.fire({ icon: 'warning', title: resp.data.error });
+                    }
+                } catch (e) {
+                    Swal.close();
+                    const errors = Object.values(e.response?.data ?? {}).join('\n') || 'An unexpected error occurred.';
+                    Toast.fire({ icon: 'error', title: errors });
                 }
-            } catch (e) {
-                console.error(e);
-                alert('An unexpected error occurred.');
-            }
+            });
         }
     </script>
 @endsection

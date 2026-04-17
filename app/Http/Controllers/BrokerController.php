@@ -24,11 +24,27 @@ class BrokerController extends Controller
             ->except(['registerForm', 'register', 'uploadSignedAgreementForm', 'uploadSignedAgreement']);
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $brokers = Broker::latest()->paginate(50);
+        $fullName = $request->input('fullName', '');
+        $phone    = $request->input('phone', '');
+        $email    = $request->input('email', '');
+        $type     = $request->input('type', '');
+        $from     = $request->input('from', '');
+        $to       = $request->input('to', '');
 
-        return view('brokers.index', compact('brokers'));
+        $brokers = Broker::query()
+            ->when($fullName, fn($q) => $q->where('full_name', 'like', "%{$fullName}%"))
+            ->when($phone,    fn($q) => $q->where('phone', 'like', "%{$phone}%"))
+            ->when($email,    fn($q) => $q->where('email', 'like', "%{$email}%"))
+            ->when($type,     fn($q) => $q->where('type', $type))
+            ->when($from,     fn($q) => $q->whereDate('created_at', '>=', $from))
+            ->when($to,       fn($q) => $q->whereDate('created_at', '<=', $to))
+            ->latest()
+            ->paginate(50)
+            ->appends($request->query());
+
+        return view('brokers.index', compact('brokers', 'fullName', 'phone', 'email', 'type', 'from', 'to'));
     }
 
     public function show($id)

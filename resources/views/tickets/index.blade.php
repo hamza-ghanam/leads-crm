@@ -370,7 +370,7 @@
                                         <div class="dropdown">
                                             <button class="btn btn-sm btn-light border dropdown-toggle"
                                                     type="button" data-toggle="dropdown">
-                                                <i class="fas fa-ellipsis-h"></i>
+                                                <i class="fas fa-cogs"></i>
                                             </button>
                                             <div class="dropdown-menu dropdown-menu-right">
                                                 @can('show ticket')
@@ -586,6 +586,9 @@
 
             updateActiveFiltersCount();
             $('#filter-form').on('change input', 'input, select', updateActiveFiltersCount);
+            $('#filter-form').on('keydown', 'input', function (e) {
+                if (e.key === 'Enter') $('#ok-filter').trigger('click');
+            });
 
             $('.date-preset').on('click', function () {
                 const range = $(this).data('range');

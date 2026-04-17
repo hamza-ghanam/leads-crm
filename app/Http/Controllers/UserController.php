@@ -27,20 +27,33 @@ class UserController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
         parent::hasPermission('list users');
 
-        $users = User::orderBy('deleted_at', 'ASC')
+        $fullName = $request->input('fullName', '');
+        $email    = $request->input('email', '');
+        $role     = $request->input('role', '');
+        $status   = $request->input('status', '');
+
+        $users = User::withTrashed()
+            ->when($fullName, fn($q) => $q->where('name', 'like', "%{$fullName}%"))
+            ->when($email,    fn($q) => $q->where('email', 'like', "%{$email}%"))
+            ->when($role,     fn($q) => $q->whereHas('roles', fn($q) => $q->where('name', $role)))
+            ->when($status === 'deleted',  fn($q) => $q->whereNotNull('deleted_at'))
+            ->when($status === 'permitted', fn($q) => $q->whereNull('deleted_at')->where('status', 'permitted'))
+            ->when($status === 'banned',    fn($q) => $q->whereNull('deleted_at')->where('status', 'banned'))
+            ->orderBy('deleted_at', 'ASC')
             ->orderBy('created_at', 'DESC')
-            ->withTrashed()
             ->get();
 
         foreach ($users as $user) {
             $user->role = count($user->roles) > 0 ? $user->roles[0]->name : '-';
         }
 
-        return view('users.index')->with(['users' => $users]);
+        $roles = Role::orderBy('name')->pluck('name');
+
+        return view('users.index', compact('users', 'roles', 'fullName', 'email', 'role', 'status'));
     }
 
     /**

@@ -312,6 +312,9 @@
 
             updateActiveFiltersCount();
             $('#filter-form').on('change input', 'input, select', updateActiveFiltersCount);
+            $('#filter-form').on('keydown', 'input', function (e) {
+                if (e.key === 'Enter') $('#ok-filter').trigger('click');
+            });
 
             $('.date-preset').on('click', function () {
                 const range = $(this).data('range');
