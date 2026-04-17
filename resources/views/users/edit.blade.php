@@ -1,126 +1,206 @@
 @extends('layouts.app')
 
 @section('title')
-    Edit user
+    Edit User
 @endsection
 
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ URL::to('/') }}">Home</a></li>
-    <li class="breadcrumb-item"><a href="{{ URL::to('/users') }}">Users list</a></li>
-    <li class="breadcrumb-item">Edit user</li>
+    <li class="breadcrumb-item"><a href="{{ route('users.all') }}">Users</a></li>
+    <li class="breadcrumb-item active">Edit User</li>
 @endsection
 
 @section('content')
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <!-- /.card-header -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-7">
+            <div class="card shadow-sm">
+                <div class="card-header" style="background-color: #2d3955;">
+                    <h3 class="card-title text-white mb-0">
+                        <i class="fas fa-user-edit mr-2"></i> Edit User — <i><strong>{{ $user->name }}</strong></i>
+                    </h3>
+                </div>
                 <div class="card-body">
+
                     @if ($errors->any())
-                        <div class="alert alert-danger">
-                            <ul style="list-style: none;">
+                        <div class="alert alert-danger alert-dismissible fade show shadow-sm">
+                            <button type="button" class="close" data-dismiss="alert">&times;</button>
+                            <h5><i class="icon fas fa-ban"></i> Please fix the following:</h5>
+                            <ul class="mb-0 pl-3">
                                 @foreach ($errors->all() as $error)
                                     <li>{{ $error }}</li>
                                 @endforeach
                             </ul>
                         </div>
                     @endif
-                    <form name="f1" action="{{ route('users.update', [$user->id]) }}" method="post" style="width: 50%;">
+
+                    <form action="{{ route('users.update', [$user->id]) }}" method="post">
                         @method('PUT')
                         @csrf
-                        <fieldset>
-                            <div class="form-group">
-                                <label for="name">Name</label>
-                                <input type="text" class="form-control" id="name" name="name" placeholder="Enter Name"
-                                       value="{{ $user->name }}">
-                            </div>
-                            <div class="form-group">
-                                <label for="email">Email</label>
-                                <input type="text" class="form-control" id="email" name="email"
-                                       placeholder="Enter Email" value="{{ $user->email }}">
-                            </div>
-                            <div class="form-group">
-                                <label for="phone_number">Phone Number</label>
-                                <input type="text" class="form-control" id="phone" name="phone"
-                                       placeholder="Enter Phone" value="{{ $user->phone }}">
-                            </div>
-                            <div class="form-group">
-                                <label for="role">Role</label>
-                                <select class="form-control" name="role" id="role">
-                                    @foreach($roles as $role)
-                                        <option value="{{$role->id}}" {{$user->role == $role->id ? 'selected' : ''}}>{{$role->name}}</option>
-                                    @endforeach
-                                </select>
-                            </div>
 
-                            @if($user->role == 3 OR $user->role == 4)
-                                <div class="form-group" id="mgrs">
-                                    <label for="mgrs-list">Sales Manager</label>
-                                    <select class="form-control" name="manager" id="mgrs-list">
-                                        @foreach($salesManagers as $salesManager)
-                                            <option {{ $user->manager_id !== null && $user->manager_id == $salesManager->id ? 'selected' : '' }} value="{{$salesManager->id}}">{{$salesManager->name}}</option>
-                                        @endforeach
-                                    </select>
+                        <div class="form-group">
+                            <label for="name">Name <sup class="text-danger">*</sup></label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-user"></i></span>
                                 </div>
-                            @endif
-
-                            <div class="form-group">
-                                <label for="password">Password</label>
-                                <small class="text-danger text-bold"> (If you don't want to change it, keep it empty.)</small>
-                                <input type="password" class="form-control" id="password" name="password" autocomplete="new-password" />
+                                <input type="text" id="name" name="name"
+                                       class="form-control @error('name') is-invalid @enderror"
+                                       placeholder="Full name"
+                                       value="{{ old('name', $user->name) }}"/>
+                                @error('name')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
+                        </div>
 
-                            <div class="form-group">
-                                <label for="password_confirmation">Password Confirmation</label>
-                                <small class="text-danger text-bold"> (If you don't want to change it, keep it empty.)</small>
-                                <input type="password" class="form-control" id="password_confirmation" autocomplete="new-password"
-                                       name="password_confirmation" />
-                            </div>
-
-                            <div class="form-group">
-                                <div class="custom-control custom-switch">
-                                  <input type="checkbox"  class="custom-control-input" id="customSwitch1" name="ban_check" {{ $user->status === 'permitted' ? 'checked' : '' }} />
-                                  <label class="custom-control-label" for="customSwitch1">{{ $user->status === 'banned' ? 'Banned' : 'Permitted' }}</label>
+                        <div class="form-group">
+                            <label for="email">Email <sup class="text-danger">*</sup></label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                 </div>
+                                <input type="email" id="email" name="email"
+                                       class="form-control @error('email') is-invalid @enderror"
+                                       placeholder="email@example.com"
+                                       value="{{ old('email', $user->email) }}"/>
+                                @error('email')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
+                        </div>
 
-                            <div class="form-group">
-                                <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
-                                    <input type="checkbox" class="custom-control-input" id="customSwitch3" name="delete_check" {{ !$user->deleted_at ? 'checked' : '' }} />
-                                    <label class="custom-control-label" for="customSwitch3">{{ $user->deleted_at ? 'Deleted (' . date('Y-m-d h:i:s A', strtotime($user->deleted_at)) . ')' : 'Available' }}</label>
+                        <div class="form-group">
+                            <label for="phone">Phone Number</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
                                 </div>
+                                <input type="text" id="phone" name="phone"
+                                       class="form-control @error('phone') is-invalid @enderror"
+                                       placeholder="Phone number"
+                                       value="{{ old('phone', $user->phone) }}"/>
+                                @error('phone')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
+                        </div>
 
-                            <button type="submit" class="btn btn-primary">Save</button>
-                            <a class="btn btn-dark ml-3" href="{{route('users.all')}}">Cancel</a>
-                        </fieldset>
+                        <div class="form-group">
+                            <label for="role">Role <sup class="text-danger">*</sup></label>
+                            <select class="form-control select2" name="role" id="role">
+                                @foreach($roles as $role)
+                                    <option value="{{ $role->id }}"
+                                        {{ $user->role == $role->id ? 'selected' : '' }}>
+                                        {{ $role->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="mgrs" style="display: none;">
+                            <label for="mgrs-list">Sales Manager <sup class="text-danger">*</sup></label>
+                            <select class="form-control select2" name="manager" id="mgrs-list">
+                                @foreach($salesManagers as $salesManager)
+                                    <option value="{{ $salesManager->id }}"
+                                        {{ $user->manager_id == $salesManager->id ? 'selected' : '' }}>
+                                        {{ $salesManager->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="form-group">
+                            <label for="password">
+                                New Password
+                                <small class="text-danger ml-1">(leave blank to keep current)</small>
+                            </label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                </div>
+                                <input type="password" id="password" name="password"
+                                       class="form-control @error('password') is-invalid @enderror"
+                                       placeholder="New password" autocomplete="new-password"/>
+                                @error('password')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password_confirmation">Confirm New Password</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                </div>
+                                <input type="password" id="password_confirmation" name="password_confirmation"
+                                       class="form-control"
+                                       placeholder="Confirm new password" autocomplete="new-password"/>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="form-group">
+                            <label class="d-block mb-2">Account Status</label>
+                            <div class="custom-control custom-switch mb-2">
+                                <input type="checkbox" class="custom-control-input" id="customSwitch1"
+                                       name="ban_check" {{ $user->status === 'permitted' ? 'checked' : '' }}/>
+                                <label class="custom-control-label" for="customSwitch1">
+                                    {{ $user->status === 'banned' ? 'Banned' : 'Permitted' }}
+                                </label>
+                            </div>
+                            <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
+                                <input type="checkbox" class="custom-control-input" id="customSwitch3"
+                                       name="delete_check" {{ !$user->deleted_at ? 'checked' : '' }}/>
+                                <label class="custom-control-label" for="customSwitch3">
+                                    @if($user->deleted_at)
+                                        Deleted ({{ date('d/m/Y h:i A', strtotime($user->deleted_at)) }})
+                                    @else
+                                        Available
+                                    @endif
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center mt-4">
+                            <a href="{{ route('users.all') }}" class="btn btn-outline-secondary mr-2">
+                                <i class="fas fa-arrow-left mr-1"></i> Back
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="submit-btn">
+                                <i class="fas fa-save mr-1"></i> Save Changes
+                            </button>
+                        </div>
+
                     </form>
                 </div>
-                <!-- /.card-body -->
             </div>
-            <!-- /.card -->
         </div>
     </div>
 @endsection
+
 @section('script')
     <script>
-        const e = document.getElementById("role");
-        let strUser = e.value; // 2
+        $(function () {
+            $('.select2').select2({ width: '100%' });
+        });
 
-        if (strUser != 3 && strUser != 4) {
-            document.getElementById('mgrs').style.display = 'none';
-        } else {
-            document.getElementById('mgrs').style.display = '';
+        const roleSelect = document.getElementById('role');
+
+        function toggleManager() {
+            const val = parseInt(roleSelect.value);
+            document.getElementById('mgrs').style.display = (val === 3 || val === 4) ? '' : 'none';
         }
 
-        e.addEventListener('change', function () {
-            strUser = e.value;
+        toggleManager();
+        roleSelect.addEventListener('change', toggleManager);
 
-            if (strUser != 3 && strUser != 4) {
-                document.getElementById('mgrs').style.display = 'none';
-            } else {
-                document.getElementById('mgrs').style.display = '';
-            }
+        document.querySelector('form').addEventListener('submit', function () {
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
         });
     </script>
 @endsection
