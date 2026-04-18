@@ -26,7 +26,7 @@
     <div class="row">
         <div class="col-12">
             <div class="card shadow-sm">
-                <div class="card-header" style="background-color: #2d3955;">
+                <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                     <h3 class="card-title text-white mb-0">
                         <i class="fas fa-bullhorn mr-2"></i> Sales Campaigns
                     </h3>
@@ -107,7 +107,7 @@
             @csrf
             <div class="modal-dialog">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #2d3955;">
+                    <div class="modal-header" style="background-color: {{ config('app.theme_color') }};">
                         <h4 class="modal-title text-white">
                             <i class="fas fa-plus-circle mr-1"></i> Assign Sales to Campaign
                         </h4>

@@ -30,7 +30,7 @@
         {{-- Basic details --}}
         <div class="col-{{ $booking ? 6 : 12 }}">
             <div class="card shadow-sm">
-                <div class="card-header" style="background-color: #2d3955;">
+                <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                     <h3 class="card-title text-white mb-0">
                         <i class="fas fa-user mr-2"></i>
                         Lead #{{ $ticket->id }}
@@ -265,7 +265,7 @@
 
                 {{-- Booking info --}}
                 <div class="card shadow-sm">
-                    <div class="card-header" style="background-color: #2d3955;">
+                    <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                         <h3 class="card-title text-white mb-0">
                             <i class="fas fa-calendar-check mr-2"></i> Booking Details
                         </h3>
@@ -295,7 +295,7 @@
                 {{-- Invoice --}}
                 @hasanyrole('admin|super-admin|sales-manager|accountant')
                 <div class="card shadow-sm">
-                    <div class="card-header" style="background-color: #2d3955;">
+                    <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                         <h3 class="card-title text-white mb-0">
                             <i class="fas fa-file-invoice mr-2"></i> Invoice
                         </h3>
@@ -328,7 +328,7 @@
                 {{-- Customer documents --}}
                 @hasanyrole('admin|super-admin|sales-manager')
                 <div class="card shadow-sm">
-                    <div class="card-header" style="background-color: #2d3955;">
+                    <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                         <h3 class="card-title text-white mb-0">
                             <i class="fas fa-passport mr-2"></i> Customer Documents
                         </h3>
@@ -381,7 +381,7 @@
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header" style="background-color: #2d3955;">
+                    <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                         <h3 class="card-title text-white mb-0">
                             <i class="fas fa-history mr-2"></i> Lead Path
                         </h3>
@@ -494,7 +494,7 @@
                     <div class="row mt-2">
                         <div class="col-12">
                             <div class="card shadow-sm">
-                                <div class="card-header" style="background-color: #2d3955;">
+                                <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                                     <h3 class="card-title text-white mb-0">
                                         <i class="fas fa-forward mr-2"></i> Move Forward
                                     </h3>

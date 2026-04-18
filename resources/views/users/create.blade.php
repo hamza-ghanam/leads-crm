@@ -14,7 +14,7 @@
     <div class="row justify-content-center">
         <div class="col-12 col-md-7">
             <div class="card shadow-sm">
-                <div class="card-header" style="background-color: #2d3955;">
+                <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                     <h3 class="card-title text-white mb-0">
                         <i class="fas fa-user-plus mr-2"></i> Add New User
                     </h3>

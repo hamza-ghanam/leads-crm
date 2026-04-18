@@ -41,11 +41,11 @@
 
     <style>
         .sidebar {
-            background-color: #2d3955 !important;
+            background-color: {{ config('app.theme_color') }} !important;
         }
 
         .brand-link {
-            background-color: #2d3955 !important;
+            background-color: {{ config('app.theme_color') }} !important;
         }
 
         .custom-map-control-button {

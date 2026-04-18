@@ -15,6 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'theme_color' => env('APP_THEME_COLOR', '#2d3955'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment
