@@ -49,269 +49,211 @@
                     <form name="f1" action="{{ route('tickets.update', $ticket->id) }}" method="post">
                         @csrf
                         @method('PUT')
-                        <table class="table table-bordered table-sm mb-0">
-                            <tr>
-                                <th style="width: 30%;">Number</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="number" name="number"
-                                               placeholder="Enter Number"
-                                               value="{{ $ticket->number ?? '' }}"/>
+
+                        <dl class="lead-detail-list mb-0">
+
+                        @hasanyrole('super-admin')
+                            <div class="lead-detail-row">
+                                <dt>Number</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="number" name="number" placeholder="Enter Number" value="{{ $ticket->number ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>AD ID</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="ad_id" name="ad_id" placeholder="Enter Ad ID" value="{{ $ticket->ad_id ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>AD Name</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="ad_name" name="ad_name" placeholder="Enter Ad Name" value="{{ $ticket->ad_name ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>AD Set ID</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="adset_id" name="adset_id" placeholder="Enter Adset ID" value="{{ $ticket->adset_id ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>AD Set Name</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="adset_name" name="adset_name" placeholder="Enter Adset Name" value="{{ $ticket->adset_name ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>Campaign ID</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="campaign_id" name="campaign_id" placeholder="Enter Campaign ID" value="{{ $ticket->campaign_id ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>Campaign Name</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="campaign_name" name="campaign_name" placeholder="Enter Campaign Name" value="{{ $ticket->campaign_name ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>Form ID</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="form_id" name="form_id" placeholder="Enter Form ID" value="{{ $ticket->form_id ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>Form Name</dt>
+                                <dd><input type="text" class="form-control form-control-sm" id="form_name" name="form_name" placeholder="Enter Form Name" value="{{ $ticket->form_name ?? '' }}"/></dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>Is Organic</dt>
+                                <dd class="d-flex align-items-center">
+                                    <input class="form-check-input m-0" type="checkbox" id="is_organic" name="is_organic" {{ $ticket->is_organic == 1 ? 'checked' : '' }}>
+                                </dd>
+                            </div>
+                        @else
+                            <div class="lead-detail-row">
+                                <dt>Number</dt>
+                                <dd>{{ $ticket->number ?? '—' }}</dd>
+                            </div>
+                            <div class="lead-detail-row">
+                                <dt>Is Organic</dt>
+                                <dd>{{ isset($ticket->is_organic) ? ($ticket->is_organic != 0 ? 'Yes' : 'No') : '—' }}</dd>
+                            </div>
+                        @endhasanyrole
+
+                        {{-- Full Name --}}
+                        <div class="lead-detail-row">
+                            <dt>Full Name</dt>
+                            <dd>
+                                @hasanyrole('admin|super-admin|sale|tele-sale')
+                                    <input type="text" class="form-control form-control-sm" id="full_name" name="full_name" placeholder="Enter Full Name" value="{{ $ticket->full_name ?? '' }}" required/>
+                                @else
+                                    {{ $ticket->full_name ?? '—' }}
+                                @endhasanyrole
+                            </dd>
+                        </div>
+
+                        {{-- Phone Number --}}
+                        <div class="lead-detail-row">
+                            <dt>Phone Number</dt>
+                            <dd>
+                                @hasanyrole('admin|super-admin')
+                                    <input type="text" class="form-control form-control-sm" id="phone_number" name="phone_number" placeholder="Enter Phone Number" value="{{ $ticket->phone_number ?? '' }}" required/>
+                                @else
+                                    @if($ticket->phone_number)
+                                        <a href="tel:{{ $ticket->phone_number }}" class="text-reset">{{ $ticket->phone_number }}</a>
                                     @else
-                                        {{ $ticket->number ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>AD ID</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="ad_id" name="ad_id"
-                                               placeholder="Enter Ad ID"
-                                               value="{{ $ticket->ad_id ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->ad_id ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>AD Name</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="ad_name" name="ad_name"
-                                               placeholder="Enter Ad Name"
-                                               value="{{ $ticket->ad_name ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->ad_name ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>AD Set ID</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="adset_id" name="adset_id"
-                                               placeholder="Enter Adset ID"
-                                               value="{{ $ticket->adset_id ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->adset_id ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>AD Set Name</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="adset_name" name="adset_name"
-                                               placeholder="Enter Adset Name"
-                                               value="{{ $ticket->adset_name ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->adset_name ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Campaign ID</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="campaign_id" name="campaign_id"
-                                               placeholder="Enter Campaign ID"
-                                               value="{{ $ticket->campaign_id ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->campaign_id ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Campaign Name</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="campaign_name" name="campaign_name"
-                                               placeholder="Enter Campaign Name"
-                                               value="{{ $ticket->campaign_name ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->campaign_name ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Form ID</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="form_id" name="form_id"
-                                               placeholder="Enter Form ID"
-                                               value="{{ $ticket->form_id ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->form_id ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Form Name</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="form_name" name="form_name"
-                                               placeholder="Enter Form Name"
-                                               value="{{ $ticket->form_name ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->form_name ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Is Organic</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox"
-                                                   id="is_organic" name="is_organic"
-                                                   {{ $ticket->is_organic == 1 ? 'checked' : '' }}>
-                                        </div>
-                                    @else
-                                        {{ isset($ticket->is_organic) ? ($ticket->is_organic != 0 ? 'Yes' : 'No') : '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Full Name</th>
-                                <td>
-                                    @hasanyrole('admin|super-admin|sale|tele-sale')
-                                        <input type="text" class="form-control form-control-sm" id="full_name" name="full_name"
-                                               placeholder="Enter Full Name"
-                                               value="{{ $ticket->full_name ?? '' }}" required/>
-                                    @else
-                                        {{ $ticket->full_name ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Phone Number</th>
-                                <td>
-                                    @hasanyrole('admin|super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="phone_number" name="phone_number"
-                                               placeholder="Enter Phone Number"
-                                               value="{{ $ticket->phone_number ?? '' }}" required/>
-                                    @else
-                                        {{ $ticket->phone_number ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Email</th>
-                                <td>
-                                    @hasanyrole('admin|super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="email" name="email"
-                                               placeholder="Enter Email Address"
-                                               value="{{ $ticket->email ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->email ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Job Title</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <input type="text" class="form-control form-control-sm" id="job_title" name="job_title"
-                                               placeholder="Enter Job Title"
-                                               value="{{ $ticket->job_title ?? '' }}"/>
-                                    @else
-                                        {{ $ticket->job_title ?? '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Source</th>
-                                <td>
-                                    @hasanyrole('super-admin')
-                                        <select name="source" id="source" class="form-control form-control-sm select2" required>
-                                            @foreach($sources as $source)
-                                                <option value="{{ $source->id }}"
-                                                    {{ ($ticket->source_id && $ticket->source_id == $source->id) ? 'selected' : '' }}>
-                                                    {{ $source->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    @else
-                                        {{ $ticket->source_id ? $ticket->source->name : '-' }}
-                                    @endhasanyrole
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Preferred Time to Call</th>
-                                <td>{{ $ticket->preferred_time ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Remarks</th>
-                                <td style="text-align: justify;">{{ $ticket->remarks ?? '-' }}</td>
-                            </tr>
-                            @hasrole('super-admin')
-                                @if($ticket->method)
-                                    <tr>
-                                        <th>Assign Method</th>
-                                        <td>{{ $ticket->method }}</td>
-                                    </tr>
-                                @endif
-                                @if($ticket->method && $ticket->assigner_id && str_contains($ticket->method, 'Manual'))
-                                    <tr>
-                                        <th>Assigned By</th>
-                                        <td>{{ $ticket->assigner->name }}</td>
-                                    </tr>
-                                @endif
-                            @endhasrole
-                            <tr>
-                                <th>Current User</th>
-                                <td>{{ $ticket->user_id ? $ticket->user->name : '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Current Status</th>
-                                <td>
-                                    <span class="badge"
-                                          style="color:#FFF; background-color: {{ Config::get('constants.status_colors.' . $ticket->status->slug) }};">
-                                        {{ $ticket->status->name }}
-                                    </span>
-                                </td>
-                            </tr>
-                            @hasrole('super-admin')
-                                <tr>
-                                    <th>Created</th>
-                                    <td>
-                                        <small class="text-muted">{{ date('d/m/Y h:i A', strtotime($ticket->created_at)) }}</small>
-                                    </td>
-                                </tr>
-                            @endhasrole
-                            <tr>
-                                <th>Last Updated</th>
-                                <td>
-                                    <small class="text-muted">{{ date('d/m/Y h:i A', strtotime($ticket->updated_at)) }}</small>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Extra Data</th>
-                                <td>
-                                    @if($ticket->extra_data)
-                                        <ul class="mb-0 pl-3">
-                                            @foreach($ticket->extra_data as $key => $value)
-                                                <li>
-                                                    <strong>{{ $key }}</strong>: {{ is_array($value) ? implode(', ', $value) : $value }}
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    @else
-                                        <i class="text-muted">No extra data available.</i>
+                                        —
                                     @endif
-                                </td>
-                            </tr>
-                            @hasanyrole('admin|super-admin|sale|tele-sale')
-                                <tr>
-                                    <td colspan="2" class="text-right bg-light">
-                                        <button type="submit" class="btn btn-success btn-sm" id="basic-save-btn">
-                                            <i class="fas fa-save mr-1"></i> Save Changes
-                                        </button>
-                                    </td>
-                                </tr>
-                            @endhasanyrole
-                        </table>
+                                @endhasanyrole
+                            </dd>
+                        </div>
+
+                        {{-- Email --}}
+                        <div class="lead-detail-row">
+                            <dt>Email</dt>
+                            <dd>
+                                @hasanyrole('admin|super-admin')
+                                    <input type="text" class="form-control form-control-sm" id="email" name="email" placeholder="Enter Email Address" value="{{ $ticket->email ?? '' }}"/>
+                                @else
+                                    @if($ticket->email)
+                                        <a href="mailto:{{ $ticket->email }}" class="text-reset">{{ $ticket->email }}</a>
+                                    @else
+                                        —
+                                    @endif
+                                @endhasanyrole
+                            </dd>
+                        </div>
+
+                        {{-- Job Title --}}
+                        <div class="lead-detail-row">
+                            <dt>Job Title</dt>
+                            <dd>
+                                @hasanyrole('super-admin')
+                                    <input type="text" class="form-control form-control-sm" id="job_title" name="job_title" placeholder="Enter Job Title" value="{{ $ticket->job_title ?? '' }}"/>
+                                @else
+                                    {{ $ticket->job_title ?? '—' }}
+                                @endhasanyrole
+                            </dd>
+                        </div>
+
+                        {{-- Source --}}
+                        <div class="lead-detail-row">
+                            <dt>Source</dt>
+                            <dd>
+                                @hasanyrole('super-admin')
+                                    <select name="source" id="source" class="form-control form-control-sm select2" required>
+                                        @foreach($sources as $source)
+                                            <option value="{{ $source->id }}" {{ ($ticket->source_id && $ticket->source_id == $source->id) ? 'selected' : '' }}>{{ $source->name }}</option>
+                                        @endforeach
+                                    </select>
+                                @else
+                                    {{ $ticket->source_id ? $ticket->source->name : '—' }}
+                                @endhasanyrole
+                            </dd>
+                        </div>
+
+                        <div class="lead-detail-row">
+                            <dt>Preferred Time to Call</dt>
+                            <dd>{{ $ticket->preferred_time ?? '—' }}</dd>
+                        </div>
+
+                        <div class="lead-detail-row">
+                            <dt>Remarks</dt>
+                            <dd style="text-align:justify;">{{ $ticket->remarks ?? '—' }}</dd>
+                        </div>
+
+                        @hasrole('super-admin')
+                            @if($ticket->method)
+                                <div class="lead-detail-row">
+                                    <dt>Assign Method</dt>
+                                    <dd>{{ $ticket->method }}</dd>
+                                </div>
+                            @endif
+                            @if($ticket->method && $ticket->assigner_id && str_contains($ticket->method, 'Manual'))
+                                <div class="lead-detail-row">
+                                    <dt>Assigned By</dt>
+                                    <dd>{{ $ticket->assigner->name }}</dd>
+                                </div>
+                            @endif
+                        @endhasrole
+
+                        <div class="lead-detail-row">
+                            <dt>Current User</dt>
+                            <dd>{{ $ticket->user_id ? $ticket->user->name : '—' }}</dd>
+                        </div>
+
+                        <div class="lead-detail-row">
+                            <dt>Current Status</dt>
+                            <dd>
+                                <span class="badge" style="color:#FFF; font-size:13px; background-color: {{ Config::get('constants.status_colors.' . $ticket->status->slug) }};">
+                                    {{ $ticket->status->name }}
+                                </span>
+                            </dd>
+                        </div>
+
+                        @hasrole('super-admin')
+                            <div class="lead-detail-row">
+                                <dt>Created</dt>
+                                <dd class="text-muted">{{ date('d/m/Y h:i A', strtotime($ticket->created_at)) }}</dd>
+                            </div>
+                        @endhasrole
+
+                        <div class="lead-detail-row">
+                            <dt>Last Updated</dt>
+                            <dd class="text-muted">{{ date('d/m/Y h:i A', strtotime($ticket->updated_at)) }}</dd>
+                        </div>
+
+                        <div class="lead-detail-row lead-detail-row--top">
+                            <dt>Extra Data</dt>
+                            <dd>
+                                @if($ticket->extra_data)
+                                    <ul class="mb-0 pl-3">
+                                        @foreach($ticket->extra_data as $key => $value)
+                                            <li><strong>{{ $key }}</strong>: {{ is_array($value) ? implode(', ', $value) : $value }}</li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <span class="text-muted"><i>No extra data available.</i></span>
+                                @endif
+                            </dd>
+                        </div>
+
+                        </dl>
+
+                        @hasanyrole('admin|super-admin|sale|tele-sale')
+                            <div class="d-flex justify-content-end p-3 border-top">
+                                <button type="submit" class="btn btn-success btn-sm" id="basic-save-btn">
+                                    <i class="fas fa-save mr-1"></i> Save Changes
+                                </button>
+                            </div>
+                        @endhasanyrole
+
                     </form>
                 </div>
             </div>
@@ -592,7 +534,7 @@
                                                         });
                                                     @endphp
 
-                                                    <select name="status" id="status" class="form-control" required>
+                                                    <select name="status" id="status" class="form-control select2" required>
                                                         <option value="-1" disabled selected>Please select…</option>
                                                         @foreach($availableStatuses as $status)
                                                             <option value="{{ $status->id }}" data-slug="{{ $status->slug }}">
@@ -610,7 +552,7 @@
                                             <div class="col-md-6">
                                                 <div class="form-group">
                                                     <label for="user">Assign To <sup class="text-danger">*</sup></label>
-                                                    <select name="user" id="user" class="form-control" required>
+                                                    <select name="user" id="user" class="form-control select2" required>
                                                         <optgroup label="Sales">
                                                             @foreach($users as $user)
                                                                 @if($user->role === 'sale')
@@ -781,6 +723,35 @@
         @endcan
     @endif
 
+    <style>
+        .lead-detail-list { margin: 0; }
+        .lead-detail-row {
+            display: flex;
+            align-items: center;
+            padding: 7px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            gap: 12px;
+        }
+        .lead-detail-row--top { align-items: flex-start; }
+        .lead-detail-row dt {
+            flex: 0 0 160px;
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: #495057;
+            margin: 0;
+        }
+        .lead-detail-row dd {
+            flex: 1;
+            margin: 0;
+            font-size: 0.875rem;
+            min-width: 0;
+        }
+        @media (max-width: 575px) {
+            .lead-detail-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+            .lead-detail-row dt { flex: none; }
+        }
+    </style>
+
 @endsection
 
 @section('script')
@@ -837,8 +808,6 @@
             }
         }
 
-        const statusSelect = document.getElementById('status');
-
         const statusModalMap = {
             'booking':   '#modal-lg',
             'meeting':   '#modal-lg2',
@@ -847,18 +816,13 @@
 
         const allModals = ['#modal-lg', '#modal-lg2', '#modal-lg3'];
 
-        if (statusSelect) {
-            statusSelect.addEventListener('change', (e) => {
-                const option = e.target.selectedOptions[0];
-                const slug   = option.dataset.slug;
-
-                resetPreviews();
-                allModals.forEach(id => $(id).modal('hide'));
-
-                const modalId = statusModalMap[slug];
-                if (modalId) $(modalId).modal('show');
-            });
-        }
+        $('#status').on('change', function () {
+            const slug = $(this).find(':selected').data('slug');
+            resetPreviews();
+            allModals.forEach(id => $(id).modal('hide'));
+            const modalId = statusModalMap[slug];
+            if (modalId) $(modalId).modal('show');
+        });
 
         const saveBtn = document.getElementById('saveBtn');
         if (saveBtn) {
