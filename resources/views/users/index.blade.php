@@ -220,7 +220,7 @@
             margin-bottom: 0.75rem;
         }
         .filter-card .card-header {
-            background-color: #2d3955 !important;
+            background-color: {{ config('app.theme_color') }} !important;
             color: #fff;
         }
         .filter-card .card-header .card-title { color: #fff; }
