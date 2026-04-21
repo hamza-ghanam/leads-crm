@@ -13,14 +13,14 @@ use Kreait\Firebase\Messaging\CloudMessage;
 class NotificationService
 {
     /**
-     * إرسال إشعار لمستخدم واحد (وحفظه في الـ DB).
+     * send a notification to single user (Store in DB).
      *
      * @param \App\Models\User|int $user
      * @param string $title
      * @param string $body
-     * @param string|null $url رابط داخلي مثلاً /tickets/123
-     * @param string|null $type مثل: reminder, ticket_follow_up
-     * @param array $extraData بيانات إضافية للـ payload
+     * @param string|null $url inner relationship /tickets/123
+     * @param string|null $type e.g.: reminder, ticket_follow_up
+     * @param array $extraData additional data of payload
      * @param string|null $icon
      * @return \App\Models\Notification
      */
@@ -42,7 +42,7 @@ class NotificationService
         ]);
 
         // 2) نجلب التوكنات تبع المستخدم
-        $tokens = $user->fcmTokens()
+        $tokens = $user->deviceTokens()
             ->pluck('token')
             ->filter()
             ->unique()
@@ -93,7 +93,7 @@ class NotificationService
     }
 
     /**
-     * الجزء الخاص بالتعامل المباشر مع FCM
+     * Send FCM
      */
     protected function sendFcm(array $tokens, array $data): void
     {

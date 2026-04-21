@@ -15,6 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'theme_color' => env('APP_THEME_COLOR', '#2d3955'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment
@@ -67,7 +69,7 @@ return [
     |
     */
 
-    'timezone' => 'Asia/Dubai',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Dubai'),
 
     /*
     |--------------------------------------------------------------------------
@@ -176,8 +178,6 @@ return [
         App\Providers\RouteServiceProvider::class,
         Spatie\Permission\PermissionServiceProvider::class,
         Maatwebsite\Excel\ExcelServiceProvider::class,
-        Barryvdh\DomPDF\ServiceProvider::class,
-        Kutia\Larafirebase\Providers\LarafirebaseServiceProvider::class,
         App\Providers\ViewServiceProvider::class,
     ],
 
@@ -233,8 +233,9 @@ return [
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View' => Illuminate\Support\Facades\View::class,
         'Excel' => Maatwebsite\Excel\Facades\Excel::class,
-        'PDF' => Barryvdh\DomPDF\Facade::class,
         'Notifier' => App\Facades\Notifier::class,
     ],
 
+    'build_version' => env('BUILD_VERSION', '4.0'),
+    'auth_token' => env('MAKE_SECRET', 'xyz'),
 ];

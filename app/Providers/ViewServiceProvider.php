@@ -10,7 +10,8 @@ class ViewServiceProvider extends ServiceProvider
 {
     public function boot()
     {
-        View::composer('layouts.app', function ($view) {
+        $limit = 5;
+        View::composer('layouts.app', function ($view) use ($limit) {
             $user = auth()->user();
 
             if (!$user) {
@@ -20,7 +21,7 @@ class ViewServiceProvider extends ServiceProvider
             // Latest 10 notifications
             $notifications = Notification::where('user_id', $user->id)
                 ->latest()
-                ->limit(10)
+                ->limit($limit)
                 ->get();
 
             // Count unread notifications

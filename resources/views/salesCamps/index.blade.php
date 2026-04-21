@@ -1,179 +1,178 @@
 @extends('layouts.app')
 
 @section('title')
-    Sales Campaigns list
+    Sales Campaigns
 @endsection
 
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ URL::to('/') }}">Home</a></li>
-    <li class="breadcrumb-item">Sales Campaigns list</li>
+    <li class="breadcrumb-item active">Sales Campaigns</li>
 @endsection
 
 @section('content')
-    <!-- Info boxes -->
-    <div class="row">
-        <!-- fix for small devices only -->
-        <div class="clearfix hidden-md-up"></div>
-    </div>
-    <!-- /.row -->
+
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            <h5><i class="icon fas fa-ban"></i> Please fix the following:</h5>
+            <ul class="mb-0 pl-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <a href="javascript:void(0);" class="btn btn-primary" id="add-sacamp">Add</a>
-                    <form method="post" name="settings-form" id="settings-form" class="float-right" action="{{ route('settings.update') }}">
-                        @csrf
-                        @method('PUT')
-                        <div class="form-group">
-                            <div class="custom-control custom-switch">
-                                <input type="checkbox" class="custom-control-input" id="customSwitch1"
-                                       name="settings_values[]" {{ $use_camps ? 'checked' : '' }}
-                                       value="{{ $use_camps ? 'on' : 'off' }}" />
-                                <label class="custom-control-label" for="customSwitch1">Enable shuffle based on campaigns</label>
-                                <input type="hidden" name="settings_names[]" value="use_camps">
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <!-- /.card-header -->
-                <div class="card-body">
-                    @if ($errors->any())
-                        <div class="alert alert-danger">
-                            <ul style="list-style: none;">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-                    <table id="example2" class="table table-bordered table-hover">
-                        <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Sales name</th>
-                            <th>Campaign name</th>
-                            <th>Assigned at</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach($salesCamps as $key => $salesCamp)
-                            <tr>
-                                <td>{{ $key + 1 }}</td>
-                                <td><a target="_blank"
-                                       href="{{ route('users.edit', [$salesCamp->user_id]) }}"> {{ $salesCamp->user->name }}</a>
-                                </td>
-                                <td>{{ $salesCamp->campaign_name }}</td>
-                                <td>{{ date('d/m/Y h:i A', strtotime($salesCamp->created_at)) }}</td>
-                                <td>
-                                    <a class="btn btn-danger" tabindex="-1" href="javascript:void(0);"
-                                       onclick="deleteSalesCamps({{ $salesCamp->id }})">
-                                        <i class="fas fa-trash"></i> Delete
-                                    </a>
-                                </td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
-                    <div class="modal fade" id="modal-lg">
-                        <form name="ff" action="{{ route('salesCamps.store') }}" method="post">
+            <div class="card shadow-sm">
+                <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
+                    <h3 class="card-title text-white mb-0">
+                        <i class="fas fa-bullhorn mr-2"></i> Sales Campaigns
+                    </h3>
+                    <div class="card-tools d-flex align-items-center">
+                        {{-- Shuffle toggle --}}
+                        <form method="post" name="settings-form" id="settings-form"
+                              action="{{ route('settings.update') }}" class="mr-3 mb-0">
                             @csrf
-                            <div class="modal-dialog modal-lg">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h4 class="modal-title">Assign sales to campaign</h4>
-                                        <button type="button" class="close" data-dismiss="modal"
-                                                aria-label="Close">
-                                            <span aria-hidden="true">&times;</span>
-                                        </button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="form-group">
-                                            <label for="client-unit">Campaign name</label><sup>*</sup>
-                                            <input type="text" class="form-control form-control-sm" name="campaign_name" id="campaign_name"
-                                                   value="{{ old('campaign_name') }}" />
-                                        </div>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="form-group">
-                                            <label for="client-unit">Sales employee</label><sup>*</sup>
-                                            <select name="sales" id="sales" class="form-control" required>
-                                                <optgroup label="Sales">
-                                                    @foreach($sales as $user)
-                                                        @if ($user->getRoleNames()[0] === 'sale')
-                                                            <option value="{{$user->id}}">
-                                                                {{$user->name}}
-                                                            </option>
-                                                        @endif
-                                                    @endforeach
-                                                </optgroup>
-                                                <optgroup label="Tele-Sales">
-                                                    @foreach($sales as $user)
-                                                        @if ($user->getRoleNames()[0] === 'tele-sale')
-                                                            <option value="{{$user->id}}">
-                                                                {{$user->name}}
-                                                            </option>
-                                                        @endif
-                                                    @endforeach
-                                                </optgroup>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer justify-content-between">
-                                        <button type="button" class="btn btn-default"
-                                                data-dismiss="modal">
-                                            Close
-                                        </button>
-                                        <button type="submit" class="btn btn-primary" id="saveBtn">
-                                            Submit
-                                        </button>
-                                    </div>
-                                </div>
-                                <!-- /.modal-content -->
+                            @method('PUT')
+                            <div class="custom-control custom-switch mb-0">
+                                <input type="hidden"
+                                       name="settings_values[{{ $camp_assign_key }}]"
+                                       value="0"/>
+                                <input type="checkbox" class="custom-control-input" id="customSwitch1"
+                                       name="settings_values[{{ $camp_assign_key }}]"
+                                       value="1"
+                                       @checked(old('settings_values.'.$camp_assign_key, $camp_assign_value) == '1')/>
+                                <label class="custom-control-label text-white" for="customSwitch1">
+                                    Enable shuffle by campaigns
+                                </label>
                             </div>
-                            <!-- /.modal-dialog -->
                         </form>
+
+                        <button type="button" id="add-sacamp" class="btn btn-sm btn-success">
+                            <i class="fas fa-plus mr-1"></i> Add
+                        </button>
                     </div>
                 </div>
-                <!-- /.card-body -->
+
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="example2" class="table table-hover table-striped align-middle">
+                            <thead class="thead-light">
+                            <tr>
+                                <th style="width:50px;">#</th>
+                                <th>Sales Name</th>
+                                <th>Campaign Name</th>
+                                <th>Assigned At</th>
+                                <th style="width:80px;" class="text-center">Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($salesCamps as $key => $salesCamp)
+                                <tr>
+                                    <td>{{ $key + 1 }}</td>
+                                    <td>
+                                        <a target="_blank" href="{{ route('users.edit', [$salesCamp->user_id]) }}">
+                                            <i class="fas fa-user-circle text-muted mr-1"></i>
+                                            {{ $salesCamp->user->name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ $salesCamp->campaign_name }}</td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ date('d/m/Y h:i A', strtotime($salesCamp->created_at)) }}
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-danger"
+                                                onclick="deleteSalesCamps({{ $salesCamp->id }})"
+                                                title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            <!-- /.card -->
         </div>
     </div>
+
+    {{-- Add modal --}}
+    <div class="modal fade" id="modal-lg">
+        <form name="ff" action="{{ route('salesCamps.store') }}" method="post">
+            @csrf
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: {{ config('app.theme_color') }};">
+                        <h4 class="modal-title text-white">
+                            <i class="fas fa-plus-circle mr-1"></i> Assign Sales to Campaign
+                        </h4>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="campaign_name">Campaign Name <sup class="text-danger">*</sup></label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-bullhorn"></i></span>
+                                </div>
+                                <input type="text" class="form-control" name="campaign_name" id="campaign_name"
+                                       placeholder="Enter campaign name"
+                                       value="{{ old('campaign_name') }}" required/>
+                            </div>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label for="sales">Sales Employee <sup class="text-danger">*</sup></label>
+                            <select name="sales" id="sales" class="form-control select2-modal" required>
+                                <optgroup label="Sales">
+                                    @foreach($sales as $user)
+                                        @if($user->getRoleNames()[0] === 'sale')
+                                            <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                        @endif
+                                    @endforeach
+                                </optgroup>
+                                <optgroup label="Tele-Sales">
+                                    @foreach($sales as $user)
+                                        @if($user->getRoleNames()[0] === 'tele-sale')
+                                            <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                        @endif
+                                    @endforeach
+                                </optgroup>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-between">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary" id="saveBtn">
+                            <i class="fas fa-save mr-1"></i> Submit
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <style>
+        table#example2 td, table#example2 th { vertical-align: middle; }
+    </style>
 @endsection
 
 @section('script')
-    <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
-    <!-- Toastr -->
-    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
+    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js') }}"></script>
 
     <script>
-        document.getElementById('customSwitch1').addEventListener('click', async() => {
-            document.getElementById('customSwitch1').checked;
-            document.getElementById('customSwitch1').value = 'on';
-            document.forms['settings-form'].submit();
-        }, false);
-
-        $(function () {
-            $('#example2').DataTable({
-                "paging": true,
-                "lengthChange": false,
-                "searching": false,
-                "ordering": true,
-                "info": true,
-                "autoWidth": false,
-                "responsive": true,
-                "pageLength": 15
-            });
-        });
-
         const Toast = Swal.mixin({
             toast: true,
+            background: '#E3E5E8',
             position: 'top-end',
             showConfirmButton: false,
-            timer: 3000
+            timer: 3000,
         });
 
         @if(session()->has('successMsg'))
@@ -183,37 +182,96 @@
             });
         @endif
 
+        $(function () {
+            $('#example2').DataTable({
+                paging: true,
+                lengthChange: false,
+                searching: false,
+                ordering: true,
+                info: true,
+                autoWidth: false,
+                responsive: true,
+                pageLength: 15,
+            });
+
+            $('.select2-modal').select2({
+                dropdownParent: $('#modal-lg'),
+                placeholder: 'Select sales employee',
+                width: '100%',
+            });
+        });
+
+        document.getElementById('add-sacamp').addEventListener('click', () => {
+            $('#modal-lg').modal('show');
+        });
+
+        document.getElementById('customSwitch1').addEventListener('change', async (e) => {
+            const form     = document.forms['settings-form'];
+            const formData = new FormData(form);
+
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+
+                const jsonRes = await res.json();
+                Toast.fire({ icon: 'success', title: jsonRes.message });
+            } catch (err) {
+                console.error(err);
+                Toast.fire({ icon: 'error', title: 'Failed to save setting.' });
+            }
+        });
+
         async function deleteSalesCamps(id) {
-            if (confirm('Are you sure?')) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!'
+            }).then(async (result) => {
+                if (!result.value) return;
+
                 const token = '{{ csrf_token() }}';
 
                 try {
-                    let response = await fetch('/salesCamps/delete/' + id, {
-                        method: 'DELETE',
-                        credentials: 'same-origin',
+                    Swal.fire({
+                        title: 'Please wait!',
+                        imageUrl: '{{ asset('dist/img/loading2.gif') }}',
+                        imageWidth: 128,
+                        imageHeight: 128,
+                        imageAlt: 'Deleting..',
+                        showConfirmButton: false,
+                    });
+
+                    const resp = await axios.delete('/salesCamps/delete/' + id, {
+                        withCredentials: true,
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
                             'X-CSRF-Token': token,
-                        },
+                        }
                     });
 
-                    response = await response.json();
+                    Swal.close();
 
-                    if (response.error) {
-                        alert(response.error);
-                    } else if (response.OK) {
-                        location.reload();
+                    if (resp.data.OK) {
+                        Toast.fire({ icon: 'success', title: 'Deleted successfully!' });
+                        setTimeout(() => location.reload(), 1500);
+                    } else if (resp.data.error) {
+                        Toast.fire({ icon: 'warning', title: resp.data.error });
                     }
                 } catch (e) {
-                    console.log(e);
+                    Swal.close();
+                    const errors = Object.values(e.response?.data ?? {}).join('\n') || 'An unexpected error occurred.';
+                    Toast.fire({ icon: 'error', title: errors });
                 }
-            }
+            });
         }
-
-        document.getElementById('add-sacamp').addEventListener('click', () => {
-            $('#modal-lg').modal('show');
-        }, false);
 
         {{ Session::forget('successMsg') }}
     </script>

@@ -1,185 +1,191 @@
 @extends('layouts.app')
 
 @section('title')
-    Import from Excel file
+    Import from Excel
 @endsection
 
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ URL::to('/') }}">Home</a></li>
-    <li class="breadcrumb-item"><a href="{{ URL::to('/tickets') }}">Leads</a></li>
-    <li class="breadcrumb-item">Import from Excel file</li>
+    <li class="breadcrumb-item"><a href="{{ route('tickets.all') }}">Leads</a></li>
+    <li class="breadcrumb-item active">Import from Excel</li>
 @endsection
 
 @section('content')
+
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            <h5><i class="icon fas fa-ban"></i> Please fix the following:</h5>
+            <ul class="mb-0 pl-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <!-- /.card-header -->
+            <div class="card shadow-sm">
+                <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
+                    <h3 class="card-title text-white mb-0">
+                        <i class="fas fa-file-excel mr-2"></i> Import from Excel
+                    </h3>
+                </div>
+
                 <div class="card-body">
-                    @if ($errors->any())
-                        <div class="alert alert-danger">
-                            <ul style="list-style: none;">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
                     <form name="f1" id="f1" action="{{ route('tickets.excel') }}" method="post"
                           enctype="multipart/form-data">
                         @csrf
-                        <fieldset style="width: 50%">
-                            <div class="form-group">
-                                <label for="temp" class="text-lg">To download Excel file template</label>
-                                <a class="text-lg" href="{{ route('tickets.download', ['type' => 'excel_temp', 'id' => 0]) }}"
-                                   target="_blank"/>Click here</a>
-                            </div>
-                            <div class="form-group">
-                                <label for="file">Select Excel (CSV or XLSX) file</label>
+                        <input type="hidden" name="operation" id="operation" value="view"/>
+
+                        {{-- Template download --}}
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Need the template?
+                            <a class="ml-1 font-weight-bold"
+                               href="{{ route('tickets.download', ['type' => 'excel_temp', 'id' => 0]) }}"
+                               target="_blank">
+                                <i class="fas fa-download mr-1"></i> Download Excel template
+                            </a>
+                        </div>
+
+                        {{-- File input --}}
+                        <div class="form-group">
+                            <label for="fileUpload">
+                                Select Excel File <sup class="text-danger">*</sup>
+                                <small class="text-muted ml-1">(CSV or XLSX)</small>
+                            </label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-file-excel"></i></span>
+                                </div>
                                 <input type="file" class="form-control" id="fileUpload" name="file"
-                                       value="{{ old('file') }}"/>
+                                       accept=".csv,.xlsx,.xls"/>
                             </div>
-                            <button type="submit" id="b1" name="b1" class="btn btn-success mr-4 submit-btn">View
+                        </div>
+
+                        {{-- Action buttons --}}
+                        <div class="d-flex flex-wrap align-items-center mb-3">
+                            <button type="submit" id="b1" name="b1" class="btn btn-success submit-btn mr-2 mb-1">
+                                <i class="fas fa-eye mr-1"></i> View
                             </button>
                             @isset($leads)
-                                <button type="submit" id="b2" name="b2" class="btn btn-primary mr-4 submit-btn">
-                                    Save to archive
+                                <button type="submit" id="b2" name="b2" class="btn btn-primary submit-btn mr-2 mb-1">
+                                    <i class="fas fa-archive mr-1"></i> Save to Archive
                                 </button>
-                                <button type="submit" id="b3" name="b3" class="btn btn-secondary submit-btn">
-                                    Save to center
+                                <button type="submit" id="b3" name="b3" class="btn btn-secondary submit-btn mb-1">
+                                    <i class="fas fa-save mr-1"></i> Save to Center
                                 </button>
                             @endisset
-                            <input type="hidden" name="operation" id="operation" value="view"/>
-                        </fieldset>
+                        </div>
+
                         <hr/>
+
+                        {{-- Preview table --}}
                         <div id="fb-data-table">
-                            <table id="example2" class="table table-bordered table-hover">
-                                <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Campaign Name</th>
-                                    <th>Full Name</th>
-                                    <th>Phone Number</th>
-                                    <th>Email</th>
-                                    <th>Created time</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @isset($leads)
-                                    @foreach($leads as $key => $lead)
-                                        <tr>
-                                            <td>{{ $key+1 }}</td>
-                                            <td>{{ $lead['campaign_name'] !== null ? $lead['campaign_name'] : '-' }}</td>
-                                            <td>{{ $lead['full_name'] !== null ? $lead['full_name'] : '-' }}</td>
-                                            <td>{{ $lead['phone_number'] !== null ? $lead['phone_number'] : '-' }}</td>
-                                            <td>{{ $lead['email'] !== null ? $lead['email'] : '-' }}</td>
-                                            <td>{{ $lead['created_time'] !== null ? date('d/m/Y h:i A', strtotime($lead['created_time'])) : '-' }}</td>
-                                        </tr>
-                                    @endforeach
-                                @endisset
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="example2" class="table table-hover table-striped align-middle">
+                                    <thead class="thead-light">
+                                    <tr>
+                                        <th style="width:50px;">#</th>
+                                        <th>Campaign Name</th>
+                                        <th>Full Name</th>
+                                        <th>Phone Number</th>
+                                        <th>Email</th>
+                                        <th>Created Time</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    @isset($leads)
+                                        @foreach($leads as $key => $lead)
+                                            <tr>
+                                                <td>{{ $key + 1 }}</td>
+                                                <td>{{ $lead['campaign_name'] ?? '—' }}</td>
+                                                <td>{{ $lead['full_name'] ?? '—' }}</td>
+                                                <td>
+                                                    @if($lead['phone_number'])
+                                                        <a href="tel:{{ $lead['phone_number'] }}" class="text-reset">
+                                                            <i class="fas fa-phone-alt text-muted mr-1"></i>
+                                                            {{ $lead['phone_number'] }}
+                                                        </a>
+                                                    @else
+                                                        —
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if($lead['email'])
+                                                        <a href="mailto:{{ $lead['email'] }}" class="text-reset">
+                                                            {{ $lead['email'] }}
+                                                        </a>
+                                                    @else
+                                                        —
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">
+                                                        {{ $lead['created_time'] ? date('d/m/Y h:i A', strtotime($lead['created_time'])) : '—' }}
+                                                    </small>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    @endisset
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
+
                         <div id="loader" style="text-align: center; display: none;">
-                            <img src="{{asset('dist/img/loading2.gif')}}" width="100"/>
+                            <img src="{{ asset('dist/img/loading2.gif') }}" width="100"/>
                         </div>
+
                     </form>
                 </div>
-                <!-- /.card-body -->
             </div>
-            <!-- /.card -->
         </div>
     </div>
+
+    <style>
+        table#example2 td, table#example2 th { vertical-align: middle; }
+    </style>
 @endsection
+
 @section('script')
-    <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
-    <!-- Toastr -->
-    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
+    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js') }}"></script>
 
     <script>
+        const Toast = Swal.mixin({
+            toast: true,
+            background: '#E3E5E8',
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+        });
+
         $(function () {
             $('#example2').DataTable({
-                "paging": true,
-                "lengthChange": false,
-                "searching": false,
-                "ordering": true,
-                "info": true,
-                "autoWidth": false,
-                "responsive": true,
-                "pageLength": 50
+                paging: true,
+                lengthChange: false,
+                searching: false,
+                ordering: true,
+                info: true,
+                autoWidth: false,
+                responsive: true,
+                pageLength: 50,
             });
         });
 
-        const Toast = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 3000
-        });
-
-        let clickedBtn = '';
-
-        const b1 = document.getElementById('b1');
-        const b2 = document.getElementById('b2');
-
         document.querySelectorAll('.submit-btn').forEach(item => {
             item.addEventListener('click', function (e) {
-                const target = e.target;
-                clickedBtn = target.name;
-                if (clickedBtn === 'b1') {
+                const name = e.target.name;
+                if (name === 'b1') {
                     document.getElementById('operation').value = 'view';
-                } else if (clickedBtn === 'b2') {
+                } else if (name === 'b2') {
                     document.getElementById('operation').value = 'archive';
                 } else {
                     document.getElementById('operation').value = 'lead';
                 }
-            }, false);
+            });
         });
-
-        {{--async function viewFromExel() {--}}
-        {{--    document.getElementById('fb-data-table').style.display = 'none';--}}
-        {{--    document.getElementById('loader').style.display = '';--}}
-        {{--    const formData = new FormData();--}}
-        {{--    const fileField = document.querySelector('input[type="file"]');--}}
-        {{--    formData.append('file', fileField.files[0]);--}}
-
-        {{--    const token = '{{ csrf_token() }}';--}}
-        {{--    try {--}}
-        {{--        let response = await fetch('/tickets/viewExelLeads/', {--}}
-        {{--            credentials: 'same-origin',--}}
-        {{--            method: 'POST',--}}
-        {{--            headers: {--}}
-        {{--                "X-CSRF-TOKEN": token--}}
-        {{--            },--}}
-        {{--            body: formData--}}
-        {{--        });--}}
-
-        {{--        response = await response.json();--}}
-        {{--        console.log(response);--}}
-        {{--        if (response.error) {--}}
-        {{--            alert(response.error);--}}
-        {{--            console.log(response);--}}
-        {{--        } else if (response.OK && response.OK > 0) {--}}
-        {{--            document.getElementById('loader').style.display = 'none';--}}
-        {{--            document.getElementById('example2').style.display = '';--}}
-
-        {{--            Toast.fire({--}}
-        {{--                icon: 'success',--}}
-        {{--                title: response.OK + ' Facebook leads have been successfully imported'--}}
-        {{--            })--}}
-        {{--        } else if (response.OK == 0) {--}}
-        {{--            document.getElementById('loader').style.display = 'none';--}}
-        {{--            document.getElementById('example2').style.display = '';--}}
-
-        {{--            Toast.fire({--}}
-        {{--                icon: 'warning',--}}
-        {{--                title: 'No leads for now!'--}}
-        {{--            })--}}
-        {{--        }--}}
-        {{--    } catch (e) {--}}
-        {{--        console.log(JSON.stringify(e));--}}
-        {{--    }--}}
-        {{--}--}}
     </script>
 @endsection

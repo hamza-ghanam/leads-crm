@@ -4,15 +4,16 @@ namespace App\Console;
 
 use App\Facades\Notifier;
 use App\Helpers\LeadsHelper;
-use App\Models\ArchivedLead;
 use App\Models\GeneralSettings;
 use App\Models\Status;
 use App\Models\Ticket;
-use App\Models\TicketPath;
 use App\Models\User;
-use Carbon\Carbon;
+use App\Services\DbLogger;
+use App\Services\LeadAutoAssignService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class Kernel extends ConsoleKernel
@@ -34,31 +35,35 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $startingHour = 9;
-        $endingHour = 19;
-
-        $dateBegin = now()->copy()->setTime($startingHour, 0, 0);
-        $dateEnd = now()->copy()->setTime($endingHour, 0, 0);
-
-        $pullDate = now();
+        $statusesByName = Status::all()->keyBy('name');
 
         $leadsHelper = app()->make(LeadsHelper::class);
-
+        $assignService = new LeadAutoAssignService(app(LeadsHelper::class));
 
         ////// 1. Notification for Follow-up Reminder
         $schedule->call(function () use ($leadsHelper) {
-            $now = now();
-            $followUpStatusId = Status::where('name', Status::FOLLOW_UP)->value('id');
-
-            if (!$followUpStatusId) {
-                // لو ما في هيك حالة، لا تعمل شيء
+            if (!$this->withinWorkingWindow()) {
                 return;
             }
 
+            $statusesByName = Cache::remember('statuses_by_name', 300, function () {
+                return Status::query()
+                    ->select(['id', 'name', 'duration']) // زِد الحقول اللي تحتاجها
+                    ->get()
+                    ->keyBy('name');
+            });
+
+            $followUp = $statusesByName->get(Status::FOLLOW_UP);
+            if (!$followUp) {
+                return;
+            }
+
+            $followUpStatusId = $followUp->id;
+
             Ticket::where('status_id', $followUpStatusId)
-                ->whereHas('latestPath', function ($q) use ($now) {
+                ->whereHas('latestPath', function ($q) {
                     $q->whereNotNull('reminder_at')
-                        ->where('reminder_at', '<=', $now)
+                        ->where('reminder_at', '<=', now())
                         ->whereNull('reminder_sent_at');
                 })
                 ->with(['user', 'latestPath'])
@@ -94,20 +99,15 @@ class Kernel extends ConsoleKernel
                         $ticket->latestPath->save();
                     }
                 });
-        })->everyMinute();
+        })->everyFiveMinutes()
+            ->name('tickets:follow_up-reminder')
+            ->withoutOverlapping(2);
 
         ////// 2. Auto Import from Social Media
-        // every 30 minutes, Facebook leads (Updated on: 17/5/2022)
-        // Adding TikTok leads, on 13/11/2022
-        // Adding Google Ads leads, on 06/04/2025
-        $schedule->call(function () use ($leadsHelper, $dateEnd, $dateBegin, $pullDate) {
-            if (!($pullDate->between($dateBegin, $dateEnd))) {
+        $schedule->call(function () use ($leadsHelper) {
+            if (!$this->withinWorkingWindow()) {
                 return;
             }
-
-            ////// New Method (15/05/2022) //////
-            ////// Call helper function (03/09/2022)
-            ////// 28/11/2024 New Zapier Webhook //////
 
             $sources = GeneralSettings::where('name', 'like', 'auto_import_%')
                 ->where('value', 1)
@@ -121,38 +121,171 @@ class Kernel extends ConsoleKernel
 
             foreach ($sources as $source) {
                 $leads = $leadsHelper->fetchLeadsFromZapier($source);
-                $leadsHelper->initiateImport($leads);
-                $leadIds = array_column($leads, 'key');
-                $leadsHelper->removeZapierTempLeads($leadIds);
+
+                [$jrStats, $srStats, $processedLeadKeys] = $leadsHelper->initiateImport($leads);
+
+                DB::table('logs')->insert([
+                    'text'  => json_encode($jrStats, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                DB::table('logs')->insert([
+                    'text'  => json_encode($srStats, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                DB::table('logs')->insert([
+                    'text'  => json_encode($processedLeadKeys, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                $leadIds = array_column($leads, 'number');
+                DB::table('logs')->insert([
+                    'text'  => json_encode($leadIds, JSON_THROW_ON_ERROR),
+                    'level' => 'info',
+                ]);
+
+                $leadsHelper->removeTempLeads($leadIds);
             }
-        })->everyThirtyMinutes();
+        })->everyThirtyMinutes()
+            ->name('tickets:auto-import')
+            ->withoutOverlapping(5);
 
         ////// 3. Sales Leads - Statuses
-        $schedule->call(function () use ($leadsHelper, $dateBegin, $dateEnd, $pullDate) {
-            if (!($pullDate->between($dateBegin, $dateEnd))) {
+        $schedule->call(function () use ($assignService) {
+            if (!$this->withinWorkingWindow()) {
+                DbLogger::log(
+                    level: 'info',
+                    message: 'timeout',
+                    context: [
+                        'time' => 'not in the time slot',
+                    ]
+                );
+
                 return;
             }
 
+            $superAdmins = User::role('super-admin')
+                ->where('status', 'permitted')
+                ->get(['id', 'email']);
 
+            $statusesByName = Cache::remember('statuses_by_name', 300, function () {
+                return Status::query()
+                    ->select(['id', 'name', 'duration']) // زِد الحقول اللي تحتاجها
+                    ->get()
+                    ->keyBy('name');
+            });
+
+            $statusesToProcess = $statusesByName->filter(function ($s) {
+                if ($s->name === Status::DEAD) {
+                    return false;
+                }
+
+                $d = strtolower(trim((string)$s->duration));
+
+                if ($d === '') {
+                    return false;
+                }
+
+                if (preg_match('/^0+\s*[mhdw]$/', $d)) {
+                    return false;
+                }
+
+                if ($d === '0') return false;
+
+                if (!preg_match('/^\d+\s*[mhdw]$/', $d)) return false;
+
+                return true;
+            });
+
+            foreach ($statusesToProcess as $status) {
+                $assignService->autoReassignFromStatus(
+                    $status->name,
+                    Status::NEW,
+                    $status->duration,
+                    $superAdmins,
+                    $statusesByName
+                );
+            }
+
+
+            /*
             //// 3.1. Status: NEW
-            $newStausInterval = 3; // 1 Hour
-
-            // re-shuffled has been removed 12/9/2022
-            $statusMap = Status::whereIn('slug', ['new', 'follow-up'])
-                ->pluck('id', 'slug');   // ['new' => 1, 'follow-up' => 2]
-
-            $newStatusId = $statusMap['new'] ?? null;
-            if (!$newStatusId) {
+            $newStatus = $statusesByName->get(Status::NEW);
+            if (!$newStatus) {
                 return;
             }
 
-            $tickets = Ticket::where('status_id', $newStatusId)
-                ->whereHas('paths')
-                ->with(['user', 'latestPath'])
-                ->get();
+            $assignService->autoReassignFromStatus(
+                Status::NEW,
+                Status::NEW,
+                $newStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
 
+            //// 3.2. Status: Follow Up
+            $followUpStatus = $statusesByName->get(Status::FOLLOW_UP);
+            if (!$followUpStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::FOLLOW_UP,
+                Status::NEW,
+                $followUpStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+
+            //// 3.3. Status: Meeting
+            $meetingStatus = $statusesByName->get(Status::MEETING);
+            if (!$meetingStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::MEETING,
+                Status::NEW,
+                $meetingStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+
+            //// 3.4. Status: Waiting
+            $waitingStatus = $statusesByName->get(Status::WAITING);
+            if (!$waitingStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::WAITING,
+                Status::NEW,
+                $waitingStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+
+
+            //// 3.5. Status: No-Answer
+            $noAnswerStatus = $statusesByName->get(Status::NO_ANSWER);
+            if (!$noAnswerStatus) {
+                return;
+            }
+
+            $assignService->autoReassignFromStatus(
+                Status::NO_ANSWER,
+                Status::NEW,
+                $noAnswerStatus->duration,
+                $superAdmins,
+                $statusesByName
+            );
+            */
+
+
+            /*
             // WRS AE | Send to archive
-            $newIntervalLimit = now()->subHours($newStausInterval);
+            $newIntervalLimit = now()->subHours($newStatusPeriod);
 
             foreach ($tickets as $ticket) {
                 $latestPath = $ticket->paths->first();
@@ -231,329 +364,78 @@ class Kernel extends ConsoleKernel
 
                 $ticket->delete();
             }
+            */
+        })->everyFifteenMinutes()
+            ->name('tickets:auto-reassign')
+            ->withoutOverlapping(5);
 
-            /** Stopped at 9/11/022 */
-            //// 3.2. Status: Follow Up (7 days)
-            $followUpDays = 7;
-            $followUpStatus = Status::where('slug', 'follow-up')->first()->id;
-            //$tickets = Ticket::where('status_id', $followUpStatus)->get();
+        /*
+        $schedule->call(function () {
+            if (!$this->withinWorkingWindow()) {
+                return;
+            }
 
-            ///// Stopped /////
-            $tickets = collect([]);
+            DB::table('logs')->insert([
+                'text' => 'Start time: ' . now()->toDateTimeString() . ' - ' . 'Test',
+                'level' => 'info',
+            ]);
+        })->everyMinute()
+            ->name('tickets:testassign')
+            ->withoutOverlapping();
+        */
+    }
 
-            $statuses = Status::whereIn('slug', ['new', 'follow-up'])
-                ->get()
-                ->pluck('id')
+    protected function withinWorkingWindow(): bool
+    {
+        $settings = Cache::remember('general_settings_window', 60, function () {
+            return GeneralSettings::whereIn('name', ['start_time', 'end_time', 'working_days'])
+                ->pluck('value', 'name')
                 ->toArray();
+        });
 
-            /** New method 11/9/2022 */
-            $salesEmps = User::role('sale')
-                ->where('status', 'permitted')
-                ->get();
+        $start = $settings['start_time'] ?? '09:00';
+        $end = $settings['end_time'] ?? '19:00';
 
-            $salesLeadCounts = Ticket::whereIn('status_id', $statuses)
-                ->whereIn('user_id', $salesEmps->pluck('id'))
-                ->select('user_id', DB::raw('COUNT(*) as cnt'))
-                ->groupBy('user_id')
-                ->pluck('cnt', 'user_id')       // [user_id => count]
-                ->sort()                        // sort by count asc
-                ->keys()                        // keep only user_ids
-                ->toArray();
+        if ($start === $end) {
+            return false; // أو true إذا بدك 24/7
+        }
 
-            // Distribution
-            $startPos = 0;
-            foreach ($tickets as $key => $ticket) {
-                $tPath = TicketPath::where('ticket_id', $ticket->id)
-                    ->where('next_status', $followUpStatus)
-                    ->orderBy('updated_at', 'DESC')
-                    ->first();
+        $workingDays = json_decode($settings['working_days'] ?? '[]', true) ?: [];
+        if (empty($workingDays)) {
+            $workingDays = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'];
+        }
 
-                $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
-                $endTime = Carbon::now();
-                $diffDays = $startTime->diffInDays($endTime);
+        $now = now();
+        $map = ['Mon' => 'mon', 'Tue' => 'tue', 'Wed' => 'wed', 'Thu' => 'thu', 'Fri' => 'fri', 'Sat' => 'sat', 'Sun' => 'sun'];
 
-                if ($diffDays >= $followUpDays) {
-                    $oldUser = User::find($ticket->user_id);
+        $today = Carbon::today();
+        $begin = $today->copy()->setTimeFromTimeString($start);
+        $finish = $today->copy()->setTimeFromTimeString($end);
 
-                    // Lead now is with Sales => tele-sales
-                    if ($oldUser->getRoleNames()[0] === 'sale' || $oldUser->getRoleNames()[0] === 'sales-senior') {
-                        $ticket->user_id = $salesLeadCounts[$startPos];
-                        $startPos++;
-                    } // Lead is now with tele-sales => tele-sales manager
-                    else if ($oldUser->getRoleNames()[0] === 'tele-sale') {
-                        $salesManager = User::find($oldUser->manager_id);
-                        $ticket->user_id = $salesManager->id;
-                    }
+        // نفس اليوم
+        if ($finish->greaterThan($begin)) {
+            $todayKey = $map[$now->format('D')] ?? null;
+            if (!$todayKey || !in_array($todayKey, $workingDays, true)) return false;
 
-                    $ticket->status_id = $newStatusId;
-                    $ticket->save();
+            // استبعاد النهاية
+            return $now->greaterThanOrEqualTo($begin) && $now->lessThan($finish);
+        }
 
-                    $ticketPath = TicketPath::create([
-                        'prev_user' => $oldUser->id,
-                        'next_user' => $salesLeadCounts[$startPos],
-                        'prev_status' => $followUpStatus,
-                        'next_status' => $newStatusId,
-                        'ticket_id' => $ticket->id,
-                        'comment' => 'Back from FOLLOW-UP after 15 days inactive.',
-                    ]);
+        // يقطع منتصف الليل
+        $finish->addDay();
 
-                    $ticketPath->save();
+        $endToday = $today->copy()->setTimeFromTimeString($end);
 
-                    $data = [
-                        'title' => 'Back from FOLLOW-UP',
-                        'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ',
-                        'user' => $ticket->user->name,
-                        'ticket' => $ticket->id
-                    ];
+        if ($now->lessThan($endToday)) {
+            $begin->subDay();
+            $effectiveDayKey = $map[$now->copy()->subDay()->format('D')] ?? null;
+        } else {
+            $effectiveDayKey = $map[$now->format('D')] ?? null;
+        }
 
-                    $superAdmins = User::role('super-admin')
-                        ->where('status', 'permitted')
-                        ->get();
+        if (!$effectiveDayKey || !in_array($effectiveDayKey, $workingDays, true)) return false;
 
-                    if ($superAdmins->isEmpty()) {
-                        return;
-                    }
-
-                    $sAdminsEmails = $superAdmins->pluck('email')->toArray();
-
-                    if (empty($sAdminsEmails)) {
-                        return;
-                    }
-
-                    $leadsHelper->sendLeadMail($sAdminsEmails, $data);
-
-                    Notifier::notifyMany(
-                        $superAdmins,
-                        'Back from FOLLOW-UP',
-                        "Lead #{$ticket->id} has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity.",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-
-                    // New User
-                    $data = [
-                        'title' => 'Back from FOLLOW-UP',
-                        'message' => 'Lead has been automatically returned from FOLLOW-UP to NEW after 15 days of inactivity: ',
-                        'user' => '',
-                        'ticket' => $ticket->id
-                    ];
-
-                    $leadsHelper->sendLeadMail($ticket->user->email, $data);
-
-                    Notifier::notifyUser(
-                        $ticket->user,
-                        'Back from FOLLOW-UP',
-                        "Lead #{$ticket->id} has been automatically returned from FOLLOW-UP.",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-
-                    // Old User
-                    $data = [
-                        'title' => 'Withdrawn Lead',
-                        'message' => 'Lead has been automatically withdrawn from you after 15 days of inactivity, and assigned to another sales!',
-                        'user' => '',
-                        'ticket' => $ticket->id
-                    ];
-
-                    $leadsHelper->sendLeadMail($oldUser->email, $data);
-
-                    Notifier::notifyUser(
-                        $oldUser,
-                        'Back from FOLLOW-UP',
-                        "Lead #{$ticket->id} has been automatically withdrawn from you!",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-
-                    $startPos++;
-                    if ($startPos === count($salesLeadCounts)) {
-                        $startPos = 0;
-                    }
-                }
-            }
-
-            //// 3.3. Status: Meeting (7 days)
-            $meetingDays = 7;
-            $meetingStatus = Status::where('slug', 'meeting')->first()->id;
-            $tickets = Ticket::where('status_id', $meetingStatus)->get();
-
-            /** New method 11/9/2022 */
-            $salesEmps = User::role('tele-sale')
-                ->where('status', 'permitted')
-                ->get();
-
-            $salesLeadCounts = [];
-            foreach ($salesEmps as $key => $teleSale) {
-                $tCount = Ticket::where('user_id', $teleSale->id)
-                    ->whereIn('status_id', $statuses)
-                    ->count();
-                $salesLeadCounts += [$teleSale->id => $tCount];
-            }
-            asort($salesLeadCounts);
-            $salesLeadCounts = array_keys($salesLeadCounts);
-
-            // Junior Distribution
-            $startPos = 0;
-            foreach ($tickets as $key => $ticket) {
-                $tPath = TicketPath::where('ticket_id', $ticket->id)
-                    ->where('next_status', $meetingStatus)
-                    ->orderBy('updated_at', 'DESC')
-                    ->first();
-
-                $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
-                $endTime = Carbon::now();
-                $diffDays = $startTime->diffInDays($endTime);
-                if ($diffDays >= $meetingDays) {
-                    $oldUser = User::find($ticket->user_id);
-
-                    // Lead now is with Sales => tele-sales
-                    if ($oldUser->getRoleNames()[0] === 'sale' || $oldUser->getRoleNames()[0] === 'sales-senior') {
-                        $ticket->user_id = $salesLeadCounts[$startPos];
-                        $startPos++;
-                    } // Lead is now with tele-sales => tele-sales manager
-                    else if ($oldUser->getRoleNames()[0] === 'tele-sale') {
-                        $salesManager = User::find($oldUser->manager_id);
-                        $ticket->user_id = $salesManager->id;
-                    }
-
-                    $ticket->status_id = $newStatusId;
-                    $ticket->save();
-                    $ticketPath = TicketPath::create([
-                        'prev_user' => $tPath->next_user,
-                        'next_user' => $salesLeadCounts[0],
-                        'prev_status' => $meetingStatus,
-                        'next_status' => $newStatusId,
-                        'ticket_id' => $ticket->id,
-                        'comment' => 'Back from MEETING after 7 days inactive.',
-                    ]);
-
-                    $ticketPath->save();
-
-                    ////// Notify Users
-                    // Super admin
-                    $data = [
-                        'title' => 'Back from MEETING',
-                        'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ',
-                        'user' => $tPath->next_user->name,
-                        'ticket' => $ticket->id
-                    ];
-
-                    $leadsHelper->sendLeadMail($sAdminsEmails, $data);
-
-                    Notifier::notifyMany(
-                        $superAdmins,
-                        'Back from MEETING',
-                        "Lead #{$ticket->id} has been automatically returned from MEETING.",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-
-                    // New User
-                    $data = ['title' => 'Back from MEETING', 'message' => 'Lead has been automatically returned from MEETING to NEW after 7 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-                    $leadsHelper->sendLeadMail($ticket->user->email, $data);
-
-                    Notifier::notifyUser(
-                        $ticket->user,
-                        'Back from MEETING',
-                        "Lead #{$ticket->id} has been automatically returned from MEETING.",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-
-                    // Old User
-                    $data = ['title' => 'Withdrawn Lead', 'message' => 'Lead has been automatically withdrawn from you!', 'user' => '', 'ticket' => $ticket->id];
-                    $leadsHelper->sendLeadMail($oldUser->email, $data);
-
-                    Notifier::notifyUser(
-                        $oldUser,
-                        'Withdrawn Lead',
-                        "Lead #{$ticket->id} has been automatically withdrawn from you!",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-
-                    $startPos++;
-                    if ($startPos === count($salesLeadCounts)) {
-                        $startPos = 0;
-                    }
-                }
-            }
-
-            //// 04. Status: Waiting (7 days)
-            $waitingDays = 7;
-            $waitingStatus = Status::where('slug', 'waiting')->first()->id;
-            $tickets = Ticket::where('status_id', $waitingStatus)->get();
-
-            foreach ($tickets as $key => $ticket) {
-                $tPath = TicketPath::where('ticket_id', $ticket->id)
-                    ->where('next_status', $waitingStatus)
-                    ->orderBy('updated_at', 'DESC')
-                    ->first();
-                $startTime = Carbon::createFromFormat('Y-m-d H:s:i', $tPath->updated_at);
-                $endTime = Carbon::now();
-                $diffDays = $startTime->diffInDays($endTime);
-
-                if ($diffDays >= $waitingDays) {
-                    $deadStatus = Status::where('slug', 'dead')->first()->id;
-                    $ticket->status_id = $deadStatus;
-                    $ticket->save();
-                    $ticketPath = TicketPath::create([
-                        'prev_user' => $tPath->next_user,
-                        'next_user' => $tPath->next_user,
-                        'prev_status' => $waitingStatus,
-                        'next_status' => $deadStatus,
-                        'ticket_id' => $ticket->id,
-                        'comment' => 'After WAITING 7 days, it\'s now DEAD.',
-                    ]);
-                    $ticketPath->save();
-
-                    /////// Notify Users
-                    // Super admin
-                    $user = User::find($ticket->user_id);
-                    $data = ['title' => 'Dead Lead', 'message' => 'Lead has been automatically moved from WAITING to DEAD after 7 days of inactivity: ', 'user' => auth()->user()->name, 'ticket' => $ticket->id];
-
-                    $leadsHelper->sendLeadMail($sAdminsEmails, $data);
-
-                    Notifier::notifyUser(
-                        $superAdmins,
-                        'Dead Lead',
-                        "Lead #{$ticket->id} is now DEAD!",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-
-                    // User himself
-                    $data = ['title' => 'Dead Lead', 'message' => 'Lead has been automatically moved from WAITING to DEAD after 7 days of inactivity: ', 'user' => '', 'ticket' => $ticket->id];
-
-                    $leadsHelper->sendLeadMail($user->email, $data);
-
-                    Notifier::notifyUser(
-                        $user,
-                        'Dead Lead',
-                        "Lead #{$ticket->id} is now DEAD!",
-                        route('tickets.show', $ticket->id),
-                        'ticket_follow_up',
-                        ['ticket_id' => $ticket->id],
-                        null
-                    );
-                }
-            }
-        })->everyTenMinutes();
+        return $now->greaterThanOrEqualTo($begin) && $now->lessThan($finish);
     }
 
     /**

@@ -8,7 +8,7 @@
     <title>Leads CRM - Management Dashboard</title>
     <meta property="og:title" content="Leads CRM">
     <meta property="og:description" content="Manage you Leads from different sources using our advanced CRM">
-    <meta property="og:image" content="{{ asset('dist/img/wrsae_thumb.png') }}">
+    <meta property="og:image" content="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}">
     <meta property="og:url" content="{{ env('APP_URL') }}">
     <meta property="og:type" content="website">
 
@@ -41,11 +41,11 @@
 
     <style>
         .sidebar {
-            background-color: #2d3955 !important;
+            background-color: {{ config('app.theme_color') }} !important;
         }
 
         .brand-link {
-            background-color: #2d3955 !important;
+            background-color: {{ config('app.theme_color') }} !important;
         }
 
         .custom-map-control-button {
@@ -73,9 +73,9 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{{ asset('dist/img/favicons/favicon.ico') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}?v={{ config('app.build_version') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}?v={{ config('app.build_version') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}?v={{ config('app.build_version') }}">
     <link rel="manifest" href="{{ asset('dist/img/favicons/site.webmanifest') }}">
 </head>
 <body class=" hold-transition sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed
@@ -89,7 +89,7 @@
                 <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
             </li>
             <li class="nav-item d-none d-sm-inline-block">
-                <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+                <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
                    class="nav-link"><i class="fas fa-chart-area"></i> Reports</a>
             </li>
             <li class="nav-item d-none d-sm-inline-block">
@@ -166,7 +166,7 @@
         <!-- Brand Logo -->
         <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
            class="brand-link">
-            <img src="{{ asset('dist/img/wrsae_thumb.png') }}" alt="AdminLTE Logo"
+            <img src="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}" alt="{{ config('app.name') }} Logo"
                  class="brand-image img-circle elevation-3"
                  style="opacity: .8">
             <span class="brand-text font-weight-light"><strong
@@ -193,7 +193,7 @@
                     <!-- Add icons to the links using the .nav-icon class
                          with font-awesome or any other icon font library -->
                     <li class="nav-item">
-                        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+                        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
                            class="nav-link {{ Route::currentRouteName() == ''  ? 'active' : ''}}">
                             <i class="nav-icon fas fa-home"></i>
                             <p>
@@ -242,19 +242,15 @@
                         <ul class="nav nav-treeview">
                             <li class="nav-item">
                                 @can('list tickets')
-                                    <a href="{{ route('tickets.all', [ 'from' => date('Y-m-01'), 'to' => date("Y-m-d")]) }}"
+                                    <a href="{{ route('tickets.all', [ 'updated_from' => date('Y-m-01'), 'updated_to' => date("Y-m-d")]) }}"
                                        class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.all') !== false  ? 'active' : '' }}">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Show All</p>
                                     </a>
                                 @endcan
-                                @can('list tickets')
-                                    <a href="/tickets/all?fstatus=re-shuffled"
-                                       class="nav-link {{ strpos(Route::currentRouteName(), 're-shuffled') !== false  ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Re-shuffled Leads</p>
-                                    </a>
-                                @endcan
+
+                                <!-- Re-shuffled has been removed! -->
+
                                 @can('create invoice')
                                     @if(auth()->user()->hasRole('accountant'))
                                         <a href="{{ route('tickets.all') }}"
@@ -350,6 +346,32 @@
                         </ul>
                     </li>
 
+                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'settings') !== false)  ? 'menu-open' : '' }}">
+                        <a href=""
+                           class="nav-link {{ strpos(Route::currentRouteName(), 'settings') !== false  ? 'active' : ''}}">
+                            <i class="nav-icon fas fa-cog"></i>
+                            <p>
+                                System Settings
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('settings.index') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'settings.index') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>General</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('settings.status') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'settings.status') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Status</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
 
                     @endhasrole
                 </ul>
@@ -400,7 +422,7 @@
         <strong>Copyright &copy; 2021 - {{ date("Y") }} | <a href="#">Leads CRM</a>.</strong>
         All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
-            <b>Version</b> {{ env('APP_VERSION') }}
+            <b>Version</b> {{ config('app.build_version') }}
         </div>
     </footer>
 </div>
@@ -555,9 +577,7 @@
                             'info'
                         );
                     }
-
                 });
-
             }
         });
     }
@@ -579,11 +599,6 @@
         if (!badge) {
             return;
         }
-
-        var currentCount = parseInt(
-            badge.getAttribute('data-count') || badge.textContent || '0',
-            10
-        );
 
         var currentCount = parseInt(
             badge.getAttribute('data-count') || badge.textContent || '0',
@@ -647,7 +662,7 @@
         container.insertAdjacentHTML('afterbegin', html);
     }
 
-    function trimNotificationDropdown(limit = 10) {
+    function trimNotificationDropdown(limit = 5) {
         var container = document.getElementById('notif-dropdown-container');
         if (!container) return;
 

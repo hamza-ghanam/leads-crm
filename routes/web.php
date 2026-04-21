@@ -9,6 +9,7 @@ use App\Mail\LeadNotifyMail;
 use App\Http\Controllers\WebNotificationController;
 use App\Http\Controllers\FcmController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\StatusController;
 
 /*
 |--------------------------------------------------------------------------
@@ -59,7 +60,8 @@ Route::prefix('tickets')->group(function () {
     Route::get('download/{type}/{id}', [TicketController::class, 'downloadAttachment'])->name('tickets.download');
     Route::get('archived', [TicketController::class, 'indexArchived'])->name('tickets.archived');
     Route::post('multipleForward', [TicketController::class, 'multipleForward'])->name('tickets.multipleForward');
-    Route::post('restoreLeads', [TicketController::class, 'restoreLeads'])->name('tickets.restore');
+    Route::post('restoreLeads', [TicketController::class, 'restoreArchivedLeads'])->name('tickets.restore');
+    Route::post('reshuffle', [TicketController::class, 'reshuffle'])->name('tickets.reshuffle');
 //    Route::match(['get', 'post'], '/report', [TicketController::class, 'getReport'])->name('tickets.report');
 
 //    Route::get('vehicles/{userId}', 'UserController@getVehicles')->name('user.vehicles');
@@ -68,10 +70,9 @@ Route::get('/ticket/pdf', [TicketController::class, 'createPDF']);
 Route::get('/ttt', function () {
     return view('ticketPDF');
 });
-Auth::routes();
 
 Route::get('/email', function (){
-    return new LeadNotifyMail();
+    return new LeadNotifyMail('test@gmail.com');
 })->name('tickets.email');
 
 Route::prefix('salesCamps')->group(function () {
@@ -81,7 +82,9 @@ Route::prefix('salesCamps')->group(function () {
 });
 
 Route::prefix('settings')->group(function () {
+    Route::get('/', [GeneralSettingsController::class, 'index'])->name('settings.index');
     Route::put('update', [GeneralSettingsController::class, 'update'])->name('settings.update');
+    Route::get('/statuses', [StatusController::class, 'index'])->name('settings.status');
 });
 
 Route::get('devTest', [TicketController::class, 'devTest'])->name('devTest');
@@ -99,6 +102,16 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.show');
 });
 
+Route::middleware(['auth', 'role:super-admin'])->group(function () {
+
+    // Save status duration settings
+    Route::post('/statuses/durations', [StatusController::class, 'saveDurations'])
+        ->name('statuses.save-durations');
+
+});
+
 Route::get('/test', function () {
     return view('test');
 });
+
+Route::view('/privacy-policy', 'privacy');

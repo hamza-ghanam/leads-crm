@@ -28,6 +28,7 @@ class CreateStatusesTable extends Migration
                 ->constrained('statuses')
                 ->onUpdate('cascade')
                 ->onDelete('cascade');
+            $table->string('duration', 10);
             $table->timestamps();
             $table->softDeletes();
         });
