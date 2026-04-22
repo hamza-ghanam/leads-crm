@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Models\ArchivedLead;
 use Mpdf\MpdfException;
 use Spatie\Permission\Models\Role;
+use App\Models\DbLog;
 
 //use Carbon\Carbon;
 
@@ -1631,9 +1632,34 @@ class TicketController extends Controller
         return back()->with('successMsg', 'Leads have been forwarded.');
     }
 
-    public function devTest()
+
+
+public function devTest()
     {
-        return response()->json('OFF!', 200);
+        $logs = DbLog::whereNotNull('context')
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.phone')) IS NOT NULL")
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.email')) IS NOT NULL")
+            ->get(['context']);
+
+        $updated = 0;
+
+        foreach ($logs as $log) {
+            $phone = $log->context['phone'] ?? null;
+            $email = $log->context['email'] ?? null;
+            echo $phone . ' - ' . $email . '\n';
+
+            if (!$phone || !$email) continue;
+
+            $rows = TempLead::where('email', $email)
+                ->where(function ($q) {
+                    $q->whereNull('phone_number')->orWhere('phone_number', 0);
+                })
+                ->update(['phone_number' => $phone]);
+
+            $updated += $rows;
+        }
+
+        return response()->json("Done. Updated {$updated} temp_leads records.", 200);
 
         $leadsHelper = app()->make(LeadsHelper::class);
 
@@ -2055,7 +2081,7 @@ class TicketController extends Controller
                 'is_organic',
                 'platform',
                 'full_name', 'name', 'first_name',
-                'phone_number',
+                'phone_number', 'phone',
                 'email',
                 'status_id',
                 'source_id',
@@ -2092,7 +2118,7 @@ class TicketController extends Controller
                 'is_organic' => $request->is_organic ?? '',
                 'platform' => $request->platform,
                 'full_name' => $request->full_name ?: $request->name ?: $request->first_name ?: 'N/A',
-                'phone_number' => $request->phone_number ?? '0',
+                'phone_number' => $request->phone_number ?? $request->phone ?? '0',
                 'email' => $request->email,
                 'job_title' => $request->job_title ?? '',
                 'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
