@@ -1998,6 +1998,34 @@ class TicketController extends Controller
         return response()->json($tl, 200);
         */
 
+        // Flatten nested JSON fields (e.g. `data`, `mappable_field_data`) to the top level.
+        // Priority: existing top-level keys > first nested field that defines the key.
+        $existing = $request->all();
+        $flattened = [];
+        foreach ($existing as $value) {
+            if (!is_array($value)) {
+                continue;
+            }
+            // Array of {name, value} objects (e.g. mappable_field_data)
+            if (isset($value[0]) && is_array($value[0]) && array_key_exists('name', $value[0]) && array_key_exists('value', $value[0])) {
+                foreach ($value as $item) {
+                    if (!array_key_exists($item['name'], $existing) && !array_key_exists($item['name'], $flattened)) {
+                        $flattened[$item['name']] = $item['value'];
+                    }
+                }
+            } elseif (array_keys($value) !== range(0, count($value) - 1)) {
+                // Associative array (e.g. `data` object)
+                foreach ($value as $subKey => $subValue) {
+                    if (!array_key_exists($subKey, $existing) && !array_key_exists($subKey, $flattened)) {
+                        $flattened[$subKey] = $subValue;
+                    }
+                }
+            }
+        }
+        if (!empty($flattened)) {
+            $request->merge($flattened);
+        }
+
         try {
             DB::beginTransaction();
 
