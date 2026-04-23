@@ -1636,6 +1636,64 @@ class TicketController extends Controller
 
 public function devTest()
     {
+        $deadStatus = Status::whereSlug('dead')->firstOrFail();
+
+        $tickets = Ticket::whereBetween('created_at', ['2022-01-01 00:00:00', '2024-12-31 23:59:59'])
+            ->where('updated_at', '>=', '2026-04-01 00:00:00')
+            ->get();
+
+        $processed = 0;
+
+        DB::beginTransaction();
+        try {
+            foreach ($tickets as $ticket) {
+                // Delete the latest ticketPath
+                $latestPath = TicketPath::where('ticket_id', $ticket->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                if ($latestPath) {
+                    $latestPath->delete();
+                }
+
+                // Get the new latest ticketPath after deletion
+                $newLatestPath = TicketPath::where('ticket_id', $ticket->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                // Update ticket user_id to new latest path's next_user
+                if ($newLatestPath) {
+                    $ticket->user_id = $newLatestPath->next_user;
+                    $ticket->save();
+                }
+
+                $prevStatusId = $ticket->status_id;
+
+                // Create new ticketPath marking ticket as Dead
+                TicketPath::create([
+                    'ticket_id'   => $ticket->id,
+                    'prev_user'   => $ticket->user_id,
+                    'next_user'   => $ticket->user_id,
+                    'prev_status' => $prevStatusId,
+                    'next_status' => $deadStatus->id,
+                    'comment'     => 'Dead as old lead',
+                ]);
+
+                // Update ticket status to Dead
+                $ticket->status_id = $deadStatus->id;
+                $ticket->save();
+
+                $processed++;
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+
+        return response()->json("Done. Processed {$processed} tickets.", 200);
+
         $logs = DbLog::whereNotNull('context')
             ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.phone')) IS NOT NULL")
             ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.email')) IS NOT NULL")
