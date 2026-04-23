@@ -1643,6 +1643,7 @@ public function devTest()
             ->get();
 
         $processed = 0;
+        $affectedIds = [];
 
         DB::beginTransaction();
         try {
@@ -1683,6 +1684,7 @@ public function devTest()
                 $ticket->status_id = $deadStatus->id;
                 $ticket->save();
 
+                $affectedIds[] = $ticket->id;
                 $processed++;
             }
 
@@ -1692,7 +1694,7 @@ public function devTest()
             return response()->json(['error' => $e->getMessage()], 500);
         }
 
-        return response()->json("Done. Processed {$processed} tickets.", 200);
+        return response()->json(['processed' => $processed, 'affected_ids' => $affectedIds], 200);
 
         $logs = DbLog::whereNotNull('context')
             ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.phone')) IS NOT NULL")
