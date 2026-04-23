@@ -1643,7 +1643,7 @@ public function devTest()
 
         $tickets = Ticket::whereBetween('created_at', ['2022-01-01 00:00:00', '2024-12-31 23:59:59'])
             ->whereIn('id', $ticketIdsWithRecentPath)
-            ->whereNot('status_id', 6)
+            ->where('status_id', 6)
             ->get();
 
         $processed = 0;
