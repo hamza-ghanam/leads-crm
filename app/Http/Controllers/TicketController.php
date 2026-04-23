@@ -1642,8 +1642,13 @@ public function devTest()
             ->get();
 
         foreach ($tickets as $ticket) {
-            $ticket->updated_at = $ticket->created_at;
-            $ticket->save();
+            $pathLatest = TicketPath::where('ticket_id', $ticket->id)
+                ->orderBy('id', 'desc')
+                ->first();
+
+            $pathLatest->created_at = $ticket->created_at;
+            $pathLatest->updated_at = $ticket->created_at;
+            $pathLatest->save();
         }
 
         return response()->json(['processed' => 'OK'], 200);
