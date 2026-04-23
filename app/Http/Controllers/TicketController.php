@@ -1654,14 +1654,9 @@ public function devTest()
                     ->orderBy('id', 'desc')
                     ->first();
 
-                $pathBeforeLatest = TicketPath::where('ticket_id', $ticket->id)
-                    ->orderBy('id', 'desc')
-                    ->skip(1)
-                    ->first();
-
-                if ($pathLatest && $pathBeforeLatest) {
+                if ($pathLatest) {
                     $processed++;
-                    $pathLatest->updated_at = $pathBeforeLatest->updated_at;
+                    $pathLatest->updated_at = $ticket->updated_at;
                     $pathLatest->save();
                 }
 
