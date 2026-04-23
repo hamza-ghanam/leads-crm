@@ -1656,7 +1656,7 @@ public function devTest()
 
                 if ($pathLatest) {
                     $processed++;
-                    $pathLatest->updated_at = $ticket->updated_at;
+                    $pathLatest->created_at = $ticket->updated_at;
                     $pathLatest->save();
                 }
 
