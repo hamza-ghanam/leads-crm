@@ -1645,16 +1645,19 @@ public function devTest()
         DB::beginTransaction();
         try {
             foreach ($tickets as $ticket) {
+                $pathLatest = TicketPath::where('ticket_id', $ticket->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+
                 $pathBeforeLatest = TicketPath::where('ticket_id', $ticket->id)
                     ->orderBy('id', 'desc')
                     ->skip(1)
                     ->first();
 
-                if ($pathBeforeLatest) {
-                    // Update ticket
+                if ($pathLatest && $pathBeforeLatest) {
                     $processed++;
-                    $ticket->updated_at = $pathBeforeLatest->updated_at;
-                    $ticket->save();
+                    $pathLatest->updated_at = $pathBeforeLatest->updated_at;
+                    $pathLatest->save();
                 }
 
             }
