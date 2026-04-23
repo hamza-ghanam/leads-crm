@@ -1637,7 +1637,7 @@ class TicketController extends Controller
 public function devTest()
     {
         $tickets = Ticket::where('status_id', 6)
-            ->whereBetween('created_at', ['2022-01-01 00:00:00', '2024-12-31 23:59:59'])
+            ->whereBetween('created_at', ['2025-01-01 00:00:00', '2026-12-31 23:59:59'])
             ->get();
 
         foreach ($tickets as $ticket) {
@@ -1649,6 +1649,9 @@ public function devTest()
                 $pathLatest->created_at = $ticket->updated_at;
                 $pathLatest->updated_at = $ticket->updated_at;
                 $pathLatest->save();
+
+                $ticket->status_id = 6;
+                $ticket->save();
             }
 
         }
