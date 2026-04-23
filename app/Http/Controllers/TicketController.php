@@ -1636,8 +1636,13 @@ class TicketController extends Controller
 
 public function devTest()
     {
+        $ticketIdsWithRecentPath = TicketPath::select('ticket_id')
+            ->whereRaw('id IN (SELECT MAX(id) FROM ticket_paths WHERE deleted_at IS NULL GROUP BY ticket_id)')
+            ->where('created_at', '>', '2026-04-01 00:00:00')
+            ->pluck('ticket_id');
+
         $tickets = Ticket::whereBetween('created_at', ['2022-01-01 00:00:00', '2024-12-31 23:59:59'])
-            ->where('updated_at', '>=', '2026-04-01 00:00:00')
+            ->whereIn('id', $ticketIdsWithRecentPath)
             ->get();
 
         $processed = 0;
