@@ -1637,7 +1637,6 @@ class TicketController extends Controller
 public function devTest()
     {
         $tickets = Ticket::where('status_id', 6)
-            ->where('updated_at', '>=', '2026-04-01 00:00:00')
             ->whereBetween('created_at', ['2022-01-01 00:00:00', '2024-12-31 23:59:59'])
             ->get();
 
@@ -1646,9 +1645,12 @@ public function devTest()
                 ->orderBy('id', 'desc')
                 ->first();
 
-            $pathLatest->created_at = $ticket->created_at;
-            $pathLatest->updated_at = $ticket->created_at;
-            $pathLatest->save();
+            if ($pathLatest && ($pathLatest->created_at >= '2026-04-01' || $pathLatest->updated_at >= '2026-04-01')) {
+                $pathLatest->created_at = $ticket->updated_at;
+                $pathLatest->updated_at = $ticket->updated_at;
+                $pathLatest->save();
+            }
+
         }
 
         return response()->json(['processed' => 'OK'], 200);
@@ -1672,7 +1674,7 @@ public function devTest()
                     ->orderBy('id', 'desc')
                     ->first();
 
-                if ($pathLatest) {
+                if ($pathLatest && ($pathLatest->created_at >= '2026-04-01' || $pathLatest->updated_at >= '2026-04-01')) {
                     $processed++;
                     $pathLatest->created_at = $ticket->updated_at;
                     $pathLatest->updated_at = $ticket->updated_at;
