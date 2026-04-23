@@ -1696,6 +1696,7 @@ public function devTest()
 
         return response()->json(['processed' => $processed, 'affected_ids' => $affectedIds], 200);
 
+        /*
         $logs = DbLog::whereNotNull('context')
             ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.phone')) IS NOT NULL")
             ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.email')) IS NOT NULL")
@@ -1718,7 +1719,7 @@ public function devTest()
 
             $updated += $rows;
         }
-
+*/
         return response()->json("Done. Updated {$updated} temp_leads records.", 200);
 
         $leadsHelper = app()->make(LeadsHelper::class);
