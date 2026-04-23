@@ -1645,11 +1645,12 @@ public function devTest()
                 ->first();
 
             if ($pathLatest && ($pathLatest->created_at >= '2026-04-01' || $pathLatest->updated_at >= '2026-04-01')) {
-                $pathLatest->created_at = $ticket->updated_at;
-                $pathLatest->updated_at = $ticket->updated_at;
+                $pathLatest->created_at = $ticket->created_at;
+                $pathLatest->updated_at = $ticket->created_at;
                 $pathLatest->save();
 
                 $ticket->status_id = 6;
+                $ticket->updated_at = $ticket->created_at;
                 $ticket->save();
             }
 
