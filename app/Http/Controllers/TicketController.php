@@ -2084,6 +2084,7 @@ public function devTest()
         return response()->json($tl, 200);
         */
 
+        /*
         // Flatten nested JSON fields (e.g. `data`, `mappable_field_data`) to the top level.
         // Priority: existing top-level keys > first nested field that defines the key.
         $existing = $request->all();
@@ -2111,6 +2112,8 @@ public function devTest()
         if (!empty($flattened)) {
             $request->merge($flattened);
         }
+
+        */
 
         try {
             DB::beginTransaction();
