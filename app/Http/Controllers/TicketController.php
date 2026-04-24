@@ -2193,7 +2193,7 @@ public function devTest()
             $newStatus = Status::where('slug', 'new')->first()->id;
             $duplicatedStatus = Status::whereName('duplicated')->first()->id;
 
-            $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$request->phone_number}%")
+            $dupLead = Ticket::where('phone_number', 'LIKE', "%{$request->phone_number}%")
                 ->where('phone_number', '!=', '')
                 ->first();
 
