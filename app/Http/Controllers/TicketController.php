@@ -2193,13 +2193,15 @@ public function devTest()
             $newStatus = Status::where('slug', 'new')->first()->id;
             $duplicatedStatus = Status::whereName('duplicated')->first()->id;
 
-            $dupLead = Ticket::where('phone_number', 'LIKE', "%{$request->phone_number}%")
-                ->where('phone_number', '!=', '')
-                ->first();
+            $phone = $request->phone_number ?? $request->phone ?? null;
 
-            $dupTempLead = TempLead::where('phone_number', 'LIKE', "%{$request->phone_number}%")
+            $dupLead = $phone ? Ticket::where('phone_number', 'LIKE', "%{$phone}%")
                 ->where('phone_number', '!=', '')
-                ->first();
+                ->first() : null;
+
+            $dupTempLead = $phone ? TempLead::where('phone_number', 'LIKE', "%{$phone}%")
+                ->where('phone_number', '!=', '')
+                ->first() : null;
 
             // Collect everything that is NOT a common key as extra_data (nothing is lost)
             $extraData = collect($request->all())
