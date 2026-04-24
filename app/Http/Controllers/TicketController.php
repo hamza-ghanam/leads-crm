@@ -2073,6 +2073,10 @@ public function devTest()
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
+        if (empty($request->all())) {
+            return response()->json(['message' => 'Empty request body'], 400);
+        }
+
         /*
         $tl = TempLead::create([
             'full_name' => 'test',
@@ -2084,36 +2088,102 @@ public function devTest()
         return response()->json($tl, 200);
         */
 
-        /*
-        // Flatten nested JSON fields (e.g. `data`, `mappable_field_data`) to the top level.
-        // Priority: existing top-level keys > first nested field that defines the key.
-        $existing = $request->all();
-        $flattened = [];
-        foreach ($existing as $value) {
-            if (!is_array($value)) {
-                continue;
+        $commonKeys = [
+            'id', 'lead_id',
+            'ad_id', 'ad_name',
+            'adset_id', 'adgroup_id',
+            'adset_name', 'adgroup_name',
+            'campaign_id', 'campaign_name',
+            'form_id', 'form_name',
+            'is_organic',
+            'platform',
+            'full_name', 'name', 'first_name',
+            'phone_number', 'phone',
+            'email',
+            'status_id', 'source_id',
+            'method',
+            'created_time', 'create_time',
+            'page_id', 'page_name',
+            'retailer_item_id',
+        ];
+
+        // Normalize a key: camelCase → snake_case, lowercase, spaces/dashes → underscores
+        $normalizeKey = function (string $k): string {
+            $k = preg_replace('/(?<!^)[A-Z]/', '_$0', $k); // camelCase → snake_case
+            return strtolower(str_replace([' ', '-'], '_', $k));
+        };
+
+        // Returns the canonical $commonKeys entry that matches the given key, or null if none.
+        // e.g. "Phone number" → "phone_number", "Email" → "email"
+        $matchCommonKey = function (string $key) use ($commonKeys, $normalizeKey): ?string {
+            $n = $normalizeKey($key);
+            foreach ($commonKeys as $ck) {
+                if ($n === $normalizeKey($ck)) return $ck;
             }
-            // Array of {name, value} objects (e.g. mappable_field_data)
-            if (isset($value[0]) && is_array($value[0]) && array_key_exists('name', $value[0]) && array_key_exists('value', $value[0])) {
-                foreach ($value as $item) {
-                    if (!array_key_exists($item['name'], $existing) && !array_key_exists($item['name'], $flattened)) {
-                        $flattened[$item['name']] = $item['value'];
+            return null;
+        };
+
+        // Promote common keys from nested structures to the top level using their canonical name.
+        // A key is always REMOVED from the nested structure if it matches a common key.
+        // It is only PROMOTED if not already present at the top level or already promoted.
+        $existing      = $request->all();
+        $promoted      = [];
+        $updatedNested = [];
+
+        foreach ($existing as $topKey => $topValue) {
+            if (!is_array($topValue)) continue;
+
+            // {name, value} pairs array (e.g. mappable_field_data)
+            if (isset($topValue[0]) && is_array($topValue[0]) && array_key_exists('name', $topValue[0]) && array_key_exists('value', $topValue[0])) {
+                $remaining = [];
+                foreach ($topValue as $item) {
+                    $itemName   = $item['name'] ?? null;
+                    $canonicKey = $itemName ? $matchCommonKey($itemName) : null;
+                    if ($canonicKey) {
+                        // Always removed from nested; only promote once
+                        if (!array_key_exists($canonicKey, $existing) && !array_key_exists($canonicKey, $promoted)) {
+                            $promoted[$canonicKey] = $item['value'];
+                        }
+                    } else {
+                        $remaining[] = $item;
                     }
                 }
-            } elseif (array_keys($value) !== range(0, count($value) - 1)) {
-                // Associative array (e.g. `data` object)
-                foreach ($value as $subKey => $subValue) {
-                    if (!array_key_exists($subKey, $existing) && !array_key_exists($subKey, $flattened)) {
-                        $flattened[$subKey] = $subValue;
+                $updatedNested[$topKey] = $remaining;
+
+            // Associative array (e.g. data object)
+            } elseif (array_keys($topValue) !== range(0, count($topValue) - 1)) {
+                $remaining = [];
+                foreach ($topValue as $subKey => $subValue) {
+                    $canonicKey = $matchCommonKey($subKey);
+                    if ($canonicKey) {
+                        // Always removed from nested; only promote once
+                        if (!array_key_exists($canonicKey, $existing) && !array_key_exists($canonicKey, $promoted)) {
+                            $promoted[$canonicKey] = $subValue;
+                        }
+                    } else {
+                        $remaining[$subKey] = $subValue;
                     }
                 }
+                $updatedNested[$topKey] = $remaining;
             }
-        }
-        if (!empty($flattened)) {
-            $request->merge($flattened);
         }
 
-        */
+        if (!empty($promoted) || !empty($updatedNested)) {
+            $request->merge(array_merge($promoted, $updatedNested));
+        }
+
+        // Rename top-level camelCase common keys to their canonical snake_case names
+        // e.g. formId → form_id, isOrganic → is_organic, adId → ad_id
+        $topLevelNormalized = [];
+        foreach ($request->all() as $key => $value) {
+            $canonicKey = $matchCommonKey($key);
+            if ($canonicKey && $key !== $canonicKey && !$request->has($canonicKey)) {
+                $topLevelNormalized[$canonicKey] = $value;
+            }
+        }
+        if (!empty($topLevelNormalized)) {
+            $request->merge($topLevelNormalized);
+        }
 
         try {
             DB::beginTransaction();
@@ -2131,39 +2201,14 @@ public function devTest()
                 ->where('phone_number', '!=', '')
                 ->first();
 
-            $commonKeys = [
-                'id', 'lead_id',
-                'ad_id',
-                'ad_name',
-                'adset_id', 'adgroup_id',
-                'adset_name', 'adgroup_name',
-                'campaign_id',
-                'campaign_name',
-                'form_id',
-                'form_name',
-                'is_organic',
-                'platform',
-                'full_name', 'name', 'first_name',
-                'phone_number', 'phone',
-                'email',
-                'status_id',
-                'source_id',
-                'method',
-                'created_time', 'create_time',
-                'page_id',
-                'page_name',
-                'retailer_item_id',
-            ];
+            // Collect everything that is NOT a common key as extra_data (nothing is lost)
+            $extraData = collect($request->all())
+                ->reject(fn($value, $key) => $matchCommonKey($key) !== null || str_starts_with($key, 'raw'))
+                ->toArray();
 
-            $payload = $request->input('extra_data');
-
-            if (is_array($payload)) {
-                $filteredData = collect($payload)->reject(function ($value, $key) use ($commonKeys) {
-                    return str_starts_with($key, 'raw') || in_array($key, $commonKeys);
-                })->toArray();
-
-                $payload = json_encode($filteredData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            }
+            $payload = !empty($extraData)
+                ? json_encode($extraData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                : null;
 
             // If it's an array, encode it:
             $sourceId = $this->leadsHelper->getSourceID($request->platform);
