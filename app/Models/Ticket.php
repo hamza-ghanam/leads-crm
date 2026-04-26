@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 class Ticket extends Model
 {
@@ -75,6 +76,11 @@ class Ticket extends Model
     public function paths()
     {
         return $this->hasMany(TicketPath::class, 'ticket_id');
+    }
+
+    public function latestPath()
+    {
+        return $this->hasOne(TicketPath::class)->latestOfMany();
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Facades\Notifier;
 use App\Helpers\LeadsHelper;
 use App\Imports\TicketsImport;
 use App\Mail\LeadNotifyMail;
 use App\Models\Booking;
+use App\Models\GeneralSettings;
 use App\Models\Meeting;
 use App\Models\Source;
 use App\Models\Status;
@@ -13,32 +15,33 @@ use App\Models\TempLead;
 use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
-use App\Notifications\SendPushNotification;
+use App\Services\LeadAutoAssignService;
+use Exception;
+use Illuminate\Validation\ValidationException;
+use Mccarlosen\LaravelMpdf\Facades\LaravelMpdf;
 use Carbon\Carbon;
-use Google\Exception;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Kutia\Larafirebase\Facades\Larafirebase;
 use Maatwebsite\Excel\Facades\Excel;
-use Revolution\Google\Sheets\Facades\Sheets;
-use PDF;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\sendingEmail;
 use App\Models\ArchivedLead;
+use Mpdf\MpdfException;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
-use Notification;
+use App\Models\DbLog;
 
 //use Carbon\Carbon;
 
 class TicketController extends Controller
 {
-    private $leadsHelper;
+    private LeadsHelper $leadsHelper;
+    private LeadAutoAssignService $assignService;
 
     /**
      * Create a new OrderController instance.
@@ -48,6 +51,7 @@ class TicketController extends Controller
     public function __construct()
     {
         $this->leadsHelper = new LeadsHelper();
+        $this->assignService = new LeadAutoAssignService($this->leadsHelper);
         $this->middleware('auth')->except(['devTest', 'storeLead']);
     }
 
@@ -206,28 +210,57 @@ class TicketController extends Controller
 
         $fUpStatus = Status::whereSlug('follow-up')->first();
 
-        foreach ($tickets as $key => $ticket) {
-            $tPath = TicketPath::whereTicketId($ticket->id)
-                ->whereNextStatus($fUpStatus->id)
-                ->orderBy('updated_at', 'DESC')
-                ->first();
+        // ---- last follow-up preview (no N+1) ---- //
 
-            $ticket->user = ($ticket->user) ? $ticket->user : [];
-            if ($tPath) {
-                $ticket->lastFollowUp = strlen($tPath->comment) < 75 ? $tPath->comment : substr($tPath->comment, 0, 75) . '...';
-            } else {
-                $ticket->lastFollowUp = '-';
+        $ticketIds = collect($tickets->items())->pluck('id')->values();
+
+        $latestFollowUps = $ticketIds->isEmpty()
+            ? collect()
+            : TicketPath::query()
+                ->select(['ticket_id', 'comment', 'next_user', 'updated_at'])
+                ->whereIn('ticket_id', $ticketIds)
+                ->where('next_status', $fUpStatus->id)
+                ->orderBy('updated_at', 'DESC')
+                ->get()
+                ->groupBy('ticket_id')
+                ->map(fn($rows) => $rows->first());
+
+        $isSalesUser = auth()->user()->hasAnyRole(['sale', 'tele-sale']);
+        $authUserId = (int)auth()->id();
+
+        foreach ($tickets as $ticket) {
+            $ticket->user = $ticket->user ?: [];
+            $ticket->lastFollowUp = '-';
+
+            $tPath = $latestFollowUps->get($ticket->id);
+            if (!$tPath) {
+                continue;
             }
+
+            // Sales & tele‑sale can only see their own follow‑ups
+            if ($isSalesUser && (int)$tPath->next_user !== $authUserId) {
+                continue;
+            }
+
+            $comment = (string)($tPath->comment ?? '');
+            $ticket->lastFollowUp = mb_strlen($comment) <= 75
+                ? $comment
+                : mb_substr($comment, 0, 75) . '...';
         }
 
         $resultParams = [
-            'sales' => $sales,
-            'tickets' => $tickets,
-            'statuses' => $statuses,
+            'sales'         => $sales,
+            'tickets'       => $tickets,
+            'statuses'      => $statuses,
             'currentStatus' => $filterParams['status'],
-            'currentSale' => $filterParams['sale'],
-            'from' => $filterParams['from'],
-            'to' => $filterParams['to']
+            'currentSale'   => $filterParams['sale'],
+            'from'          => $filterParams['from'],
+            'to'            => $filterParams['to'],
+            'updatedFrom'   => $filterParams['updated_from'],
+            'updatedTo'     => $filterParams['updated_to'],
+            'camp'          => $filterParams['camp'],
+            'fullName'      => $filterParams['fullName'],
+            'phone'         => $filterParams['phone'],
         ];
 
         session()->flashInput($request->input());
@@ -306,10 +339,16 @@ class TicketController extends Controller
         }
 
         if (auth()->user()->hasAnyRole(['sale', 'tele-sale'])) {
+            $user = auth()->user();
+            if ($user->status === 'banned') {
+                return back()->withErrors(['msg' => "You cannot create a lead while you're banned!"])
+                    ->withInput($request->all());
+            }
+
             if (isset($request->user))
-                return back()->withErrors(['msg' => 'You cannot assign a lead to others!'])->withInput($request->all());
+                return back()->withErrors(['msg' => 'You cannot assign a lead to others!'])
+                    ->withInput($request->all());
             else {
-                $user = auth()->user();
                 $sender = 'you';
             }
         } else {
@@ -419,6 +458,12 @@ class TicketController extends Controller
             return abort(404);
         }
 
+        $ticket->loadMissing([
+            'paths.prevUser:id,name',
+            'paths.nextUser:id,name',
+            'paths.prevStatus:id,name,slug',
+        ]);
+
         if (auth()->user()->hasAnyRole(['sale', 'tele-sale']) and $ticket->user_id != auth()->user()->id) {
             return back()->withErrors(['msg' => 'Unauthorised Access.']);
         }
@@ -474,7 +519,7 @@ class TicketController extends Controller
             }
         }
 
-        if (auth()->user()->hasRole('admin') and $ticket->status->slug === 'rejected') {
+        if (auth()->user()->hasRole('admin') && $ticket->status->slug === 'rejected') {
             $revStatus = Status::where('slug', 'reviewed')->get();
             $statuses = $revStatus->merge($statuses);
         }
@@ -484,33 +529,46 @@ class TicketController extends Controller
         $passport = null;
         $sources = Source::all();
 
-        $ticketDates = TicketPath::where('ticket_id', $ticket->id)
-            ->pluck('created_at')
-            ->toArray();
+        $user = auth()->user();
+        $isSalesUser = $user->hasAnyRole($roles);
 
-        $ticketPaths = [];
+        $pathsQuery = $ticket->paths()
+            ->with([
+                'prevUser:id,name',
+                'nextUser:id,name',
+                'prevStatus:id,name,slug',
+            ]);
 
-        foreach ($ticketDates as $key => $ticketDate) {
-            $ticketPaths += [$ticketDate->toDateString() => []];
+        if ($isSalesUser) {
+            $pathsQuery->where('next_user', $user->id);
         }
 
-        foreach ($ticket->paths as $key => $ticketPath) {
-            $ticketPaths[$ticketPath->created_at->toDateString()][] = $ticketPath;
-        }
+        $paths = $pathsQuery->get();
 
-        $ticket->paths = $ticketPaths;
+        $paths->transform(function ($path) use ($isSalesUser) {
+            $sameUser = $path->prevUser && $path->nextUser
+                && (int)$path->prevUser->id === (int)$path->nextUser->id;
+
+            $path->show_prev_status_block = $isSalesUser ? $sameUser : true;
+
+            return $path;
+        });
+
+        $ticketPaths = $paths->groupBy(fn($path) => $path->created_at->toDateString());
+
         $ticket->extra_data = json_decode($ticket->extra_data, true); // Decode JSON
 
         $results = [
             'ticket' => $ticket,
+            'ticketPaths' => $ticketPaths,
             'users' => $users,
             'dead' => $dead,
             'statuses' => $statuses,
             'booking' => $booking,
             'invoice' => $invoice,
-            'sources' => $sources
+            'sources' => $sources,
         ];
-//dd($booking);
+
         return view('tickets.show')->with($results);
     }
 
@@ -762,12 +820,19 @@ class TicketController extends Controller
             });
         }
 
+        $key = 'auto_import_' . $source;
+        $autoImportValue = optional(
+            GeneralSettings::whereName($key)->first()
+        )->value ?? '0';
+
         return view('tickets.showImports')->with([
             'tickets' => $leads,
             'sales' => $sales ? $sales->map(function ($group) {
                 return $group->toArray();
             })->toArray() : [],
             'source' => $source,
+            'auto_import_key' => $key,
+            'auto_import_value' => $autoImportValue, // 0 or 1
         ]);
     }
 
@@ -922,7 +987,7 @@ class TicketController extends Controller
         parent::hasPermission('facebook import');
 
         if (!in_array($source, ['facebook', 'tiktok', 'googleAds'])) {
-            return response()->json(['ERROR' => 'Unkown Source'], 404);
+            return response()->json(['ERROR' => 'Unknown Source'], 404);
         }
 
         $rules = [
@@ -955,8 +1020,8 @@ class TicketController extends Controller
             $leads = TempLead::whereIn('id', $leadIds)->get();
 
             // return response()->json(['OK' => $request->details], 200);
-            $newStatus = Status::where('slug', 'new')->first()->id;
-            // $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+            $newStatus = Status::where('name', Status::NEW)->first()->id;
+            $duplicatedStatus = Status::where('name', Status::DUPLICATED)->first()->id;
 
             foreach ($leads as $rawLead) {
                 if (!User::find($request->details[$rawLead->id])) {
@@ -972,33 +1037,33 @@ class TicketController extends Controller
                     ->where('id', '!=', $rawLead->id)
                     ->first();
 
-                if (!$dupLead && !$dupTempLead) {
-                    $lead = Ticket::create([
-                        'number' => $rawLead->number,
-                        'user_id' => $request->details[$rawLead->id],
-                        'ad_id' => $rawLead->ad_id,
-                        'ad_name' => $rawLead->ad_name,
-                        'adset_id' => $rawLead->ad_name,
-                        'adset_name' => $rawLead->adset_id,
-                        'campaign_id' => $rawLead->campaign_id,
-                        'campaign_name' => $rawLead->campaign_name,
-                        'form_id' => $rawLead->form_id,
-                        'form_name' => $rawLead->form_name ?? '',
-                        'is_organic' => $rawLead->is_organic ?? '',
-                        'platform' => $rawLead->platform,
-                        'full_name' => $rawLead->full_name,
-                        'phone_number' => $rawLead->phone_number,
-                        'email' => $rawLead->email,
-                        'job_title' => $rawLead->job_title ?? '',
-                        'status_id' => $newStatus,
-                        'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
-                        'assigner_id' => $request->manual ? auth()->user()->id : null,
-                        'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
-                        'extra_data' => $rawLead->extra_data,
-                    ]);
+                //  if (!$dupLead && !$dupTempLead) {
+                $lead = Ticket::create([
+                    'number' => $rawLead->number,
+                    'user_id' => $request->details[$rawLead->id],
+                    'ad_id' => $rawLead->ad_id,
+                    'ad_name' => $rawLead->ad_name,
+                    'adset_id' => $rawLead->ad_name,
+                    'adset_name' => $rawLead->adset_id,
+                    'campaign_id' => $rawLead->campaign_id,
+                    'campaign_name' => $rawLead->campaign_name,
+                    'form_id' => $rawLead->form_id,
+                    'form_name' => $rawLead->form_name ?? '',
+                    'is_organic' => $rawLead->is_organic ?? '',
+                    'platform' => $rawLead->platform,
+                    'full_name' => $rawLead->full_name ?? 'N/A',
+                    'phone_number' => $rawLead->phone_number ?? '0',
+                    'email' => $rawLead->email,
+                    'job_title' => $rawLead->job_title ?? '',
+                    'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
+                    'source_id' => $this->leadsHelper->getSourceID($rawLead->platform),
+                    'assigner_id' => $request->manual ? auth()->user()->id : null,
+                    'method' => ($request->manual ? 'Manual ' : 'Automatic ') . ucfirst($source),
+                    'extra_data' => $rawLead->extra_data,
+                ]);
 
-                    $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
-                }
+                $this->leadsHelper->createAndAssignLead($lead, $lead->status_id);
+                // }
 
                 TempLead::destroy($rawLead->id);
             }
@@ -1089,7 +1154,7 @@ class TicketController extends Controller
         // Retrieve ticket early; return error if not found.
         $ticket = Ticket::find($id);
         if (!$ticket) {
-            return back()->withErrors(['msg' => 'Ticket does not exist!'])->withInput($request->all());
+            return back()->withErrors(['msg' => 'Lead does not exist!'])->withInput($request->all());
         }
 
         // Determine status id: use request value if provided, otherwise use ticket's next status.
@@ -1099,29 +1164,53 @@ class TicketController extends Controller
             return back()->withErrors(['msg' => 'No such status.'])->withInput($request->all());
         }
 
+        $slug = $theStatus->slug;
+        $isBooking = stripos($slug, 'book') !== false;
+        $isMeeting = stripos($slug, 'meet') !== false;
+        $isFollowUp = ($slug === 'follow-up');
+        $isNotInterested = ($slug === 'not-interested');
+
+        $role = request()->user()->getRoleNames()->first();
+        $commentRule = $role !== 'super-admin' ? 'required' : 'nullable';
+
         // Build base validation rules.
         $rules = [
-            'comment' => ['required', 'string'],
-            'user'    => ['integer', 'gt:0', 'exists:users,id'],
-            'status'  => ['required', 'nullable', 'integer', 'gt:0', 'exists:statuses,id'],
+            'comment' => [$commentRule, 'string'],
+            'user' => ['integer', 'gt:0', 'exists:users,id'],
+            'status' => ['required', 'integer', 'gt:0', 'exists:statuses,id'],
         ];
 
         // If status name contains 'book', add additional booking validation rules.
-        if (stripos($theStatus->name, 'book') !== false) {
+        if ($isBooking) {
             $rules = array_merge($rules, [
-                'client-unit'      => ['required'],
-                'client-price'     => ['required', 'integer', 'gt:0'],
-                'client-project'   => ['required'],
-                'client-developer' => ['required'],
+                'client-unit' => ['required', 'string'],
+                'client-price' => ['required', 'numeric', 'gt:0'],
+                'client-project' => ['required', 'string'],
+                'client-developer' => ['required', 'string'],
+            ]);
+        }
+
+        if ($isFollowUp) {
+            $rules = array_merge($rules, [
+                'reminder_datetime' => ['required', 'date', 'after:now'],
+            ]);
+        }
+
+        if ($isMeeting) {
+            $rules = array_merge($rules, [
+                'meeting_range' => ['required', 'string'],
             ]);
         }
 
         $messages = [
             'required' => 'The :attribute field is required.',
-            'integer'  => 'The :attribute field must be an integer.',
-            'string'   => 'The :attribute field must be a string.',
-            'gt'       => 'The :attribute field must be greater than zero.',
-            'exists'   => 'The selected :attribute is invalid.',
+            'integer' => 'The :attribute field must be an integer.',
+            'string' => 'The :attribute field must be a string.',
+            'gt' => 'The :attribute field must be greater than zero.',
+            'exists' => 'The selected :attribute is invalid.',
+            'after' => 'The :attribute must be a future date and time.',
+            'date' => 'The :attribute must be a valid date and time.',
+            'numeric' => 'The :attribute field must be a number.',
         ];
 
         $validator = Validator::make($request->all(), $rules, $messages);
@@ -1130,13 +1219,13 @@ class TicketController extends Controller
         }
 
         // Role-specific status restrictions.
-        if ($theStatus->name === 'approved' && !auth()->user()->hasRole('super-admin')) {
+        if ($theStatus->slug === 'approved' && !auth()->user()->hasRole('super-admin')) {
             return back()->withErrors(['msg' => 'Unauthorized Operation!'])->withInput($request->all());
         }
 
         // Determine user: if not provided use ticket's user.
         $userId = $request->input('user') ?? ($ticket->user->id ?? null);
-        $user   = User::find($userId);
+        $user = User::find($userId);
         if (!$user) {
             return back()->withErrors(['msg' => 'User does not exist!'])->withInput($request->all());
         }
@@ -1161,41 +1250,46 @@ class TicketController extends Controller
 
         try {
             // If meeting scheduling is needed.
-            if (stripos($theStatus->name, 'meet') !== false) {
-                $rangeParts = explode(' - ', $request->datetimes);
+            if ($isMeeting) {
+                $range = $request->input('meeting_range');
+                $rangeParts = explode(' - ', $range);
+
                 if (count($rangeParts) < 2) {
                     throw new \Exception('Invalid meeting datetime format.');
                 }
-                $startDate = \Carbon\Carbon::createFromFormat('d/m Y g:i A', $rangeParts[0]);
-                $endDate   = \Carbon\Carbon::createFromFormat('d/m Y g:i A', $rangeParts[1]);
+                $startDate = Carbon::parse(trim($rangeParts[0]));
+                $endDate = Carbon::parse(trim($rangeParts[1]));
 
-                if ($endDate->lessThan($startDate)) {
+                if ($endDate->lessThanOrEqualTo($startDate)) {
                     throw new \Exception('Start date & time must be before end date & time.');
                 }
 
                 $mtng = Meeting::create([
-                    'started_at'  => $startDate->toDateTimeString(),
-                    'ended_at'    => $endDate->toDateTimeString(),
-                    'method'      => 'automatic',
+                    'started_at' => $startDate->toDateTimeString(),
+                    'ended_at' => $endDate->toDateTimeString(),
+                    'method' => 'automatic',
                     'reminder_at' => $startDate->copy()->subMinutes(30)->toDateTimeString(),
                 ]);
             }
 
             // Create ticket path record.
             $tPath = TicketPath::create([
-                'prev_user'   => $ticket->user->id ?? null,
-                'next_user'   => $user->id,
+                'prev_user' => $ticket->user->id ?? null,
+                'next_user' => $user->id,
                 'prev_status' => $ticket->status->id,
                 'next_status' => $statusId,
-                'ticket_id'   => $ticket->id,
-                'comment'     => $request->comment,
+                'ticket_id' => $ticket->id,
+                'comment' => $request->comment ?? '-',
+                'reminder_at' => $isFollowUp
+                    ? Carbon::parse($request->input('reminder_datetime'))
+                    : null,
             ]);
 
             // Adjust ticket user based on status.
             $mgmtStatuses = Status::whereIn('slug', ['reviewed', 'sold', 'pre-approved', 'rejected'])
                 ->pluck('id')
                 ->toArray();
-            $dead     = Status::where('slug', 'dead')->first();
+            $dead = Status::where('slug', 'dead')->first();
             $deadTele = Status::where('slug', 'dead-tele')->first();
 
             if ($request->input('status') == $dead->id || $request->input('status') == $deadTele->id) {
@@ -1210,12 +1304,29 @@ class TicketController extends Controller
 
             // Update ticket status.
             $ticket->status_id = $statusId;
+
             $ticket->save();
 
             // If a meeting was created, link it to the ticket path.
             if (isset($mtng)) {
                 $mtng->ticket_path_id = $tPath->id;
                 $mtng->save();
+            }
+
+            ///// If Not Interested -> kill the lead immediately!
+            if ($isNotInterested) {
+                $tPath = TicketPath::create([
+                    'prev_user' => $ticket->user->id ?? null,
+                    'next_user' => $ticket->user->id ?? null,
+                    'prev_status' => $theStatus->id,
+                    'next_status' => $dead->id,
+                    'ticket_id' => $ticket->id,
+                    'comment' => 'Lead is now DEAD as the client is Not Interested.',
+                ]);
+
+                $ticket->update([
+                    'status_id' => $dead->id,
+                ]);
             }
 
             // Update ticket user's status based on meeting.
@@ -1233,10 +1344,10 @@ class TicketController extends Controller
             $prevStatusName = Status::find($tPath->prev_status)->name;
             $nextStatusName = Status::find($tPath->next_status)->name;
             $data = [
-                'title'   => 'Lead Status Update',
+                'title' => 'Lead Status Update',
                 'message' => 'A new lead status has been updated from "' . $prevStatusName . '" to "' . $nextStatusName . '"',
-                'user'    => auth()->user()->name,
-                'ticket'  => $ticket->id,
+                'user' => auth()->user()->name,
+                'ticket' => $ticket->id,
             ];
 
             // Notify super-admins.
@@ -1245,23 +1356,22 @@ class TicketController extends Controller
 
             // Notify assigned user.
             $this->sendLeadMail($user->email, [
-                'title'   => 'Lead Status Update',
+                'title' => 'Lead Status Update',
                 'message' => 'Your lead status has been updated from "' . $prevStatusName . '" to "' . $nextStatusName . '".',
-                'user'    => '',
-                'ticket'  => $ticket->id,
+                'user' => '',
+                'ticket' => $ticket->id,
             ]);
 
             // Create booking if status indicates booking.
-            if (stripos($theStatus->name, 'book') !== false) {
+            if ($isBooking) {
                 $booking = Booking::create([
-                    'project_name'   => $request->input('client-project'),
-                    'unit_number'    => $request->input('client-unit'),
-                    'price'          => $request->input('client-price'),
+                    'project_name' => $request->input('client-project'),
+                    'unit_number' => $request->input('client-unit'),
+                    'price' => $request->input('client-price'),
                     'developer_name' => $request->input('client-developer'),
-                    'user_id'        => auth()->user()->id,
-                    'ticket_id'      => $ticket->id,
+                    'user_id' => auth()->user()->id,
+                    'ticket_id' => $ticket->id,
                 ]);
-                $booking->save();
             }
 
             DB::commit();
@@ -1356,6 +1466,10 @@ class TicketController extends Controller
     }
 
     // Generate PDF
+
+    /**
+     * @throws MpdfException
+     */
     public function createPDF()
     {
         // retrieve all records from db
@@ -1363,9 +1477,12 @@ class TicketController extends Controller
 
         // share data to view
         view()->share('ticket', $data);
-        $pdf = PDF::loadView('ticketPDF', $data);
-        $pdf->setOptions(['isRemoteEnabled' => true]);
-        $pdf->getDomPDF()->setProtocol($_SERVER['DOCUMENT_ROOT']);
+        $pdf = LaravelMpdf::loadView('ticketPDF', $data, [], [
+            'format' => 'A4',
+            'allow_url_fopen' => true,
+        ]);
+
+        // in blade put: <img src="{{ public_path('images/logo.png') }}" style="width:120px">
         // download PDF file with download method
         return $pdf->download('pdf_file.pdf');
     }
@@ -1398,6 +1515,7 @@ class TicketController extends Controller
         }
     }
 
+    ////// WRS AE | Updated 25/11/25
     public function indexArchived()
     {
         if (!auth()->user()->hasRole('super-admin')) {
@@ -1406,7 +1524,15 @@ class TicketController extends Controller
 
         $archivedLeads = ArchivedLead::all();
 
-        return view('tickets.archived')->with(['leads' => $archivedLeads]);
+        $salesAll = User::role(['sale', 'tele-sale'])
+            ->where('status', 'permitted')
+            ->get();
+
+        $sales = $salesAll->groupBy(function ($user) {
+            return $user->hasRole('sale') ? 'sale' : 'tele-sale';
+        });
+
+        return view('tickets.archived', compact('archivedLeads', 'sales'));
     }
 
     public function multipleForward(Request $request)
@@ -1491,14 +1617,219 @@ class TicketController extends Controller
                 // Mail::to($lead->user->email)->send(new LeadNotifyMail($data));
                 $this->sendLeadMail($lead->user->email, $data);
 
+                // Notification
+                Notifier::notifyUser(
+                    $lead->user,
+                    'New ticket',
+                    "A new ticket has been assigned to you #{$lead->id}",
+                    route('tickets.show', $lead->id),
+                    'ticket_new',
+                    ['ticket_id' => $lead->id],
+                    null
+                );
+
             }
         }
 
         return back()->with('successMsg', 'Leads have been forwarded.');
     }
 
-    public function devTest()
+
+
+public function devTest()
     {
+        $deadStatus = Status::whereSlug('dead')->firstOrFail();
+
+        $tickets = Ticket::whereBetween('created_at', ['2022-01-01 00:00:00', '2024-12-31 23:59:59'])
+            ->where('updated_at', '>=', '2026-04-01 00:00:00')
+            ->get();
+
+        $processed = 0;
+        $affectedIds = [];
+
+        DB::beginTransaction();
+        try {
+            foreach ($tickets as $ticket) {
+                // Delete the latest ticketPath
+                $latestPath = TicketPath::where('ticket_id', $ticket->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                if ($latestPath) {
+                    $latestPath->delete();
+                }
+
+                // Get the new latest ticketPath after deletion
+                $newLatestPath = TicketPath::where('ticket_id', $ticket->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                // Update ticket user_id to new latest path's next_user
+                if ($newLatestPath) {
+                    $ticket->user_id = $newLatestPath->next_user;
+                    $ticket->save();
+                }
+
+                $prevStatusId = $ticket->status_id;
+
+                // Create new ticketPath marking ticket as Dead
+                TicketPath::create([
+                    'ticket_id'   => $ticket->id,
+                    'prev_user'   => $ticket->user_id,
+                    'next_user'   => $ticket->user_id,
+                    'prev_status' => $prevStatusId,
+                    'next_status' => $deadStatus->id,
+                    'comment'     => 'Dead as old lead',
+                ]);
+
+                // Update ticket status to Dead
+                $ticket->status_id = $deadStatus->id;
+                $ticket->save();
+
+                $affectedIds[] = $ticket->id;
+                $processed++;
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['processed' => $processed, 'affected_ids' => $affectedIds], 200);
+
+        $logs = DbLog::whereNotNull('context')
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.phone')) IS NOT NULL")
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.email')) IS NOT NULL")
+            ->get(['context']);
+
+        $updated = 0;
+
+        foreach ($logs as $log) {
+            $phone = $log->context['phone'] ?? null;
+            $email = $log->context['email'] ?? null;
+            echo $phone . ' - ' . $email . '\n';
+
+            if (!$phone || !$email) continue;
+
+            $rows = TempLead::where('email', $email)
+                ->where(function ($q) {
+                    $q->whereNull('phone_number')->orWhere('phone_number', 0);
+                })
+                ->update(['phone_number' => $phone]);
+
+            $updated += $rows;
+        }
+
+        return response()->json("Done. Updated {$updated} temp_leads records.", 200);
+
+        $leadsHelper = app()->make(LeadsHelper::class);
+
+        $sources = GeneralSettings::where('name', 'like', 'auto_import_%')
+            ->where('value', 1)
+            ->pluck('value', 'name')
+            ->keys()
+            ->map(function ($key) {
+                return str_replace('auto_import_', '', $key);
+            })
+            ->values()
+            ->toArray();
+
+        foreach ($sources as $source) {
+            $leads = $leadsHelper->fetchLeadsFromZapier($source);
+            [$jrStats, $srStats, $processedLeadKeys] = $leadsHelper->initiateImport($leads);
+
+            $leadIds = array_column($leads, 'number');
+
+            $leadsHelper->removeTempLeads($leadIds);
+        }
+
+        return response()->json('DONE!', 200);
+
+        $noAnswerStatusPeriod = '3d';
+        $statusMap = Status::pluck('id', 'name');   // ['new' => 1, 'follow-up' => 2]
+        $newStatusId = $statusMap->get(Status::NEW);
+        $noAnswerStatusId = $statusMap->get(Status::NO_ANSWER);
+        $superAdmins = User::role('super-admin')
+            ->where('status', 'permitted')
+            ->get();
+
+        $res = $this->assignService->autoReassignFromStatus(
+            $noAnswerStatusId,
+            $newStatusId,
+            $noAnswerStatusPeriod,
+            $superAdmins,
+            $statusMap
+        );
+
+        return response()->json($res, 200);
+        /*
+                Notifier::notifyUser(
+                    97,
+                    'Follow up reminder',
+                    "You have a follow up on ticket #3333333",
+                    route('tickets.show', 327925),
+                    'ticket_follow_up',
+                    ['ticket_id' => 327925],
+                    null
+                );
+        */
+
+        $now = now();
+        $followUpStatusId = Status::where('name', Status::FOLLOW_UP)->value('id');
+
+        if (!$followUpStatusId) {
+            // لو ما في هيك حالة، لا تعمل شيء
+            return;
+        }
+
+        Ticket::where('status_id', $followUpStatusId)
+            ->whereHas('latestPath', function ($q) use ($now) {
+                $q->whereNotNull('reminder_at')
+                    ->where('reminder_at', '<=', $now)
+                    ->whereNull('reminder_sent_at');
+            })
+            ->with(['user', 'latestPath'])
+            ->chunkById(100, function ($tickets) {
+                foreach ($tickets as $ticket) {
+                    if (!$ticket->user) {
+                        continue;
+                    }
+
+                    // ✅ إرسال الإيميل + إشعار سطح مكتب عن طريق Notification
+
+                    $data = [
+                        'title' => 'Lead Follow-up Reminder!',
+                        'message' => 'You have a lead (' . $ticket->id . ') that needs your attention for follow-up.
+                                          Please check the system at your earliest convenience.',
+                        'user' => $ticket->user->name,
+                        'ticket' => $ticket->id
+                    ];
+
+                    $this->leadsHelper->sendLeadMail($ticket->user->email, $data);
+                    /*
+                                        Notifier::notifyUser(
+                                            $ticket->user,
+                                            'Follow up reminder',
+                                            "You have a follow up on ticket #{$ticket->id}",
+                                            route('tickets.show', $ticket->id),
+                                            'ticket_follow_up',
+                                            ['ticket_id' => $ticket->id],
+                                            null
+                                        );
+                    */
+                    $ticket->latestPath->reminder_sent_at = now();
+                    $ticket->latestPath->save();
+                }
+            });
+
+        return response()->json('OK', 200);
+
+        $this->leadsHelper->sendFcmNotification(97, 'Archived Lead!', "A lead has been archived!");
+
+
+        $this->leadsHelper->sendFcmNotification(13, 'Hello there!', "It's working fine!");
+
         $pullDate = date('Y-m-d H:i:s');
         $dateBegin = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 10:29:57"));
         $dateEnd = date('Y-m-d H:i:s', strtotime(date("Y") . '-' . date("m") . '-' . date("d") . " 23:00:03"));
@@ -1512,7 +1843,7 @@ class TicketController extends Controller
         [$assignmentsCountJR, $assignmentsCountSR, $tempLeads] = $this->leadsHelper->initiateImport($leads);
         //$res = $this->leadsHelper->initiateImport($leads);
 
-        $this->leadsHelper->removeZapierTempLeads($tempLeads);
+        $this->leadsHelper->removeTempLeads($tempLeads);
 
         return response()->json([$tempLeads], 200);
 
@@ -1674,7 +2005,7 @@ class TicketController extends Controller
         ];
 
         $tickets = [];
-        $newStatus = Status::where('slug', 'new')->first()->id;
+        $newStatusId = Status::where('slug', 'new')->first()->id;
         $duplicateStatus = Status::whereName('duplicated')->first()->id;
 
         foreach ($leads as $lead) {
@@ -1696,7 +2027,7 @@ class TicketController extends Controller
             if ($dupLead) {
                 $lead->status_id = $duplicateStatus;
             } else {
-                $lead->status_id = $newStatus;
+                $lead->status_id = $newStatusId;
             }
 
             $tickets[] = $lead;
@@ -1740,8 +2071,120 @@ class TicketController extends Controller
 
     public function storeLead(Request $request)
     {
-        if ($request->header('X-Zapier-Token') !== env('ZAPIER_SECRET')) {
+        if (!$request->header('X-Make-Token') || $request->header('X-Make-Token') !== config('app.auth_token')) {
             return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        if (empty($request->all())) {
+            return response()->json(['message' => 'Empty request body'], 400);
+        }
+
+        /*
+        $tl = TempLead::create([
+            'full_name' => 'test',
+            'phone_number' => '099999999',
+            'status_id' => Status::where('slug', 'new')->first()->id,
+            'source_id' => $this->leadsHelper->getSourceID('fb'),
+            'extra_data' => json_encode($request->all(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        ]);
+        return response()->json($tl, 200);
+        */
+
+        $commonKeys = [
+            'id', 'lead_id',
+            'ad_id', 'ad_name',
+            'adset_id', 'adgroup_id',
+            'adset_name', 'adgroup_name',
+            'campaign_id', 'campaign_name',
+            'form_id', 'form_name',
+            'is_organic',
+            'platform',
+            'full_name', 'name', 'first_name',
+            'phone_number', 'phone',
+            'email',
+            'status_id', 'source_id',
+            'method',
+            'created_time', 'create_time',
+            'page_id', 'page_name',
+            'retailer_item_id',
+        ];
+
+        // Normalize a key: camelCase → snake_case, lowercase, spaces/dashes → underscores
+        $normalizeKey = function (string $k): string {
+            $k = preg_replace('/(?<!^)[A-Z]/', '_$0', $k); // camelCase → snake_case
+            return strtolower(str_replace([' ', '-'], '_', $k));
+        };
+
+        // Returns the canonical $commonKeys entry that matches the given key, or null if none.
+        // e.g. "Phone number" → "phone_number", "Email" → "email"
+        $matchCommonKey = function (string $key) use ($commonKeys, $normalizeKey): ?string {
+            $n = $normalizeKey($key);
+            foreach ($commonKeys as $ck) {
+                if ($n === $normalizeKey($ck)) return $ck;
+            }
+            return null;
+        };
+
+        // Promote common keys from nested structures to the top level using their canonical name.
+        // A key is always REMOVED from the nested structure if it matches a common key.
+        // It is only PROMOTED if not already present at the top level or already promoted.
+        $existing      = $request->all();
+        $promoted      = [];
+        $updatedNested = [];
+
+        foreach ($existing as $topKey => $topValue) {
+            if (!is_array($topValue)) continue;
+
+            // {name, value} pairs array (e.g. mappable_field_data)
+            if (isset($topValue[0]) && is_array($topValue[0]) && array_key_exists('name', $topValue[0]) && array_key_exists('value', $topValue[0])) {
+                $remaining = [];
+                foreach ($topValue as $item) {
+                    $itemName   = $item['name'] ?? null;
+                    $canonicKey = $itemName ? $matchCommonKey($itemName) : null;
+                    if ($canonicKey) {
+                        // Always removed from nested; only promote once
+                        if (!array_key_exists($canonicKey, $existing) && !array_key_exists($canonicKey, $promoted)) {
+                            $promoted[$canonicKey] = $item['value'];
+                        }
+                    } else {
+                        $remaining[] = $item;
+                    }
+                }
+                $updatedNested[$topKey] = $remaining;
+
+            // Associative array (e.g. data object)
+            } elseif (array_keys($topValue) !== range(0, count($topValue) - 1)) {
+                $remaining = [];
+                foreach ($topValue as $subKey => $subValue) {
+                    $canonicKey = $matchCommonKey($subKey);
+                    if ($canonicKey) {
+                        // Always removed from nested; only promote once
+                        if (!array_key_exists($canonicKey, $existing) && !array_key_exists($canonicKey, $promoted)) {
+                            $promoted[$canonicKey] = $subValue;
+                        }
+                    } else {
+                        $remaining[$subKey] = $subValue;
+                    }
+                }
+                $updatedNested[$topKey] = $remaining;
+            }
+        }
+
+        if (!empty($promoted) || !empty($updatedNested)) {
+            $request->merge(array_merge($promoted, $updatedNested));
+        }
+
+        // Rename top-level camelCase common keys to their canonical snake_case names
+        // e.g. formId → form_id, isOrganic → is_organic, adId → ad_id
+        $topLevelNormalized = [];
+        foreach ($request->all() as $key => $value) {
+            $canonicKey = $matchCommonKey($key);
+            if ($canonicKey && $key !== $canonicKey && !$request->has($canonicKey)) {
+                $topLevelNormalized[$canonicKey] = $value;
+            }
+        }
+        if (!empty($topLevelNormalized)) {
+            $request->merge($topLevelNormalized);
         }
 
         try {
@@ -1749,44 +2192,30 @@ class TicketController extends Controller
 
             //$this->validateLead($request);
 
-            $newStatus = Status::where('slug', 'new')->first()->id;
-            $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+            $newStatus = Status::where('name', Status::NEW)->first()->id;
+            $duplicatedStatus = Status::where('name', Status::DUPLICATED)->first()->id;
 
-            $dupLead = Ticket::where('phone_number', 'LIKE' . "%{$request->phone_number}%")
+            $phone = $request->phone_number ?? $request->phone ?? null;
+
+            $dupLead = $phone ? Ticket::where('phone_number', 'LIKE', "%{$phone}%")
                 ->where('phone_number', '!=', '')
-                ->first();
+                ->first() : null;
 
-            $dupTempLead = TempLead::where('phone_number', 'LIKE', "%{$request->phone_number}%")
+            $dupTempLead = $phone ? TempLead::where('phone_number', 'LIKE', "%{$phone}%")
                 ->where('phone_number', '!=', '')
-                ->first();
+                ->first() : null;
 
-            $commonKeys = [
-                'id', 'lead_id',
-                'ad_id',
-                'ad_name',
-                'adset_id', 'adgroup_id',
-                'adset_name', 'adgroup_name',
-                'campaign_id',
-                'campaign_name',
-                'form_id',
-                'form_name',
-                'is_organic',
-                'platform',
-                'full_name', 'name', 'first_name',
-                'phone_number',
-                'email',
-                'status_id',
-                'source_id',
-                'method',
-                'created_time', 'create_time',
-                'page_id',
-                'page_name',
-                'retailer_item_id',
-            ];
+            // Collect everything that is NOT a common key as extra_data (nothing is lost)
+            $extraData = collect($request->all())
+                ->reject(fn($value, $key) => $matchCommonKey($key) !== null || str_starts_with($key, 'raw'))
+                ->toArray();
 
-            $filteredData = collect($request->request->all())->reject(function ($value, $key) use ($commonKeys) {
-                return str_starts_with($key, 'raw') || in_array($key, $commonKeys);
-            })->toArray();
+            $payload = !empty($extraData)
+                ? json_encode($extraData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                : null;
+
+            // If it's an array, encode it:
+            $sourceId = $this->leadsHelper->getSourceID($request->platform);
 
             $lead = TempLead::create([
                 'number' => $request->id ?? $request->lead_id ?? 0,
@@ -1801,37 +2230,199 @@ class TicketController extends Controller
                 'is_organic' => $request->is_organic ?? '',
                 'platform' => $request->platform,
                 'full_name' => $request->full_name ?: $request->name ?: $request->first_name ?: 'N/A',
-                'phone_number' => $request->phone_number,
+                'phone_number' => $request->phone_number ?? $request->phone ?? '0',
                 'email' => $request->email,
                 'job_title' => $request->job_title ?? '',
                 'status_id' => ($dupLead || $dupTempLead) ? $duplicatedStatus : $newStatus,
-                'source_id' => $this->leadsHelper->getSourceID($request->query('pf')),
-                'extra_data' => json_encode($filteredData, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-                'method' => 'Automatic ' . ucfirst($request->query('sc')) . ' - Webhook',
+                'source_id' => $sourceId,
+                'extra_data' => $payload,
+                'method' => 'Automatic ' . Source::find($sourceId)->name . ' - Webhook',
             ]);
 
             DB::commit();
 
             // Return a success response
             return response()->json(['message' => 'Lead stored successfully', 'lead' => $lead], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             // Rollback the transaction if there's an error
             DB::rollBack();
 
             return response()->json(['error' => $e->getMessage()], 500);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Rollback the transaction if there's an error
             DB::rollBack();
 
-            return response()->json(['error' => 'فشل إضافة الطلب: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'Request execution failed: ' . $e->getMessage()], 500);
         }
     }
 
-    public function ignoreLeads(Request $request)
+    public function restoreArchivedLeads(Request $request)
     {
-        $deletedRowsCount = TempLead::whereIn('id', $request->leadIds)->delete();
+        $validator = Validator::make($request->all(), [
+            'manual' => 'nullable|string',
+            'details' => 'required|array|min:1',
+            'details.*' => 'required|integer|exists:users,id',
+        ], [
+            'details.required' => 'No leads were submitted.',
+            'details.array' => 'Invalid details format.',
+            'details.*.exists' => 'One or more selected sales users do not exist.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors()->toArray(), 422);
+        }
+
+        $details = $request->input('details', []);
+        $leadIds = array_keys($details);
+        $salesIds = array_values($details);
+        $assignerId = Auth::id();
+
+        $validSalesCount = User::whereIn('id', $salesIds)
+            ->where('status', 'permitted')
+            ->count();
+
+        if ($validSalesCount !== count($salesIds)) {
+            return response()->json([
+                'sales_ids' => 'One or more selected sales users are not permitted.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $archivedLeads = ArchivedLead::whereIn('id', $leadIds)->get()->keyBy('id');
+
+        if ($archivedLeads->count() !== count($leadIds)) {
+            return response()->json([
+                'lead_ids' => 'One or more archived leads were not found.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $restoredCount = 0;
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($details as $archivedLeadId => $salesUserId) {
+                /** @var \App\Models\ArchivedLead $archivedLead */
+                $archivedLead = $archivedLeads->get($archivedLeadId);
+
+                if (!$archivedLead) {
+                    continue;
+                }
+
+                // 4) بناء بيانات الـ Ticket الجديدة من ArchivedLead
+                $ticketData = [
+                    'number' => $archivedLead->number,
+                    'ad_id' => $archivedLead->ad_id,
+                    'ad_name' => $archivedLead->ad_name,
+                    'adset_id' => $archivedLead->adset_id,
+                    'adset_name' => $archivedLead->adset_name,
+                    'campaign_id' => $archivedLead->campaign_id,
+                    'campaign_name' => $archivedLead->campaign_name,
+                    'form_id' => $archivedLead->form_id,
+                    'form_name' => $archivedLead->form_name,
+                    'is_organic' => $archivedLead->is_organic,
+                    'platform' => $archivedLead->platform,
+                    'full_name' => $archivedLead->full_name,
+                    'phone_number' => $archivedLead->phone_number,
+                    'email' => $archivedLead->email,
+                    'invoice' => $archivedLead->invoice,
+                    'passport' => $archivedLead->passport,
+                    'res_form' => $archivedLead->res_form,
+                    'job_title' => $archivedLead->job_title,
+                    'user_id' => $salesUserId,         // 🔹 السيلز المسند له
+                    'status_id' => $archivedLead->status_id,
+                    'source_id' => $archivedLead->source_id,
+                    'assigner_id' => $assignerId,          // 🔹 مين عمل الريستور
+                    'method' => $archivedLead->method,
+                    'preferred_time' => $archivedLead->preferred_time,
+                    'remarks' => $archivedLead->remarks,
+                    'extra_data' => $archivedLead->extra_data,
+                ];
+
+                $restoredLead = Ticket::create($ticketData);
+                $this->leadsHelper->createAndAssignLead($restoredLead, $archivedLead->status_id, 'Lead restored from archive.');
+
+                // 5) حذف ArchivedLead بعد التحويل
+                $archivedLead->delete(); // لو عندك SoftDeletes على ArchivedLead وإلا use forceDelete()
+
+                $restoredCount++;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'OK' => $restoredCount,
+            ]);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            // ممكن تضيف Log هنا لو حاب
+            // Log::error('Restore leads failed', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'error' => 'Failed to restore leads. Please try again later.',
+            ], 500);
+        }
+    }
+
+    public function ignoreLeads(Request $request, $type)
+    {
+        switch ($type) {
+            case 'archive':
+                $modelClass = ArchivedLead::class;
+                break;
+
+            case 'temp':
+                $modelClass = TempLead::class;
+                break;
+
+            default:
+                return response()->json([
+                    'error' => 'Invalid type. Allowed values are: archive, temp.',
+                ], 400);
+        }
+
+        $modelInstance = new $modelClass;
+        $table = $modelInstance->getTable(); // يعطيك اسم الجدول: archived_leads أو temp_leads
+
+        // 1) Validation
+        $validated = $request->validate([
+            'lead_ids' => 'required|array|min:1',
+            'lead_ids.*' => 'required|integer|exists:' . $table . ',id',
+        ], [
+            'lead_ids.required' => 'No selected leads!',
+            'lead_ids.*.exists' => 'One or more selected leads do not exist.',
+        ]);
+
+        $leadIds = $validated['lead_ids'];
+
+        $deletedRowsCount = $modelClass::whereIn('id', $leadIds)->delete();
 
         return response()->json(['OK' => $deletedRowsCount], 200);
+    }
+
+    public function reshuffle(Request $request)
+    {
+        $data = $request->validate([
+            'lead_ids' => ['required', 'array', 'min:1'],
+            'lead_ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $result = $this->leadsHelper->reshuffleAndAssign($data['lead_ids']);
+
+        if (!$result['ok']) {
+            return response()->json([
+                'message' => $result['message'],
+                'missing_ids' => $result['missing_ids'] ?? [],
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Reshuffled successfully',
+            'total_fetched' => $result['total_fetched'],
+            'total_assigned' => $result['total_assigned'],
+            'assigned_stats' => $result['assigned_stats'],
+        ]);
     }
 
     private function validateLead(Request $request)

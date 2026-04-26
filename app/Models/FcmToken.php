@@ -10,7 +10,7 @@ class FcmToken extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['user_id', 'token','device_type','user_agent','last_used_at'];
+    protected $fillable = ['user_id', 'token', 'device_type', 'user_agent', 'last_used_at'];
 
     public function user()
     {

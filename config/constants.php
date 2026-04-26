@@ -20,6 +20,9 @@ return [
         'booking-tele' => '#6610f2',
         'dead-tele' => '#dc3545',
         're-shuffled' => '#4d2d00',
+        'no-answer' => '#45161e',
+        'not-interested' => '#a29786',
+
         'New' => '#007bff',
         'Follow-up' => '#6c757d',
         'Meeting' => '#ffc107',
@@ -39,6 +42,8 @@ return [
         'Booking (Tele)' => '#6610f2',
         'Dead (Tele)' => '#dc3545',
         'Re-shuffled' => '#4d2d00',
+        'No-Answer' => '#45161e',
+        'Not-Interested' => '#a29786',
     ],
 
     'status_icons' => [
@@ -61,5 +66,7 @@ return [
         'waiting-tele' => '#343a40',
         'booking-tele' => '#6610f2',
         'dead-tele' => '#dc3545',
+        'no-answer' => 'fas fa-microphone-slash',
+        'not-interested' => 'fas fa-bell-slash',
     ]
 ];

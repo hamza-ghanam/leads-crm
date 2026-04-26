@@ -1,171 +1,366 @@
 @extends('layouts.app')
 
 @section('title')
-    Archived Leads list
+    Archived Leads
 @endsection
 
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ URL::to('/') }}">Home</a></li>
-    <li class="breadcrumb-item">Archived Leads list</li>
+    <li class="breadcrumb-item active">Archived Leads</li>
 @endsection
 
 @section('content')
-    <!-- Info boxes -->
-    <div class="row">
-        <!-- fix for small devices only -->
-        <div class="clearfix hidden-md-up"></div>
-    </div>
-    <!-- /.row -->
 
     @if ($errors->any())
-        <div class="row">
-            <div class="col-12">
-                <div class="alert alert-danger">
-                    <ul style="list-style: none;">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            <h5><i class="icon fas fa-ban"></i> Please fix the following:</h5>
+            <ul class="mb-0 pl-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
         </div>
     @endif
 
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <table id="example2" class="table table-bordered table-hover">
-                        <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Campaign Name</th>
-                            <th>Full Name</th>
-                            <th>Phone Number</th>
-                            <th>Email</th>
-                            <th>Created time</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach($leads as $key => $lead)
-                            <tr>
-                                <td>{{ $key+1 }}</td>
-                                <td>{{ $lead['campaign_name'] !== null ? $lead['campaign_name'] : '-' }}</td>
-                                <td>{{ $lead['full_name'] !== null ? $lead['full_name'] : '-' }}</td>
-                                <td>{{ $lead['phone_number'] !== null ? $lead['phone_number'] : '-' }}</td>
-                                <td>{{ $lead['email'] !== null ? $lead['email'] : '-' }}</td>
-                                <td>{{ $lead['created_time'] !== null ? date('d/m/Y h:i A', strtotime($lead['created_time'])) : '-' }}</td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
+            <div class="card shadow-sm">
+                <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
+                    <h3 class="card-title text-white mb-0">
+                        <i class="fas fa-archive mr-2"></i> Archived Leads
+                    </h3>
+                    @can('add ticket')
+                    <div class="card-tools">
+                        <button type="button" onclick="ignoreLeads()" class="btn btn-sm btn-danger mr-2">
+                            <i class="fas fa-ban mr-1"></i> Ignore Leads
+                        </button>
+                        <button type="button" onclick="restoreTickets()" class="btn btn-sm btn-success">
+                            <i class="fas fa-undo mr-1"></i> Restore
+                        </button>
+                    </div>
+                    @endcan
                 </div>
-                <!-- /.card-body -->
+
+                <div class="card-body">
+                    <div id="fb-data-table">
+                        <form id="form1" method="POST" action="">
+                            <div class="table-responsive">
+                                <table id="example2" class="table table-hover table-striped align-middle">
+                                    <thead class="thead-light">
+                                    <tr>
+                                        <th style="width:40px;">
+                                            <div class="form-check">
+                                                <input class="form-check-input lead-checkbox" type="checkbox"
+                                                       checked value="" id="select-all">
+                                                <label id="select-all-lbl" class="form-check-label" for="select-all">
+                                                    Deselect all
+                                                </label>
+                                            </div>
+                                        </th>
+                                        <th style="width:50px;">#</th>
+                                        <th>Campaign</th>
+                                        <th>Full Name</th>
+                                        <th>Phone</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th>Assign To</th>
+                                        <th>Created</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    @php $k = 1; @endphp
+                                    @foreach($archivedLeads as $key => $lead)
+                                        <tr id="row_{{ $lead->id }}">
+                                            <td>
+                                                <div class="form-check">
+                                                    <input type="checkbox" name="lead_ids[]"
+                                                           id="lead-{{ $lead->id }}"
+                                                           value="{{ $lead->id }}"
+                                                           class="lead-checkbox form-check-input" checked/>
+                                                </div>
+                                            </td>
+                                            <td>{{ $k }}</td>
+                                            <td>{{ $lead->campaign_name ?? '—' }}</td>
+                                            <td>{{ $lead->full_name ?? '—' }}</td>
+                                            <td>
+                                                @if($lead->phone_number)
+                                                    <a href="tel:{{ $lead->phone_number }}" class="text-reset">
+                                                        <i class="fas fa-phone-alt text-muted mr-1"></i>
+                                                        {{ $lead->phone_number }}
+                                                    </a>
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($lead->email)
+                                                    <a href="mailto:{{ $lead->email }}" class="text-reset">
+                                                        {{ $lead->email }}
+                                                    </a>
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-{{ $lead->status->name === 'New' ? 'primary' : 'danger' }}">
+                                                    {{ $lead->status->name }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <select class="form-control form-control-sm select2 sales-select"
+                                                        required
+                                                        name="sales_ids[{{ $lead->id }}]"
+                                                        id="sales_ids_{{ $lead->id }}">
+                                                    <option value=""></option>
+                                                    @foreach ($sales as $role => $employees)
+                                                        <optgroup label="{{ ucfirst(str_replace('-', ' ', $role)) }}">
+                                                            @foreach ($employees as $salesEmp)
+                                                                <option value="{{ $salesEmp->id }}">
+                                                                    {{ $salesEmp->name }}
+                                                                </option>
+                                                            @endforeach
+                                                        </optgroup>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ date('d/m/Y h:i A', strtotime($lead->created_at)) }}
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        @php $k++; @endphp
+                                    @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="loader" style="text-align: center; display: none;">
+                        <img src="{{ asset('dist/img/loading2.gif') }}" width="100"/>
+                    </div>
+                </div>
             </div>
-            <!-- /.card -->
         </div>
     </div>
 @endsection
 
 @section('script')
-
-    <!-- PAGE SCRIPTS -->
-    <script src="{{ asset('dist/js/pages/dashboard2.js') }}"></script>
-    <!-- Select2 -->
-    <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+    <script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js') }}"></script>
 
     <script>
-        function getParams(url, formId) {
-            console.log(formId);
-            const form = document.getElementById(formId);
-            const formData = new FormData(form);
-
-            let i = 0;
-            for (var pair of formData.entries()) {
-                if (pair[0] === '_token') {
-                    continue;
-                }
-
-                if (pair[1] !== '') {
-                    if (i == 0) {
-                        url += '?' + pair[0] + '=' + pair[1];
-                    } else {
-                        url += '&' + pair[0] + '=' + pair[1];
-                    }
-                    i++;
-                }
-            }
-
-            return url;
-        }
+        const Toast = Swal.mixin({
+            toast: true,
+            background: '#E3E5E8',
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+        });
 
         $(function () {
-            $("#ok-id").on('click', () => {
-                const url = getParams('/tickets/all/', 'form-id');
-                location.href = url;
-            });
-
-            $("#ok-filter").on('click', () => {
-                const url = getParams('/tickets/all/', 'filter-form');
-                location.href = url;
-            });
-
-            $("#flip").click(function () {
-                $("#filter-form").slideToggle("slow");
-                const element = document.getElementById('angle1');
-                const style = element.getAttribute('class');
-                const attr = style === 'fas fa-angle-down' ? 'fas fa-angle-up' : 'fas fa-angle-down';
-                element.setAttribute('class', attr);
-            });
-
-            //Initialize Select2 Elements
-            $('.select2').select2();
-
-            //Initialize Select2 Elements
-            $('.select2bs4').select2({
-                theme: 'bootstrap4'
-            });
-
             $('#example2').DataTable({
-                "paging": true,
-                "lengthChange": false,
-                "searching": false,
-                "ordering": true,
-                "info": true,
-                "autoWidth": false,
-                "responsive": true,
-                "pageLength": 15,
-                "order": [
-                    [0, "desc"]
-                ]
+                paging: true,
+                lengthChange: false,
+                searching: false,
+                ordering: true,
+                info: true,
+                autoWidth: false,
+                responsive: true,
+                pageLength: 50,
+            });
+
+            $('.select2').select2({
+                placeholder: 'Select sales',
+                width: '100%',
             });
         });
 
+        const selectAll = document.getElementById('select-all');
+        const label     = document.getElementById('select-all-lbl');
+
+        selectAll.checked  = true;
+        label.textContent  = 'Deselect all';
+
+        selectAll.addEventListener('click', () => {
+            const checked = selectAll.checked;
+            document.querySelectorAll('.lead-checkbox').forEach(box => box.checked = checked);
+            label.textContent = checked ? 'Deselect all' : 'Select all';
+        });
+
+        function deleteRow(rowId) {
+            const row = document.getElementById(rowId);
+            if (row) row.parentNode.removeChild(row);
+        }
+
         async function deleteTicket(id) {
-            if (confirm('Are you sure?')) {
-                const token = '{{ csrf_token() }}';
-                try {
-                    let response = await fetch('/tickets/delete/' + id, {
-                        method: 'DELETE',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-Token': token,
-                        },
-                    });
+            const confirmResult = await Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!'
+            });
 
-                    response = await response.json();
+            if (!confirmResult.value) return;
 
-                    if (response.error) {
-                        alert(response.error);
-                        console.log(response);
-                    } else if (response.OK) {
-                        location.reload();
+            const token = '{{ csrf_token() }}';
+
+            try {
+                Swal.fire({
+                    title: 'Please wait!',
+                    imageUrl: '{{ asset('dist/img/loading2.gif') }}',
+                    imageWidth: 128,
+                    imageHeight: 128,
+                    imageAlt: 'Deleting..',
+                    showConfirmButton: false,
+                });
+
+                const resp   = await axios.delete('/tickets/delete/' + id, {
+                    withCredentials: true,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': token,
                     }
-                } catch (e) {
-                    console.log(e);
+                });
+                const result = resp.data;
+
+                Swal.close();
+
+                if (result.OK) {
+                    const table = $('#example2').DataTable();
+                    const row   = document.getElementById('row_' + id);
+                    if (row) table.row(row).remove().draw();
+                    Toast.fire({ icon: 'success', title: 'Deleted successfully!' });
+                } else {
+                    Toast.fire({ icon: 'warning', title: 'Could not delete the ticket.' });
                 }
+            } catch (e) {
+                Swal.close();
+                const errors = Object.values(e.response?.data ?? {}).join('\n') || 'Unexpected error occurred.';
+                Toast.fire({ icon: 'warning', title: errors });
+            }
+        }
+
+        async function restoreTickets() {
+            document.getElementById('fb-data-table').style.display = 'none';
+            document.getElementById('loader').style.display = '';
+
+            const token    = '{{ csrf_token() }}';
+            const form     = document.getElementById('form1');
+            const formData = new FormData(form);
+            const leadIds  = formData.getAll('lead_ids[]').filter(id => id !== '');
+
+            if (leadIds.length === 0) {
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('fb-data-table').style.display = '';
+                Toast.fire({ icon: 'warning', title: 'No leads selected!' });
+                return;
+            }
+
+            let data = { details: {}, manual: 'Manual' };
+
+            for (const leadId of leadIds) {
+                const salesId = formData.get(`sales_ids[${leadId}]`);
+                if (!salesId) {
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('fb-data-table').style.display = '';
+                    Toast.fire({ icon: 'warning', title: 'Please select sales for all selected leads!' });
+                    return;
+                }
+                data.details[leadId] = salesId;
+            }
+
+            try {
+                const resp   = await axios.post('/tickets/restoreLeads/', data, {
+                    withCredentials: true,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': token,
+                    }
+                });
+                const result = resp.data;
+
+                if (result.OK !== undefined) {
+                    document.getElementById('loader').style.display = 'none';
+                    const title = result.OK > 0
+                        ? result.OK + ' lead' + (result.OK > 1 ? 's have' : ' has') + ' been successfully restored'
+                        : 'No leads for now!';
+                    Toast.fire({ icon: 'success', title });
+                    setTimeout(() => window.location.href = window.location.pathname + '?r=' + Date.now(), 2000);
+                }
+            } catch (e) {
+                Swal.close();
+                const errors = Object.values(e.response?.data ?? {}).join('\n') || 'Unexpected error occurred.';
+                Toast.fire({ icon: 'warning', title: errors });
+            }
+        }
+
+        async function ignoreLeads() {
+            const form     = document.getElementById('form1');
+            const formData = new FormData(form);
+            const leadIds  = formData.getAll('lead_ids[]').filter(id => id !== '');
+
+            if (leadIds.length === 0) {
+                Toast.fire({ icon: 'warning', title: 'No selected leads!' });
+                return;
+            }
+
+            const confirmResult = await Swal.fire({
+                title: 'Are you sure?',
+                text: "You CANNOT restore ignored leads.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, proceed',
+                cancelButtonText: 'Cancel'
+            });
+
+            if (!confirmResult.value) return;
+
+            const token = '{{ csrf_token() }}';
+
+            try {
+                Swal.fire({
+                    title: 'Please wait!',
+                    imageUrl: '{{ asset('dist/img/loading2.gif') }}',
+                    imageWidth: 128,
+                    imageHeight: 128,
+                    imageAlt: 'Processing...',
+                    showConfirmButton: false,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                });
+
+                const resp     = await axios.put('/tickets/ignoreLeads/archive', { lead_ids: leadIds }, {
+                    withCredentials: true,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': token,
+                    }
+                });
+                const response = resp.data;
+
+                Swal.close();
+
+                if (response.OK !== undefined) {
+                    const title = response.OK > 0
+                        ? response.OK + ' archived lead' + (response.OK > 1 ? 's have' : ' has') + ' been successfully ignored'
+                        : 'No leads for now!';
+                    Toast.fire({ icon: 'success', title });
+                    setTimeout(() => window.location.href = window.location.pathname + '?r=' + Date.now(), 2000);
+                }
+            } catch (e) {
+                Swal.close();
+                const errors = Object.values(e.response?.data ?? {}).join('\n') || 'Unexpected error occurred.';
+                Toast.fire({ icon: 'warning', title: errors });
             }
         }
     </script>

@@ -8,7 +8,7 @@
     <title>Leads CRM - Management Dashboard</title>
     <meta property="og:title" content="Leads CRM">
     <meta property="og:description" content="Manage you Leads from different sources using our advanced CRM">
-    <meta property="og:image" content="{{ asset('dist/img/leads-logo-bg.png') }}">
+    <meta property="og:image" content="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}">
     <meta property="og:url" content="{{ env('APP_URL') }}">
     <meta property="og:type" content="website">
 
@@ -18,6 +18,9 @@
     <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
     <!-- DataTables -->
     <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <!-- Tempusdominus Bootstrap 4 -->
+    <link rel="stylesheet"
+          href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
     <!-- Select2 -->
     <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
@@ -37,6 +40,14 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css"/>
 
     <style>
+        .sidebar {
+            background-color: {{ config('app.theme_color') }} !important;
+        }
+
+        .brand-link {
+            background-color: {{ config('app.theme_color') }} !important;
+        }
+
         .custom-map-control-button {
             appearance: button;
             background-color: #fff;
@@ -61,9 +72,10 @@
     </style>
 
     <!-- Favicon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('dist/img/favicons/favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('dist/img/favicons/apple-touch-icon.png') }}?v={{ config('app.build_version') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('dist/img/favicons/favicon-32x32.png') }}?v={{ config('app.build_version') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('dist/img/favicons/favicon-16x16.png') }}?v={{ config('app.build_version') }}">
     <link rel="manifest" href="{{ asset('dist/img/favicons/site.webmanifest') }}">
 </head>
 <body class=" hold-transition sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed
@@ -77,10 +89,10 @@
                 <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
             </li>
             <li class="nav-item d-none d-sm-inline-block">
-                <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+                <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
                    class="nav-link"><i class="fas fa-chart-area"></i> Reports</a>
             </li>
-            <li class="nav-item d-none d-sm-inline-block">
+            <li class="nav-item">
                 <a class="nav-link"
                    href="{{ route('logout') }}"
                    onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
@@ -93,15 +105,73 @@
             </li>
         </ul>
 
+        <!-- Right navbar links -->
+        <ul class="navbar-nav ml-auto" style="margin-right: 20px;">
+            <!-- Notifications Dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link" data-toggle="dropdown" href="#">
+                    <i class="far fa-bell"></i>
+
+                    @php
+                        $count = $headerUnreadCount ?? 0;
+                        $headerUnreadCount = $count > 99 ? '99+' : $count;
+                    @endphp
+
+                    <span
+                        id="notif-count-badge"
+                        class="badge badge-warning navbar-badge"
+                        data-count="{{ $count }}"
+                    >
+                        {{ $headerUnreadCount }}
+                    </span>
+
+                </a>
+
+                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+                    <span class="dropdown-item dropdown-header">
+                        {{ isset($headerNotifications) ? $headerNotifications->count() : 0 }} Notifications
+                    </span>
+
+                    <div class="dropdown-divider"></div>
+
+                    <div id="notif-dropdown-container">
+                        @forelse($headerNotifications ?? [] as $notif)
+                            <a href="{{ route('notifications.show', $notif->id) }}"
+                               class="dropdown-item {{ $notif->is_read ? '' : 'font-weight-bold' }}">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                {{ $notif->title }}
+
+                                <br>
+                                <small class="text-muted">
+                                    {{ \Illuminate\Support\Str::limit($notif->body, 40) }}
+                                </small>
+
+                                <span class="float-right text-muted text-sm">
+                                    {{ $notif->created_at->diffForHumans() }}
+                                </span>
+                            </a>
+
+                            <div class="dropdown-divider"></div>
+                        @empty
+                            <span class="dropdown-item text-center text-muted"> No notifications </span>
+                        @endforelse
+                    </div>
+                    <a href="{{ route('notifications.index') }}" class="dropdown-item dropdown-footer">
+                        See All Notifications
+                    </a>
+                </div>
+            </li>
+        </ul>
+
     </nav>
     <!-- /.navbar -->
 
     <!-- Main Sidebar Container -->
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
         <!-- Brand Logo -->
-        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
            class="brand-link">
-            <img src="{{ asset('dist/img/leads-logo-bg.png') }}" alt="AdminLTE Logo"
+            <img src="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}" alt="{{ config('app.name') }} Logo"
                  class="brand-image img-circle elevation-3"
                  style="opacity: .8">
             <span class="brand-text font-weight-light"><strong
@@ -113,7 +183,7 @@
             <!-- Sidebar user panel (optional) -->
             <div class="user-panel mt-3 pb-3 mb-3 d-flex">
                 <div class="image">
-                    <img src="{{ asset('dist/img/user2-160x160.jpg') }}" class="img-circle elevation-2"
+                    <img src="{{ asset('dist/img/user_placeholder.jpg') }}" class="img-circle elevation-2"
                          alt="User Image">
                 </div>
                 <div class="info">
@@ -128,7 +198,7 @@
                     <!-- Add icons to the links using the .nav-icon class
                          with font-awesome or any other icon font library -->
                     <li class="nav-item">
-                        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+                        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
                            class="nav-link {{ Route::currentRouteName() == ''  ? 'active' : ''}}">
                             <i class="nav-icon fas fa-home"></i>
                             <p>
@@ -177,19 +247,15 @@
                         <ul class="nav nav-treeview">
                             <li class="nav-item">
                                 @can('list tickets')
-                                    <a href="{{ route('tickets.all', [ 'from' => date('Y-m-01'), 'to' => date("Y-m-d")]) }}"
+                                    <a href="{{ route('tickets.all', [ 'updated_from' => date('Y-m-01'), 'updated_to' => date("Y-m-d")]) }}"
                                        class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.all') !== false  ? 'active' : '' }}">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Show All</p>
                                     </a>
                                 @endcan
-                                @can('list tickets')
-                                    <a href="/tickets/all?fstatus=re-shuffled"
-                                       class="nav-link {{ strpos(Route::currentRouteName(), 're-shuffled') !== false  ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Re-shuffled Leads</p>
-                                    </a>
-                                @endcan
+
+                                <!-- Re-shuffled has been removed! -->
+
                                 @can('create invoice')
                                     @if(auth()->user()->hasRole('accountant'))
                                         <a href="{{ route('tickets.all') }}"
@@ -262,15 +328,6 @@
                                 </li>
                             @endcan
 
-                                @can('facebook import')
-                                    <li class="nav-item">
-                                        <a href="{{ route('tickets.showImports', ['googleAds']) }}"
-                                           class="nav-link {{ strpos(Route::currentRouteName(), 'tickets.showImports') !== false && strpos(request()->route('source'), 'googleAds') !== false ? 'active' : ''}}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Google Ads import</p>
-                                        </a>
-                                    </li>
-                                @endcan
                         </ul>
                     </li>
 
@@ -293,6 +350,34 @@
                             </li>
                         </ul>
                     </li>
+
+                    <li class="nav-item has-treeview {{ (strpos(Route::currentRouteName(), 'settings') !== false)  ? 'menu-open' : '' }}">
+                        <a href=""
+                           class="nav-link {{ strpos(Route::currentRouteName(), 'settings') !== false  ? 'active' : ''}}">
+                            <i class="nav-icon fas fa-cog"></i>
+                            <p>
+                                System Settings
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('settings.index') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'settings.index') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>General</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('settings.status') }}"
+                                   class="nav-link {{ strpos(Route::currentRouteName(), 'settings.status') !== false  ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Status</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
                     @endhasrole
                 </ul>
             </nav>
@@ -342,7 +427,7 @@
         <strong>Copyright &copy; 2021 - {{ date("Y") }} | <a href="#">Leads CRM</a>.</strong>
         All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
-            <b>Version</b> {{ env('APP_VERSION') }}
+            <b>Version</b> {{ config('app.build_version') }}
         </div>
     </footer>
 </div>
@@ -368,24 +453,278 @@
 <script src="{{ asset('dist/js/demo.js') }}"></script>
 
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<!-- Tempusdominus Bootstrap 4 -->
+<script src="{{ asset('plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js') }}"></script>
+
 <!-- Select 2 -->
 <script src="{{ asset('plugins/select2/js/select2.min.js') }}"></script>
 
-<script type="module">
-    // Import the functions you need from the SDKs you need
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-analytics.js";
-    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.0.2/firebase-messaging.js";
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+<script src="{{ asset('plugins/sweetalert2/sweetalert2.min.js')}}"></script>
 
+<script type="module">
     var firebaseConfig = {
-        apiKey: "AIzaSyCJyExVqmT0cLM60nO5HF1my0dopyqRoWI",
-        authDomain: "leads-crm-4553d.firebaseapp.com",
-        projectId: "leads-crm-4553d",
-        storageBucket: "leads-crm-4553d.appspot.com",
-        messagingSenderId: "388756731314",
-        appId: "1:388756731314:web:e147dfc6ec4936c67860ab"
+        apiKey: "AIzaSyDkHR17YYFalO2XmQJ9xqrg5madLpntIuc",
+        authDomain: "wrs-ae-leads.firebaseapp.com",
+        projectId: "wrs-ae-leads",
+        storageBucket: "wrs-ae-leads.firebasestorage.app",
+        messagingSenderId: "1039605684936",
+        appId: "1:1039605684936:web:7fd3e40af79c0a2c13e3fd",
     };
 
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
+
+    // لازم تسجّل الـ service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then(function (registration) {
+                // console.log("SW registered:", registration);
+            })
+            .catch((err) => console.log("SW registration failed:", err));
+    }
+
+    function initFirebaseMessagingRegistration() {
+        messaging.getToken({
+            vapidKey: 'BGxpOp_utb49WjMA5lMaOD5IM2n1MX_-i3wymmKnSMHuMIp4JuCMrPcLnfZN9IeJtPVwAcqNjo8eW_D_uWR-lYk'
+        }).then((currentToken) => {
+            if (currentToken) {
+                if (!currentToken) {
+                    console.log('No registration token available. Request permission to generate one.');
+                    return;
+                }
+
+                // 👇 كشف إذا الجهاز موبايل
+                var ua = navigator.userAgent || navigator.vendor || window.opera;
+                var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
+                var deviceType = isMobile ? 'mobile-browser' : 'desktop'; // أو 'desktop' بدل 'web' لو حاب تفرق
+
+                var lastToken = localStorage.getItem('fcm_token');
+                var lastDeviceType = localStorage.getItem('fcm_device_type');
+
+                // نفس التوكن ونفس النوع؟ لا ترسل شي
+                if (lastToken === currentToken && lastDeviceType === deviceType) {
+                    return;
+                }
+
+                fetch('{{ url('/fcm/token') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token: currentToken,
+                        device_type: deviceType
+                    })
+                })
+                    .then(function (res) {
+                        return res.json();
+                    })
+                    .then(function (data) {
+                        console.log('FCM token saved:', data);
+                        localStorage.setItem('fcm_token', currentToken);
+                        localStorage.setItem('fcm_device_type', deviceType);
+                    })
+                    .catch(function (err) {
+                        console.error('Error saving FCM token:', err);
+                    });
+            }
+        }).catch((err) => {
+            console.log('Error retrieving FCM token:', err);
+        });
+    }
+
+    function askForNotificationPermission() {
+        const status = Notification.permission; // granted, default, denied
+
+        // Already enabled
+        if (status === 'granted') {
+            initFirebaseMessagingRegistration();
+            return;
+        }
+
+        if (status === 'denied') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Notifications are blocked!',
+                text: 'Please enable notifications manually from your browser settings.',
+            });
+            return;
+        }
+
+        // status === 'default' → نطلب الإذن عبر Swal
+        Swal.fire({
+            title: 'Enable Notifications?',
+            text: "We'll enable notifications permission.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Enable'
+        }).then((result) => {
+            if (result.value) {
+                // ⚠️ مهم جداً: هذا طلب الإذن الآن داخل event ناتج عن المستخدم!
+                Notification.requestPermission().then((permission) => {
+                    if (permission === 'granted') {
+                        initFirebaseMessagingRegistration();
+
+                        Swal.fire(
+                            'Enabled!',
+                            'Desktop notifications have been enabled successfully.',
+                            'success'
+                        );
+                    } else {
+                        Swal.fire(
+                            'Not enabled',
+                            'Notifications permission was not granted.',
+                            'info'
+                        );
+                    }
+                });
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        askForNotificationPermission();
+    });
+
+    const Toast = Swal.mixin({
+        toast: true,
+        background: '#E3E5E8',
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 4000,
+    });
+
+    function updateNotificationCountFromPayload(payload) {
+        var badge = document.getElementById('notif-count-badge');
+        if (!badge) {
+            return;
+        }
+
+        var currentCount = parseInt(
+            badge.getAttribute('data-count') || badge.textContent || '0',
+            10
+        );
+
+        var newCount = currentCount;
+
+        if (payload && payload.data && typeof payload.data.unread_count !== 'undefined') {
+            newCount = parseInt(payload.data.unread_count, 10);
+
+            if (isNaN(newCount) || newCount < 0) {
+                newCount = 0;
+            }
+        } else {
+            newCount = currentCount + 1;
+        }
+
+        badge.setAttribute('data-count', newCount);
+
+        if (newCount === 0) {
+            badge.classList.add('d-none');
+            badge.textContent = '0';
+        } else {
+            badge.classList.remove('d-none');
+            badge.textContent = newCount;
+        }
+    }
+
+    function prependNotificationToDropdown(payload) {
+        var container = document.getElementById('notif-dropdown-container');
+        if (!container) return;
+
+        // لو الإشعار بدون عنوان/جسم → تجاهله
+        if (!payload?.data?.title) return;
+
+        // تحضير الرابط عبر show()
+        var notifId = payload?.data?.notification_id ?? null;
+        var notifUrl = notifId
+            ? '/notifications/' + notifId      // يمر عبر Laravel → يحدّث is_read & clicked_at
+            : (payload?.data?.url ?? '#');
+
+        // نص مختصر للجسم
+        var bodyShort = payload.data.body.length > 40
+            ? payload.data.body.substring(0, 40) + '...'
+            : payload.data.body;
+
+        // بناء HTML للإشعار الجديد (غير مقروء)
+        var html = `
+        <a href="${notifUrl}" class="dropdown-item font-weight-bold"
+           style="background-color: #f5f7fa;">
+            <i class="fas fa-info-circle mr-2"></i>
+            ${payload.data.title}
+            <div class="text-muted text-sm">${bodyShort}</div>
+            <span class="float-right text-muted text-sm">Just now</span>
+        </a>
+        <div class="dropdown-divider"></div>
+    `;
+
+        // إضافة الإشعار أعلى القائمة (prepend)
+        container.insertAdjacentHTML('afterbegin', html);
+    }
+
+    function trimNotificationDropdown(limit = 5) {
+        var container = document.getElementById('notif-dropdown-container');
+        if (!container) return;
+
+        // اجلب كل العناصر من نوع dropdown-item (كل إشعار)
+        var items = container.querySelectorAll('.dropdown-item');
+
+        if (items.length <= limit) {
+            return; // تمام، ما في شي لقصّه
+        }
+
+        // نحذف الزايد (من آخر القائمة)
+        for (var i = limit; i < items.length; i++) {
+            var item = items[i];
+
+            // نحذف الـ divider اللي بعدو (إن وجد)
+            var divider = item.nextElementSibling;
+            if (divider && divider.classList.contains('dropdown-divider')) {
+                divider.remove();
+            }
+
+            // نحذف الإشعار نفسه
+            item.remove();
+        }
+    }
+
+    // استقبال إشعارات foreground
+    messaging.onMessage(function (payload) {
+        console.log('Message received. ', payload);
+
+        updateNotificationCountFromPayload(payload);
+        prependNotificationToDropdown(payload);
+        trimNotificationDropdown(10);
+
+        Swal.fire({
+            toast: true,
+            title: payload.data.title,
+            text: payload.data.body,
+            imageUrl: "/dist/img/notif_icon.png",
+            imageWidth: 40,
+            imageHeight: 40,
+            imageAlt: "Notifications",
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 4000,
+
+            onOpen: (toast) => {
+                toast.style.cursor = 'pointer';
+                toast.addEventListener('click', () => {
+                    if (payload.data.url) {
+                        window.open(payload.data.url, '_blank');
+                    }
+                });
+            }
+        });
+    });
+
+    /*
     window.addEventListener("load", (e) => {
         initFirebaseMessagingRegistration();
     });
@@ -418,6 +757,7 @@
             // alert(payload.data.notification);
         });
     }
+    */
 </script>
 
 @yield('script')
