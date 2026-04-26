@@ -16,6 +16,8 @@ use App\Models\Ticket;
 use App\Models\TicketPath;
 use App\Models\User;
 use App\Services\LeadAutoAssignService;
+use Exception;
+use Illuminate\Validation\ValidationException;
 use Mccarlosen\LaravelMpdf\Facades\LaravelMpdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -2190,8 +2192,8 @@ public function devTest()
 
             //$this->validateLead($request);
 
-            $newStatus = Status::where('slug', 'new')->first()->id;
-            $duplicatedStatus = Status::whereName('duplicated')->first()->id;
+            $newStatus = Status::where('name', Status::NEW)->first()->id;
+            $duplicatedStatus = Status::where('name', Status::DUPLICATED)->first()->id;
 
             $phone = $request->phone_number ?? $request->phone ?? null;
 
@@ -2241,12 +2243,12 @@ public function devTest()
 
             // Return a success response
             return response()->json(['message' => 'Lead stored successfully', 'lead' => $lead], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             // Rollback the transaction if there's an error
             DB::rollBack();
 
             return response()->json(['error' => $e->getMessage()], 500);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Rollback the transaction if there's an error
             DB::rollBack();
 
