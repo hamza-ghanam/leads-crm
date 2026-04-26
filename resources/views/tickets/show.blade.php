@@ -233,11 +233,7 @@
                             <dt>Extra Data</dt>
                             <dd>
                                 @if($ticket->extra_data)
-                                    <ul class="mb-0 pl-3">
-                                        @foreach($ticket->extra_data as $key => $value)
-                                            <li><strong>{{ $key }}</strong>: {{ is_array($value) ? implode(', ', $value) : $value }}</li>
-                                        @endforeach
-                                    </ul>
+                                    @include('tickets.partials.nested-list', ['items' => $ticket->extra_data])
                                 @else
                                     <span class="text-muted"><i>No extra data available.</i></span>
                                 @endif
