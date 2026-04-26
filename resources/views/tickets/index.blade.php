@@ -498,7 +498,7 @@
             letter-spacing: 0.3px;
             border-radius: 0.25rem;
         }
-        table#example20 td, table#example20 th { vertical-align: middle; }
+        table#example20 td, table#example20 th { vertical-align: middle; white-space: nowrap; }
         table#example20 tbody tr { transition: background-color 0.15s ease-in-out; }
     </style>
 @endsection
@@ -545,8 +545,9 @@
                 searching: false,
                 ordering: true,
                 info: false,
-                responsive: true,
+                responsive: false,
                 autoWidth: false,
+                scrollX: false,
             });
 
             $('#flip').on('click', function () {

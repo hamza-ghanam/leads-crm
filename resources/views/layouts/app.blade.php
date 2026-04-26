@@ -92,7 +92,7 @@
                 <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
                    class="nav-link"><i class="fas fa-chart-area"></i> Reports</a>
             </li>
-            <li class="nav-item d-none d-sm-inline-block">
+            <li class="nav-item">
                 <a class="nav-link"
                    href="{{ route('logout') }}"
                    onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
@@ -112,12 +112,17 @@
                 <a class="nav-link" data-toggle="dropdown" href="#">
                     <i class="far fa-bell"></i>
 
+                    @php
+                        $count = $headerUnreadCount ?? 0;
+                        $headerUnreadCount = $count > 99 ? '99+' : $count;
+                    @endphp
+
                     <span
                         id="notif-count-badge"
-                        class="badge badge-warning navbar-badge {{ ($headerUnreadCount ?? 0) > 0 ? '' : 'd-none' }}"
-                        data-count="{{ $headerUnreadCount ?? 0 }}"
+                        class="badge badge-warning navbar-badge"
+                        data-count="{{ $count }}"
                     >
-                        {{ $headerUnreadCount ?? 0 }}
+                        {{ $headerUnreadCount }}
                     </span>
 
                 </a>
@@ -164,7 +169,7 @@
     <!-- Main Sidebar Container -->
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
         <!-- Brand Logo -->
-        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?from=' . date('Y-m-01') . '&to=' . date("Y-m-d")) : URL::to('/') }}"
+        <a href="{{ auth()->user()->hasAnyRole(['super-admin', 'sales-manager']) ? URL::to('/?updated_from=' . date('Y-m-01') . '&updated_to=' . date("Y-m-d")) : URL::to('/') }}"
            class="brand-link">
             <img src="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}" alt="{{ config('app.name') }} Logo"
                  class="brand-image img-circle elevation-3"
