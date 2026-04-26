@@ -9,7 +9,7 @@
     <meta property="og:title" content="Leads CRM">
     <meta property="og:description" content="Manage you Leads from different sources using our advanced CRM">
     <meta property="og:image" content="{{ asset('dist/img/app_thumb.png') }}?v={{ config('app.build_version') }}">
-    <meta property="og:url" content="{{ env('APP_URL') }}">
+    <meta property="og:url" content="{{ config('url') }}">
     <meta property="og:type" content="website">
 
     <!-- Font Awesome Icons -->
