@@ -24,7 +24,7 @@ class NotificationController extends Controller
         $user = auth()->user();
 
         // تأكد إن الإشعار تابع للمستخدم الحالي
-        if ($notification->user_id !== $user->id) {
+        if ($notification->user_id !== $user->id && !$user->hasRole('super-admin')) {
             abort(Response::HTTP_FORBIDDEN);
         }
 
