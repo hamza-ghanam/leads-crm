@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Greywolf
+      - name: Deploy WRS AE
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.WRS_SERVER_IP }}
