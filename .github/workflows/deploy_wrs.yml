@@ -15,6 +15,7 @@ jobs:
           host: ${{ secrets.WRS_SERVER_IP }}
           username: ${{ secrets.WRS_SERVER_USER }}
           key: ${{ secrets.WRS_SSH_KEY }}
+	  passphrase: ${{ secrets.WRS_SSH_PASSPHRASE }}
           port: 9128
           script: |
             cd /home/wrsaeae/leads.wrsae.ae
