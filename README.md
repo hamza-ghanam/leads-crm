@@ -1,65 +1,175 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Leads CRM
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A real estate lead management system built with Laravel. It centralises leads from multiple sources (Facebook/Meta, Zapier, manual import), routes them to the right sales reps, and tracks every lead through the full sales pipeline to a closed deal.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Lead ingestion** — Facebook/Meta Leads API webhook, Zapier webhook, Excel bulk import, manual entry
+- **Sales pipeline** — 14 configurable statuses (New → Follow-up → Meeting → Booking → Sold, and more)
+- **Automated routing** — round-robin auto-assignment based on availability, campaign, and working hours
+- **Booking & invoicing** — attach booking details, invoices, and customer documents (passport, reservation form) per lead
+- **Role-based access** — 7 roles with 13 fine-grained permissions
+- **Notifications** — in-app, Firebase FCM push, and email (follow-up reminders, status changes)
+- **Scheduled tasks** — follow-up reminders every 5 min, Zapier auto-import every 30 min, auto-reassignment every 15 min
+- **Reporting** — dashboard with per-status lead counts, activity log, lead path audit trail
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Layer | Technology |
+|---|---|
+| Backend | Laravel 12, PHP 8.2+ |
+| Database | MySQL |
+| Frontend | Bootstrap 5, jQuery 3.6, Laravel Mix |
+| Auth & RBAC | Laravel Sanctum, Spatie/Permission v6 |
+| Push notifications | Firebase FCM, Pusher |
+| PDF generation | Laravel MPDF |
+| Excel import | Maatwebsite/Excel |
 
-## Learning Laravel
+## Requirements
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- PHP 8.2+
+- Composer
+- Node.js 18+ & npm
+- MySQL 8+
+- A Firebase project (for push notifications)
+- A Pusher app (for real-time in-app notifications)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Installation
 
-## Laravel Sponsors
+```bash
+# 1. Clone the repo
+git clone <repo-url>
+cd leads-crm
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+# 2. Install PHP dependencies
+composer install
 
-### Premium Partners
+# 3. Install JS dependencies
+npm install
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[CMS Max](https://www.cmsmax.com/)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+# 4. Copy and configure environment
+cp .env.example .env
+php artisan key:generate
 
-## Contributing
+# 5. Run migrations and seed roles/permissions
+php artisan migrate
+php artisan db:seed
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# 6. Build frontend assets
+npm run production
+```
 
-## Code of Conduct
+## Environment Variables
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Key variables to set in `.env`:
 
-## Security Vulnerabilities
+```env
+APP_NAME="Leads CRM"
+APP_URL=https://your-domain.com
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# Database
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=leads_crm
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Mail
+MAIL_MAILER=smtp
+MAIL_HOST=
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=noreply@your-domain.com
+
+# Firebase (push notifications)
+FIREBASE_PROJECT=your-project-id
+FIREBASE_CREDENTIALS=/path/to/service-account.json
+
+# Pusher (real-time notifications)
+PUSHER_APP_ID=
+PUSHER_APP_KEY=
+PUSHER_APP_SECRET=
+PUSHER_APP_CLUSTER=
+BROADCAST_DRIVER=pusher
+
+# Queue (use database or redis in production)
+QUEUE_CONNECTION=database
+```
+
+## Scheduled Tasks
+
+Add this cron entry to run Laravel's scheduler:
+
+```
+* * * * * cd /path-to-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+The scheduler runs three automated tasks:
+
+| Command | Frequency | Purpose |
+|---|---|---|
+| `tickets:follow_up-reminder` | Every 5 min | Sends email + push reminders for follow-up leads |
+| `tickets:auto-import` | Every 30 min | Fetches new leads from Zapier-enabled sources |
+| `tickets:auto-reassign` | Every 15 min | Reassigns stale leads; moves to Dead if no agent available |
+
+All tasks respect configurable working hours set in General Settings.
+
+## Queue Workers
+
+If `QUEUE_CONNECTION` is set to `database` or `redis`, start a worker:
+
+```bash
+php artisan queue:work
+```
+
+## Roles & Permissions
+
+| Role | Key Capabilities |
+|---|---|
+| `super-admin` | Full access — all permissions, user management, settings |
+| `admin` | Manage leads and users; cannot approve, book, or invoice |
+| `sales-manager` | Manage team leads; can pre-approve or reject |
+| `sale` | View and update assigned leads; can book |
+| `tele-sale` | View and update assigned leads; can book |
+| `accountant` | View booked leads; can create invoices and mark as Sold |
+
+Roles and permissions are seeded via `php artisan db:seed`.
+
+## Webhook Endpoints
+
+| Method | URL | Purpose |
+|---|---|---|
+| `GET/POST` | `/api/webhooks/meta` | Facebook/Meta Leads API (signature-verified) |
+| `POST` | `/api/webhook/leads` | Zapier or any external lead source |
+
+## Project Structure
+
+```
+app/
+  Console/          # Scheduler and artisan commands
+  Http/Controllers/ # 18 controllers (Ticket, User, Meta, Notification…)
+  Imports/          # Excel import classes
+  Models/           # 17 models (Ticket, Booking, Meeting, User…)
+  Services/         # Business logic (LeadAutoAssign, Meta, Notification)
+  Helpers/          # Lead distribution helpers
+config/
+  constants.php     # Status colours and icons
+database/
+  migrations/       # 25 migration files
+  seeders/          # Role, Permission, Status seeders
+resources/views/
+  tickets/          # Lead list, detail, import, archive
+  users/            # User management
+  settings/         # General settings
+  notifications/    # Notification inbox
+routes/
+  web.php           # Web routes
+  api.php           # Webhook and API routes
+```
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Private / proprietary.

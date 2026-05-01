@@ -28,7 +28,7 @@
     <div class="row">
 
         {{-- Basic details --}}
-        <div class="col-{{ $booking ? 6 : 12 }}">
+        <div class="col-12 col-md-{{ $booking ? 6 : 12 }}">
             <div class="card shadow-sm">
                 <div class="card-header" style="background-color: {{ config('app.theme_color') }};">
                     <h3 class="card-title text-white mb-0">
@@ -257,7 +257,7 @@
 
         {{-- Booking details --}}
         @if($booking)
-            <div class="col-6">
+            <div class="col-12 col-md-6">
 
                 {{-- Booking info --}}
                 <div class="card shadow-sm">
