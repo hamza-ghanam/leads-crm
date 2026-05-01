@@ -1,0 +1,21 @@
+name: Deploy WRS AE
+
+on:
+  push:
+    branches:
+      - wrs-updates/base
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Greywolf
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.WRS_SERVER_IP }}
+          username: ${{ secrets.WRS_SERVER_USER }}
+          key: ${{ secrets.WRS_SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/wrsaeae/leads.wrsae.ae
+            ./deploy.sh
