@@ -1,0 +1,21 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - unique-saray-develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Unique Saray
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SARAY_SERVER_IP }}
+          username: ${{ secrets.SARAY_SERVER_USER }}
+          key: ${{ secrets.SARAY_SERVER_SSH_KEY }}
+          port: 22
+          script: |
+            cd /opt/deploy
+            ./deploy_leads_crm.sh
