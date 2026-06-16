@@ -37,7 +37,7 @@ class SalesCampaignController extends Controller
         )->value ?? '0';
 
         return view('salesCamps.index')->with([
-            'salesCamps' => SalesCampaign::all(),
+            'salesCamps' => SalesCampaign::with('user')->get(),
             'sales' => User::role(['sale', 'tele-sale'])->get(),
             'camp_assign_key' => $key,
             'camp_assign_value' => $campAssignValue, // 0 or 1

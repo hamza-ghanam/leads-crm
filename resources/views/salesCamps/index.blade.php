@@ -75,7 +75,7 @@
                                     <td>
                                         <a target="_blank" href="{{ route('users.edit', [$salesCamp->user_id]) }}">
                                             <i class="fas fa-user-circle text-muted mr-1"></i>
-                                            {{ $salesCamp->user->name }}
+                                            {{ optional($salesCamp->user)->name ?? 'Deleted User' }}
                                         </a>
                                     </td>
                                     <td>{{ $salesCamp->campaign_name }}</td>
